@@ -1,0 +1,265 @@
+<section class="intel-block" aria-labelledby="intel-delivery">
+  <h3 id="intel-delivery" i18n="@@intel.deliveryTitle">Delivery performance</h3>
+  @if (evidence().completedProjects === 0) {
+    <p i18n="@@intel.noDelivery">
+      No finalized closeout in this scope yet — no delivery evidence. This is missing evidence, not
+      poor performance.
+    </p>
+  } @else {
+    @if (evidence().completedProjects < 3) {
+      <p class="prj-note" i18n="@@intel.smallSample">
+        A small sample: read these figures as individual projects, not as a trend.
+      </p>
+    }
+    @if (notCompleted().length > 0) {
+      <!-- CF-048 (ADR-124): subcontracts that did not complete are named and counted; their cost and time are not in the figures below. -->
+      <p class="prj-note" role="note" data-testid="intel-outcome-types">
+        @for (item of notCompleted(); track item.type) {
+          <span class="prj-chip"
+            >{{ outcomeLabel(item.type) }}: <bdi dir="ltr">{{ item.count }}</bdi></span
+          >
+        }
+        <span i18n="@@intel.excludedFromVariance"
+          >Left out of the on-time and variance figures:
+          <bdi dir="ltr">{{ delivery().excludedFromVariance ?? 0 }}</bdi></span
+        >
+      </p>
+    }
+    <dl class="dc-facts">
+      <div>
+        <dt i18n="@@intel.onTime">On time</dt>
+        <dd>
+          <bdi dir="ltr">{{ rate(delivery().onTimeRatePercent) }}</bdi>
+          @if (delivery().onTime + delivery().late === 0) {
+            <span class="intel-sub" i18n="@@intel.onTimeNone"
+              >no project had an awarded duration to compare with</span
+            >
+          } @else {
+            <span class="intel-sub" i18n="@@intel.onTimeEvidence"
+              >within the awarded duration in <bdi dir="ltr">{{ delivery().onTime }}</bdi> of
+              <bdi dir="ltr">{{ delivery().onTime + delivery().late }}</bdi> projects with one</span
+            >
+          }
+          @if (delivery().noScheduleBaseline > 0) {
+            <span class="intel-sub" i18n="@@intel.noBaselineCount"
+              >no awarded duration (not counted):
+              <bdi dir="ltr">{{ delivery().noScheduleBaseline }}</bdi></span
+            >
+          }
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@intel.scheduleVariance">Duration against awarded</dt>
+        <dd>
+          <bdi dir="ltr">{{ percent(centralAt(delivery().scheduleVariance, 'percent')) }}</bdi>
+          <span class="intel-sub">
+            @switch (delivery().scheduleVariance.count) {
+              @case (0) {
+                <span i18n="@@intel.noVarianceSample">no project with a baseline</span>
+              }
+              @case (1) {
+                <span i18n="@@intel.oneProject">one project</span>
+              }
+              @default {
+                <span i18n="@@intel.medianOf"
+                  >median of <bdi dir="ltr">{{ delivery().scheduleVariance.count }}</bdi> · range
+                  <bdi dir="ltr">{{ range(delivery().scheduleVariance) }}</bdi></span
+                >
+              }
+            }
+          </span>
+        </dd>
+      </div>
+      @if (delivery().costVariance; as cost) {
+        <div>
+          <dt i18n="@@intel.costVariance">Final cost against award</dt>
+          <dd>
+            <bdi dir="ltr">{{ percent(centralAt(cost, 'percent')) }}</bdi>
+            <span class="intel-sub">
+              @switch (cost.count) {
+                @case (0) {
+                  <span i18n="@@intel.noVarianceSample">no project with a baseline</span>
+                }
+                @case (1) {
+                  <span i18n="@@intel.oneProject">one project</span>
+                }
+                @default {
+                  <span i18n="@@intel.medianOfCost"
+                    >median of <bdi dir="ltr">{{ cost.count }}</bdi> · range
+                    <bdi dir="ltr">{{ range(cost) }}</bdi></span
+                  >
+                }
+              }
+            </span>
+          </dd>
+        </div>
+      }
+      <div>
+        <dt i18n="@@intel.quality">Quality (internal 1–5)</dt>
+        <dd>
+          <bdi dir="ltr">{{ centralAt(delivery().quality, 'rating') ?? '—' }} / 5</bdi>
+          @if (delivery().quality.count >= 2) {
+            <span class="intel-sub" i18n="@@intel.ratingSample"
+              >median of <bdi dir="ltr">{{ delivery().quality.count }}</bdi> ·
+              <bdi dir="ltr">{{ range(delivery().quality, 'rating') }}</bdi></span
+            >
+          }
+          <span class="intel-sub"
+            ><span class="prj-visually-hidden" i18n="@@intel.ratingsGiven">Ratings given:</span>
+            <bdi dir="ltr">{{ distribution(delivery().qualityDistribution) }}</bdi></span
+          >
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@intel.hse">HSE / safety (internal 1–5)</dt>
+        <dd>
+          <bdi dir="ltr">{{ centralAt(delivery().hse, 'rating') ?? '—' }} / 5</bdi>
+          @if (delivery().hse.count >= 2) {
+            <span class="intel-sub" i18n="@@intel.ratingSample"
+              >median of <bdi dir="ltr">{{ delivery().hse.count }}</bdi> ·
+              <bdi dir="ltr">{{ range(delivery().hse, 'rating') }}</bdi></span
+            >
+          }
+          <span class="intel-sub"
+            ><span class="prj-visually-hidden" i18n="@@intel.ratingsGiven">Ratings given:</span>
+            <bdi dir="ltr">{{ distribution(delivery().hseDistribution) }}</bdi></span
+          >
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@intel.variations">Variations</dt>
+        <dd i18n="@@intel.variationPattern">
+          <bdi dir="ltr">{{ delivery().variations }}</bdi> on
+          <bdi dir="ltr">{{ delivery().projectsWithVariations }}</bdi> projects
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@intel.claims">Claims</dt>
+        <dd i18n="@@intel.claimPattern">
+          <bdi dir="ltr">{{ delivery().claims }}</bdi> on
+          <bdi dir="ltr">{{ delivery().projectsWithClaims }}</bdi> projects · unresolved
+          <bdi dir="ltr">{{ delivery().unresolvedClaims }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@intel.disputes">Disputes</dt>
+        <dd i18n="@@intel.disputePattern">
+          <bdi dir="ltr">{{ delivery().disputes }}</bdi> on
+          <bdi dir="ltr">{{ delivery().projectsWithDisputes }}</bdi> projects · unresolved
+          <bdi dir="ltr">{{ delivery().unresolvedDisputes }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@intel.rehire">Would work again</dt>
+        <dd i18n="@@intel.rehirePattern">
+          yes <bdi dir="ltr">{{ delivery().wouldWorkAgainYes }}</bdi> · conditional
+          <bdi dir="ltr">{{ delivery().wouldWorkAgainConditional }}</bdi> · no
+          <bdi dir="ltr">{{ delivery().wouldWorkAgainNo }}</bdi>
+        </dd>
+      </div>
+      <!-- CF-026 / CF-023: a composite exists only for one category, beside the components above — never across trades. -->
+      @if (categoryName(); as category) {
+        @if (delivery().outcomeScore; as score) {
+          <div data-testid="intel-composite">
+            <dt i18n="@@intel.compositeFor">
+              Composite for <bdi>{{ category }}</bdi> — used when a recommendation weighs history
+            </dt>
+            <dd>
+              <bdi dir="ltr">{{ score }} / 100</bdi>
+              <span class="intel-sub" i18n="@@intel.outcomeScoreEvidence"
+                >mean of <bdi dir="ltr">{{ evidence().completedProjects }}</bdi> project scores ·
+                rule <bdi dir="ltr" class="ltr-token">{{ delivery().outcomeScoreRule }}</bdi></span
+              >
+            </dd>
+          </div>
+        }
+      } @else if (delivery().outcomeScore) {
+        <div>
+          <dt i18n="@@intel.compositeAllTitle">Composite</dt>
+          <dd class="intel-sub" i18n="@@intel.compositeAll">
+            Choose a category to see its composite: scores of different trades are never combined.
+          </dd>
+        </div>
+      }
+    </dl>
+    <details class="intel-why">
+      <summary i18n="@@intel.deliveryWhy">How is delivery evidence calculated?</summary>
+      <ul>
+        <li i18n="@@intel.whyVariance">
+          Variances = (actual − awarded) ÷ awarded, from finalized closeouts only. A project without
+          an awarded value or duration is left out of that figure, never counted as late or over
+          budget.
+        </li>
+        <li i18n="@@intel.whyRatings">
+          Quality and HSE are your company's internal 1–5 ratings, not a certification. They are
+          never combined into one score here.
+        </li>
+        <li i18n="@@intel.whyComposite">
+          The composite is the documented outcome-score rule a recommendation uses when it weighs
+          past performance: the whole-number mean of each project's score (quality, HSE, cost,
+          schedule, would-work-again). It is shown with its sample because one project is not a
+          trend.
+        </li>
+      </ul>
+    </details>
+    <h4 i18n="@@intel.projects">Completed projects</h4>
+    <ul class="intel-list" role="list">
+      @for (item of delivery().outcomes; track item.awardId) {
+        <li>
+          <a [routerLink]="['/closeouts', item.awardId]"
+            ><bdi dir="ltr" class="tnd-code">{{ item.tenderReference }}</bdi></a
+          >
+          <bdi dir="ltr" class="tnd-code">{{ item.projectCode }}</bdi>
+          <bdi>{{ item.workPackageTitle }}</bdi>
+          <span>{{ scheduleLabel(item.scheduleOutcome) }}</span>
+          @if (item.scheduleVariancePercent) {
+            <bdi dir="ltr">{{ percent(item.scheduleVariancePercent) }}</bdi>
+          }
+          @if (access().commercial && item.costVariancePercent) {
+            <span i18n="@@intel.costShort"
+              >cost <bdi dir="ltr">{{ percent(item.costVariancePercent) }}</bdi></span
+            >
+          }
+          <app-variance-cause
+            [cause]="item.variationCause"
+            [share]="item.variationSharePercent"
+            [residual]="item.residualCostVariancePercent"
+          />
+          <span i18n="@@intel.ratingsShort"
+            >quality <bdi dir="ltr">{{ item.qualityRating }}</bdi> · HSE
+            <bdi dir="ltr">{{ item.hseRating }}</bdi></span
+          >
+          <span class="prj-chip">{{ rehireLabel(item.wouldWorkAgain) }}</span>
+          @if (item.outcomeType && item.outcomeType !== 'Completed') {
+            <span class="prj-chip dc-state dc-state--warn">{{
+              outcomeLabel(item.outcomeType)
+            }}</span>
+          }
+          @if (item.earlyWorksDeclared) {
+            <span class="prj-chip" i18n="@@intel.earlyWorks">Early works declared</span>
+          }
+          @if (
+            item.finalizedDaysAfterAward !== null && item.finalizedDaysAfterAward !== undefined
+          ) {
+            <span
+              class="prj-hint"
+              i18n="@@intel.finalizedDaysAfterAward"
+              >{item.finalizedDaysAfterAward, plural,
+                =0 {finalized on the award day}
+                =1 {finalized 1 day after the award}
+                other {finalized {{ item.finalizedDaysAfterAward }} days after the award}
+              }</span
+            >
+          }
+          @for (warning of item.timingWarnings ?? []; track warning) {
+            <span class="prj-chip dc-state dc-state--warn">{{ timingLabel(warning) }}</span>
+          }
+          <span class="prj-hint"
+            >{{ categoryLabel(item.category) }} ·
+            <bdi>{{ item.closedAtUtc | businessDate: 'instant' }}</bdi></span
+          >
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -1,0 +1,54 @@
+:root {
+  color-scheme: light;
+  --font-body: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-ui: var(--font-body);
+  --font-label: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --font-code: monospace;
+  --color-background: #f7f7f1;
+  --color-surface: #fff;
+  --color-ink: #182a2b;
+  --color-muted: #596567;
+  --color-border: #d5ddda;
+  --color-accent: #166356;
+  --color-warning: #934618;
+  --color-caution: #7a5a00;
+  --color-danger: #9e241c;
+  --color-on-dark: #f3f6f4;
+  --color-muted-on-dark: #b9c6c3;
+  --color-border-on-dark: rgb(243 246 244 / 32%);
+  --color-accent-on-dark: #8fd4c2;
+  --nav-indicator: 3px;
+  --touch-target: 2.75rem;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  src: url('/ar/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  src: url('/ar/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-SemiBold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans Arabic';
+  src: url('/ar/fonts/ibm-plex-sans-arabic/IBMPlexSansArabic-Bold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root:lang(ar) {
+  --font-body: 'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;
+  --font-display: 'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;
+  --font-ui: 'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;
+  --font-label: 'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;
+}

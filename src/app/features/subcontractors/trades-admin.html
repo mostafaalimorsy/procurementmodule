@@ -1,0 +1,307 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/subcontractors" i18n="@@nav.subcontractors">Subcontractors</a
+    ><span aria-hidden="true">/</span><span i18n="@@trades.title">Trades</span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@directory.eyebrow">Subcontractor directory</p>
+      <h1 i18n="@@trades.title">Trades</h1>
+      <p i18n="@@trades.intro">
+        Your company's own names for the kinds of work you subcontract. They classify every
+        subcontractor, and retiring one never removes it from records that already carry it.
+      </p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  <form class="prj-form" novalidate (ngSubmit)="create()">
+    <fieldset class="prj-fieldset">
+      <legend i18n="@@trades.add">Add a trade</legend>
+      <div class="prj-grid">
+        <div class="prj-field">
+          <label for="trade-code"
+            ><ng-container i18n="@@trades.code">Trade code</ng-container>
+            <span aria-hidden="true">*</span></label
+          >
+          <input
+            dir="ltr"
+            class="ltr-token"
+            id="trade-code"
+            name="code"
+            maxlength="32"
+            autocomplete="off"
+            required
+            [(ngModel)]="code"
+            [attr.aria-invalid]="submitted && codeInvalid ? 'true' : null"
+            [attr.aria-describedby]="
+              submitted && codeInvalid ? 'trade-code-error' : 'trade-code-hint'
+            "
+          />
+          @if (submitted && codeInvalid) {
+            <span id="trade-code-error" class="prj-error-text" i18n="@@trades.codeError"
+              >Use 2–32 letters, digits, dash, underscore or slash — for example
+              <bdi dir="ltr">HVAC</bdi>.</span
+            >
+          } @else {
+            <span id="trade-code-hint" class="prj-hint" i18n="@@trades.codeHint"
+              >Permanent once added. Imports use it to name a trade.</span
+            >
+          }
+        </div>
+        <div class="prj-field">
+          <label for="trade-name"
+            ><ng-container i18n="@@directoryField.tradeName">Trade name</ng-container>
+            <span aria-hidden="true">*</span></label
+          >
+          <input
+            id="trade-name"
+            name="name"
+            maxlength="100"
+            required
+            [(ngModel)]="name"
+            [attr.aria-invalid]="submitted && nameInvalid ? 'true' : null"
+          />
+          @if (submitted && nameInvalid) {
+            <span class="prj-error-text" i18n="@@trades.nameError">A trade name is required.</span>
+          }
+        </div>
+      </div>
+      <div class="prj-form-actions">
+        <button class="prj-btn" type="submit" [disabled]="busy()" i18n="@@trades.addButton">
+          Add trade
+        </button>
+      </div>
+    </fieldset>
+  </form>
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@common.loading">Loading…</p>
+  } @else if (trades().length === 0) {
+    <div class="prj-empty">
+      <h2 i18n="@@trades.emptyTitle">No trades yet</h2>
+      <p i18n="@@trades.emptyHelp">
+        Add the trades your company buys, such as HVAC, Electrical or Fire fighting.
+      </p>
+    </div>
+  } @else {
+    <div class="prj-table-wrap">
+      <table class="prj-table">
+        <caption class="prj-visually-hidden" i18n="@@trades.caption">
+          Your company's trades
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@directoryField.code">Code</th>
+            <th scope="col" i18n="@@directoryField.tradeName">Trade name</th>
+            <th scope="col" i18n="@@project.status">Status</th>
+            <th scope="col" class="prj-numeric" i18n="@@trades.usedBy">Subcontractors</th>
+            <th scope="col">
+              <span class="prj-visually-hidden" i18n="@@trades.actions">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (trade of trades(); track trade.id) {
+            <tr>
+              <td>
+                <code dir="ltr" class="ltr-token">{{ trade.code }}</code>
+              </td>
+              <td>
+                @if (editing() === trade.id) {
+                  <form class="prj-actions" novalidate (ngSubmit)="rename(trade)">
+                    <label
+                      class="prj-visually-hidden"
+                      [for]="'rename-' + trade.id"
+                      i18n="@@directoryField.tradeName"
+                      >Trade name</label
+                    >
+                    <input
+                      [id]="'rename-' + trade.id"
+                      name="renameTo"
+                      maxlength="100"
+                      required
+                      [(ngModel)]="renameTo"
+                    />
+                    <button
+                      class="prj-btn"
+                      type="submit"
+                      [disabled]="busy()"
+                      i18n="@@trades.saveName"
+                    >
+                      Save name
+                    </button>
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      (click)="editing.set(null)"
+                      i18n="@@common.cancel"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                } @else {
+                  <bdi>{{ trade.name }}</bdi>
+                }
+              </td>
+              <td>
+                @if (trade.isActive) {
+                  <span class="prj-chip prj-chip--Active" i18n="@@trades.active">Active</span>
+                } @else {
+                  <span class="prj-chip prj-chip--Cancelled" i18n="@@trades.retiredLabel"
+                    >Retired</span
+                  >
+                }
+              </td>
+              <td class="prj-numeric">
+                <bdi dir="ltr">{{ trade.subcontractorCount }}</bdi>
+              </td>
+              <td>
+                <span class="prj-actions">
+                  @if (editing() !== trade.id) {
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      (click)="startRename(trade)"
+                      i18n="@@trades.rename"
+                    >
+                      Rename
+                    </button>
+                  }
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="toggle(trade)"
+                  >
+                    @if (trade.isActive) {
+                      <ng-container i18n="@@trades.retire">Retire</ng-container>
+                    } @else {
+                      <ng-container i18n="@@trades.restore">Restore</ng-container>
+                    }
+                  </button>
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <section class="prj-section" aria-labelledby="mappings-title">
+    <h2 id="mappings-title" i18n="@@mappings.title">Category mapping</h2>
+    <p class="prj-hint" i18n="@@mappings.intro">
+      Work-package categories are these trades. Category text recorded before that, and former trade
+      names, are mapped to a trade here so their history is read together. A mapping never changes
+      what was recorded, and every change is audited.
+    </p>
+    @if (mappingError()) {
+      <p class="prj-note prj-note--error" role="alert">{{ mappingError() }}</p>
+    }
+    @if (mappings(); as rows) {
+      @if (rows.length === 0) {
+        <p i18n="@@mappings.empty">No stored category text needs mapping.</p>
+      } @else {
+        <div class="prj-table-wrap">
+          <table class="prj-table">
+            <caption class="prj-visually-hidden" i18n="@@mappings.caption">
+              Stored category text and the trade it is read as
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@mappings.text">Stored text</th>
+                <th scope="col" class="prj-numeric" i18n="@@mappings.packages">Work packages</th>
+                <th scope="col" class="prj-numeric" i18n="@@mappings.closeouts">Closeouts</th>
+                <th scope="col" i18n="@@mappings.readAs">Read as</th>
+                <th scope="col" i18n="@@mappings.change">Map to</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows; track row.sourceKey) {
+                <tr>
+                  <th scope="row">
+                    <bdi>{{ row.label }}</bdi>
+                  </th>
+                  <td class="prj-numeric">
+                    <bdi dir="ltr">{{ row.workPackages }}</bdi>
+                  </td>
+                  <td class="prj-numeric">
+                    <bdi dir="ltr">{{ row.closeouts }}</bdi>
+                  </td>
+                  <td>
+                    @if (row.tradeName) {
+                      <bdi>{{ row.tradeName }}</bdi> ·
+                    }
+                    <span class="prj-hint">{{ resolutionLabel(row.resolution) }}</span>
+                  </td>
+                  <td>
+                    <label
+                      class="prj-visually-hidden"
+                      [for]="'map-' + row.sourceKey"
+                      i18n="@@mappings.mapLabel"
+                      >Trade for {{ row.label }}</label
+                    >
+                    <select
+                      [id]="'map-' + row.sourceKey"
+                      [name]="'map-' + row.sourceKey"
+                      [(ngModel)]="mappingChoice[row.sourceKey]"
+                    >
+                      <option value="" i18n="@@mappings.none">No mapping</option>
+                      @for (trade of trades(); track trade.id) {
+                        <option [value]="trade.id">{{ trade.name }} ({{ trade.code }})</option>
+                      }
+                    </select>
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      [disabled]="
+                        busy() ||
+                        (mappingChoice[row.sourceKey] || null) ===
+                          (row.resolution === 'MatchedByName' ? null : row.tradeId)
+                      "
+                      (click)="saveMapping(row)"
+                      i18n="@@mappings.save"
+                    >
+                      Save
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  </section>
+
+  @if (pendingRetire(); as trade) {
+    <app-confirm-dialog
+      [heading]="retireHeading"
+      [confirmLabel]="retireLabel"
+      [danger]="true"
+      [busy]="busy()"
+      (confirmed)="confirmRetire()"
+      (cancelled)="pendingRetire.set(null)"
+    >
+      <p i18n="@@trades.retireConsequence">
+        <bdi>{{ trade.name }}</bdi> can no longer be newly assigned. Subcontractors that already
+        carry it keep it.
+      </p>
+      <p>
+        <span i18n="@@trades.carriedBy">{trade.subcontractorCount, plural,
+          =0 {No subcontractor carries it yet.}
+          =1 {1 subcontractor carries it.}
+          other {{{ trade.subcontractorCount }} subcontractors carry it.}
+        }</span>
+      </p>
+    </app-confirm-dialog>
+  }
+</section>

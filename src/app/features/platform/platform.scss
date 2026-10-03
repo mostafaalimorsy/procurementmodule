@@ -1,0 +1,276 @@
+:host {
+  display: block;
+}
+h1 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  margin-block: 0.5rem 1rem;
+}
+h2 {
+  font-size: 1.25rem;
+  margin-block-start: 0;
+}
+p {
+  line-height: 1.6;
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-accent);
+  font-size: 0.75rem;
+}
+.narrow {
+  max-inline-size: 36rem;
+}
+.toolbar,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+.toolbar {
+  justify-content: space-between;
+  margin-block-end: 2rem;
+}
+a {
+  color: var(--color-accent);
+  text-underline-offset: 0.2em;
+}
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+.detail-head h1 {
+  margin-block-end: 0.5rem;
+}
+.state-chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 999px;
+  color: var(--color-accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.state-chip--suspended {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1.5rem;
+}
+.panel {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 1.5rem;
+  margin-block-end: 1.5rem;
+}
+form {
+  display: grid;
+  gap: 1rem;
+}
+label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+input,
+textarea,
+select {
+  min-inline-size: 0;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink);
+  font: inherit;
+  border-radius: 0.25rem;
+}
+textarea {
+  min-block-size: 5rem;
+  resize: vertical;
+}
+button {
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: white;
+  font: inherit;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  inline-size: fit-content;
+}
+button.secondary {
+  background: transparent;
+  color: var(--color-accent);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.error {
+  color: #9e241c;
+}
+.notice {
+  color: var(--color-accent);
+}
+.muted,
+small {
+  color: var(--color-muted);
+}
+.table-scroll {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  inline-size: 100%;
+  text-align: start;
+}
+th,
+td {
+  padding: 0.85rem;
+  border-block-end: 1px solid var(--color-border);
+  text-align: start;
+}
+td a {
+  color: var(--color-accent);
+}
+dt {
+  color: var(--color-muted);
+  margin-block-start: 0.7rem;
+}
+dd {
+  margin-inline-start: 0;
+  overflow-wrap: anywhere;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+.state-chip--muted {
+  border-color: var(--color-border);
+  color: var(--color-muted);
+}
+button.compact {
+  padding: 0.35rem 0.7rem;
+  min-block-size: 2.75rem;
+}
+button[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+.builder-group {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+}
+.builder-group legend {
+  padding-inline: 0.4rem;
+  font-weight: 600;
+}
+.check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.2rem 0.6rem;
+}
+.check input {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+  margin-block-start: 0.2rem;
+}
+.check small {
+  grid-column: 2;
+}
+.carried {
+  padding: 0.6rem;
+  border-inline-start: 3px solid var(--color-warning);
+  background: var(--color-background);
+}
+.limit {
+  display: grid;
+  gap: 0.4rem;
+}
+.limit input {
+  max-inline-size: 12rem;
+}
+.quick-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.builder-note,
+.builder-preview {
+  padding: 0.75rem 1rem;
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-background);
+}
+.builder-preview {
+  display: grid;
+  gap: 0.4rem;
+}
+.revisions {
+  display: grid;
+  gap: 1rem;
+  padding-inline-start: 1.25rem;
+}
+.revisions p {
+  margin-block: 0.2rem;
+}
+.diff th[scope='row'] {
+  font-weight: 500;
+}
+.diff tr.reduced td,
+.diff tr.reduced th,
+.warning {
+  color: var(--color-warning);
+}
+.consequences {
+  display: grid;
+  gap: 0.4rem;
+  padding-inline-start: 1.25rem;
+}
+.token {
+  display: inline-block;
+  margin-inline-end: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.2rem;
+  font-size: 0.85rem;
+}
+.result[data-band='approaching'] {
+  color: var(--color-caution);
+  font-weight: 600;
+}
+.result[data-band='atLimit'] {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+.result[data-band='overLimit'] {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.list-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin-block-end: 1rem;
+}
+.list-filter label {
+  min-inline-size: 16rem;
+}
+
+// CF-078: a first-admin invitation email that could not be sent.
+.first-admin-mail--failed {
+  color: var(--color-danger);
+}

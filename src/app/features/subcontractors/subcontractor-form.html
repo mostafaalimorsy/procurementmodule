@@ -1,0 +1,314 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/subcontractors" i18n="@@nav.subcontractors">Subcontractors</a
+    ><span aria-hidden="true">/</span>
+    <span>
+      @if (isEdit) {
+        <ng-container i18n="@@common.edit">Edit</ng-container>
+      } @else {
+        <ng-container i18n="@@directory.new">Add subcontractor</ng-container>
+      }
+    </span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@directory.eyebrow">Subcontractor directory</p>
+      <h1>
+        @if (isEdit) {
+          <bdi>{{ legalName || code }}</bdi>
+        } @else {
+          <ng-container i18n="@@directory.new">Add subcontractor</ng-container>
+        }
+      </h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@common.loading">Loading…</p>
+  } @else {
+    <form
+      class="prj-form"
+      novalidate
+      (ngSubmit)="save()"
+      (input)="edited($event)"
+      (change)="edited($event)"
+    >
+      <!-- CF-020 (B-020-2): the errors of an invalid submit, first in the form. -->
+      <app-error-summary />
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@directory.identity">Identity</legend>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="code"
+              ><ng-container i18n="@@directory.code">Subcontractor code</ng-container>
+              @if (!isEdit) {
+                <span aria-hidden="true">*</span>
+              }
+            </label>
+            <input
+              dir="ltr"
+              class="ltr-token"
+              id="code"
+              name="code"
+              maxlength="32"
+              autocomplete="off"
+              [readonly]="isEdit"
+              [required]="!isEdit"
+              [(ngModel)]="code"
+              [attr.aria-invalid]="submitted && codeInvalid ? 'true' : null"
+              [attr.aria-describedby]="submitted && codeInvalid ? 'code-error' : 'code-hint'"
+            />
+            @if (submitted && codeInvalid) {
+              <span id="code-error" class="prj-error-text" i18n="@@directory.codeError"
+                >Use 2–32 letters, digits, dash, underscore or slash — for example
+                <bdi dir="ltr">ACME-01</bdi>.</span
+              >
+            } @else if (isEdit) {
+              <span id="code-hint" class="prj-hint" i18n="@@directory.codeImmutable"
+                >The code is permanent: imports, people and later records refer to it.</span
+              >
+            } @else {
+              <span id="code-hint" class="prj-hint" i18n="@@directory.codeHint"
+                >Your own reference, unique in this company — often your vendor number. It cannot be
+                changed later.</span
+              >
+            }
+          </div>
+          <div class="prj-field">
+            <label for="legal-name"
+              ><ng-container i18n="@@directoryField.legalName">Legal name</ng-container>
+              <span aria-hidden="true">*</span></label
+            >
+            <input
+              id="legal-name"
+              name="legalName"
+              required
+              maxlength="200"
+              [(ngModel)]="legalName"
+              [attr.aria-invalid]="submitted && legalNameInvalid ? 'true' : null"
+              [attr.aria-describedby]="submitted && legalNameInvalid ? 'legal-name-error' : null"
+            />
+            @if (submitted && legalNameInvalid) {
+              <span id="legal-name-error" class="prj-error-text" i18n="@@directory.legalNameError"
+                >A legal name is required.</span
+              >
+            }
+          </div>
+          <div class="prj-field">
+            <label for="trading-name" i18n="@@directoryField.tradingName">Trading name</label>
+            <input id="trading-name" name="tradingName" maxlength="200" [(ngModel)]="tradingName" />
+          </div>
+          <div class="prj-field">
+            <label for="commercial-registration" i18n="@@directoryField.commercialRegistration"
+              >Commercial registration no.</label
+            >
+            <input
+              dir="ltr"
+              class="ltr-token"
+              id="commercial-registration"
+              name="commercialRegistration"
+              maxlength="80"
+              autocomplete="off"
+              [(ngModel)]="commercialRegistration"
+            />
+          </div>
+          <div class="prj-field">
+            <label for="tax-registration" i18n="@@directoryField.taxRegistration"
+              >Tax registration no.</label
+            >
+            <input
+              dir="ltr"
+              class="ltr-token"
+              id="tax-registration"
+              name="taxRegistration"
+              maxlength="80"
+              autocomplete="off"
+              [(ngModel)]="taxRegistration"
+            />
+          </div>
+          <p class="prj-hint prj-span-all" i18n="@@directory.registrationHint">
+            Registration numbers are stored without spaces or dashes and must be unique in this
+            company.
+          </p>
+          <div class="prj-field">
+            <label for="country" i18n="@@directoryField.country">Country</label>
+            <select id="country" name="country" [(ngModel)]="countryCode">
+              <option value="" i18n="@@directory.noCountry">Not recorded</option>
+              @for (country of countries; track country.code) {
+                <option [value]="country.code">{{ country.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="prj-field">
+            <label for="city" i18n="@@directoryField.city">City</label>
+            <input id="city" name="city" maxlength="100" [(ngModel)]="city" />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@directoryField.trades">Trades</legend>
+        @if (selectableTrades().length) {
+          <div class="prj-grid">
+            @for (trade of selectableTrades(); track trade.id) {
+              <label
+                class="prj-field"
+                style="flex-direction: row; align-items: center; gap: 0.5rem"
+              >
+                <input
+                  type="checkbox"
+                  [attr.name]="'trade-' + trade.code"
+                  [checked]="selectedTrades.has(trade.id)"
+                  (change)="toggleTrade(trade.id, $any($event.target).checked)"
+                />
+                <span
+                  ><bdi>{{ trade.name }}</bdi> · <bdi dir="ltr">{{ trade.code }}</bdi>
+                  @if (!trade.isActive) {
+                    &ngsp;<ng-container i18n="@@directory.retiredKept"
+                      >(retired — kept on this record)</ng-container
+                    >
+                  }
+                </span>
+              </label>
+            }
+          </div>
+        } @else {
+          <p class="prj-hint" i18n="@@directory.noTradesDefined">
+            Your company has not defined any trades yet. A Procurement Manager or Company Admin
+            defines them under Manage trades.
+          </p>
+        }
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@directory.contacts">Contacts</legend>
+        @for (row of contacts; track $index; let index = $index) {
+          <div class="prj-grid" role="group" [attr.aria-label]="row.name || null">
+            <div class="prj-field">
+              <label [for]="'contact-name-' + index"
+                ><ng-container i18n="@@directoryField.contactName">Contact name</ng-container>
+                <span aria-hidden="true">*</span></label
+              >
+              <input
+                [id]="'contact-name-' + index"
+                [name]="'contactName' + index"
+                maxlength="160"
+                required
+                [(ngModel)]="row.name"
+                [attr.aria-invalid]="submitted && contactNameInvalid(row) ? 'true' : null"
+              />
+              @if (submitted && contactNameInvalid(row)) {
+                <span class="prj-error-text" i18n="@@directory.contactNameError"
+                  >A contact name is required.</span
+                >
+              }
+            </div>
+            <div class="prj-field">
+              <label [for]="'contact-title-' + index" i18n="@@directoryField.contactJobTitle"
+                >Job title</label
+              >
+              <input
+                [id]="'contact-title-' + index"
+                [name]="'contactTitle' + index"
+                maxlength="100"
+                [(ngModel)]="row.jobTitle"
+              />
+            </div>
+            <div class="prj-field">
+              <label [for]="'contact-email-' + index" i18n="@@directory.email">Email</label>
+              <input
+                dir="ltr"
+                type="email"
+                [id]="'contact-email-' + index"
+                [name]="'contactEmail' + index"
+                maxlength="254"
+                autocomplete="off"
+                [(ngModel)]="row.email"
+                [attr.aria-invalid]="submitted && contactEmailInvalid(row) ? 'true' : null"
+              />
+              @if (submitted && contactEmailInvalid(row)) {
+                <span class="prj-error-text" i18n="@@problem.contactEmailInvalid"
+                  >Enter a valid contact email address.</span
+                >
+              }
+            </div>
+            <div class="prj-field">
+              <label [for]="'contact-phone-' + index" i18n="@@directory.phone">Phone</label>
+              <input
+                dir="ltr"
+                type="tel"
+                [id]="'contact-phone-' + index"
+                [name]="'contactPhone' + index"
+                maxlength="40"
+                [(ngModel)]="row.phone"
+              />
+            </div>
+            <div class="prj-field" style="flex-direction: row; align-items: center; gap: 0.5rem">
+              <input
+                type="radio"
+                name="primaryContact"
+                [id]="'contact-primary-' + index"
+                [checked]="primaryIndex === index"
+                (change)="primaryIndex = index"
+              />
+              <label [for]="'contact-primary-' + index" i18n="@@directory.primaryContact"
+                >Primary contact</label
+              >
+            </div>
+            <div class="prj-actions">
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="removeContact(index)"
+                i18n="@@directory.removeContact"
+              >
+                Remove contact
+              </button>
+            </div>
+          </div>
+        }
+        @if (contacts.length < maxContacts) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="addContact()"
+            i18n="@@directory.addContact"
+          >
+            Add contact
+          </button>
+        }
+        <p class="prj-hint" i18n="@@directory.contactsHint">
+          Contact details are personal data. They are kept on this record only.
+        </p>
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@directoryField.notes">Notes</legend>
+        <div class="prj-field prj-span-all">
+          <label for="notes" class="prj-visually-hidden" i18n="@@directoryField.notes">Notes</label>
+          <textarea id="notes" name="notes" maxlength="2000" [(ngModel)]="notes"></textarea>
+        </div>
+      </fieldset>
+
+      <div class="prj-form-actions">
+        <button class="prj-btn" type="submit" [disabled]="saving()">
+          @if (saving()) {
+            <ng-container i18n="@@common.saving">Saving…</ng-container>
+          } @else if (isEdit) {
+            <ng-container i18n="@@common.saveChanges">Save changes</ng-container>
+          } @else {
+            <ng-container i18n="@@directory.create">Add subcontractor</ng-container>
+          }
+        </button>
+        <a class="prj-btn prj-btn--ghost" [routerLink]="cancelLink()" i18n="@@common.cancel"
+          >Cancel</a
+        >
+      </div>
+    </form>
+  }
+</section>

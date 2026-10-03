@@ -1,0 +1,330 @@
+<section class="prj-section" aria-labelledby="compliance-title">
+  <h2 id="compliance-title" i18n="@@compliance.title">Compliance and approved-vendor status</h2>
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+  @if (file(); as item) {
+    @if (item.blocked) {
+      <p class="prj-note prj-note--error" i18n="@@compliance.blocked">
+        Blocked in the directory: no approved-vendor status overrides a block.
+      </p>
+    }
+    @if (item.requirements.length) {
+      <div class="prj-table-wrap" role="region" aria-labelledby="compliance-title" tabindex="0">
+        <table class="prj-table">
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@compliance.colDocument">Document</th>
+              <th scope="col" i18n="@@compliance.colState">State</th>
+              <th scope="col" i18n="@@compliance.colDetails">On record</th>
+              <th scope="col" i18n="@@compliance.colFile">File</th>
+              <th scope="col">
+                <span class="prj-visually-hidden" i18n="@@common.actions">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (requirement of item.requirements; track requirement.type.id) {
+              <tr>
+                <td>
+                  <bdi>{{ requirement.type.name }}</bdi>
+                  @if (requirement.required) {
+                    <span class="prj-hint tnd-block" i18n="@@compliance.required"
+                      >Required for this firm's trades</span
+                    >
+                  }
+                  @if (requirement.type.awardBlocking) {
+                    <span class="prj-chip" i18n="@@compliance.awardBlocking">Blocks award</span>
+                  }
+                </td>
+                <td>
+                  <span class="prj-chip prj-chip--{{ requirement.state }}">{{
+                    stateLabel(requirement.state)
+                  }}</span>
+                </td>
+                <td>
+                  @if (requirement.current; as current) {
+                    @if (current.isWithdrawal) {
+                      <span class="prj-hint" i18n="@@compliance.withdrawnOn"
+                        >Withdrawn {{ current.recordedAtUtc | businessDate: 'instant' }}</span
+                      >
+                    } @else {
+                      @if (current.number) {
+                        <bdi dir="ltr">{{ current.number }}</bdi>
+                      }
+                      @if (current.expiresOn) {
+                        <span class="prj-hint tnd-block" i18n="@@compliance.expiresOn"
+                          >Expires <bdi dir="ltr">{{ current.expiresOn }}</bdi></span
+                        >
+                      }
+                    }
+                  } @else {
+                    <span class="prj-hint" i18n="@@compliance.nothingOnRecord"
+                      >Nothing on record</span
+                    >
+                  }
+                </td>
+                <td>
+                  @if (requirement.current?.fileName) {
+                    @if (requirement.current?.fileScanState === 'Clean') {
+                      <a [href]="fileUrl(requirement.current!)" download
+                        ><bdi>{{ requirement.current?.fileName }}</bdi></a
+                      >
+                    } @else if (requirement.current?.fileScanState === 'Infected') {
+                      <span class="prj-error-text" i18n="@@compliance.fileWithheld"
+                        >Withheld — flagged by the malware scanner</span
+                      >
+                    } @else {
+                      <span class="prj-hint" i18n="@@compliance.fileScanning"
+                        >Being scanned for malware</span
+                      >
+                    }
+                  }
+                </td>
+                <td>
+                  @if (canRecord() && requirement.current && !requirement.current.isWithdrawal) {
+                    <button
+                      type="button"
+                      class="prj-btn prj-btn--ghost"
+                      [disabled]="busy()"
+                      (click)="withdraw(requirement.current)"
+                    >
+                      <ng-container i18n="@@compliance.withdraw">Withdraw</ng-container>
+                      <span class="prj-visually-hidden"
+                        ><bdi>{{ requirement.type.name }}</bdi></span
+                      >
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@compliance.noTypes">
+        Your company has not defined any compliance documents yet.
+      </p>
+    }
+
+    @if (canRecord() && activeTypes().length) {
+      <form class="prj-form" (ngSubmit)="record()">
+        <fieldset class="prj-fieldset">
+          <legend i18n="@@compliance.recordLegend">Record a document</legend>
+          <p class="prj-hint" i18n="@@compliance.recordHint">
+            A renewal or correction is a new record: the earlier one stays in the history.
+          </p>
+          <div class="prj-grid">
+            <div class="prj-field">
+              <label for="compliance-type" i18n="@@compliance.type">Document type</label>
+              <select
+                id="compliance-type"
+                name="typeId"
+                [(ngModel)]="form.typeId"
+                (ngModelChange)="edited()"
+                required
+              >
+                <option value="" disabled i18n="@@compliance.chooseType">Choose…</option>
+                @for (type of activeTypes(); track type.id) {
+                  <option [value]="type.id">{{ type.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="prj-field">
+              <label for="compliance-number"
+                ><ng-container i18n="@@compliance.number">Number</ng-container>
+                @if (selectedType()?.requiresNumber) {
+                  <span class="prj-hint" i18n="@@compliance.requiredMark">(required)</span>
+                }
+              </label>
+              <input
+                id="compliance-number"
+                name="number"
+                dir="ltr"
+                maxlength="100"
+                [(ngModel)]="form.number"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="compliance-issuer"
+                ><ng-container i18n="@@compliance.issuer">Issuer</ng-container>
+                @if (selectedType()?.requiresIssuer) {
+                  <span class="prj-hint" i18n="@@compliance.requiredMark">(required)</span>
+                }
+              </label>
+              <input
+                id="compliance-issuer"
+                name="issuer"
+                maxlength="200"
+                [(ngModel)]="form.issuer"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="compliance-issued" i18n="@@compliance.issuedOn">Issued on</label>
+              <input
+                id="compliance-issued"
+                name="issuedOn"
+                type="date"
+                [(ngModel)]="form.issuedOn"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="compliance-expires"
+                ><ng-container i18n="@@compliance.expiresOnLabel">Expires on</ng-container>
+                @if (selectedType()?.requiresExpiry) {
+                  <span class="prj-hint" i18n="@@compliance.requiredMark">(required)</span>
+                }
+              </label>
+              <input
+                id="compliance-expires"
+                name="expiresOn"
+                type="date"
+                [(ngModel)]="form.expiresOn"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="compliance-file" i18n="@@compliance.file">File (optional)</label>
+              <input id="compliance-file" name="file" type="file" (change)="choose($event)" />
+              <span class="prj-hint" i18n="@@compliance.fileHint"
+                >Scanned for malware; available once clean.</span
+              >
+            </div>
+            <div class="prj-field prj-span-all">
+              <label for="compliance-note" i18n="@@compliance.note">Note</label>
+              <textarea
+                id="compliance-note"
+                name="note"
+                rows="2"
+                maxlength="1000"
+                [(ngModel)]="form.note"
+              ></textarea>
+            </div>
+          </div>
+          <div class="prj-form-actions">
+            <button
+              type="submit"
+              class="prj-btn"
+              [disabled]="busy() || !form.typeId"
+              i18n="@@compliance.save"
+            >
+              Record document
+            </button>
+          </div>
+        </fieldset>
+      </form>
+    }
+
+    @if (item.history.length) {
+      <details>
+        <summary i18n="@@compliance.history">Document history ({{ item.history.length }})</summary>
+        <ul class="tnd-docs" role="list">
+          @for (entry of item.history; track entry.id) {
+            <li>
+              <bdi>{{ entry.typeName }}</bdi> ·
+              @if (entry.isWithdrawal) {
+                <span i18n="@@compliance.historyWithdrawn">withdrawn</span>
+              } @else {
+                <bdi dir="ltr">{{ entry.number ?? '—' }}</bdi>
+                @if (entry.expiresOn) {
+                  ·
+                  <span i18n="@@compliance.historyExpires"
+                    >expires <bdi dir="ltr">{{ entry.expiresOn }}</bdi></span
+                  >
+                }
+              }
+              · <bdi>{{ entry.recordedByName }}</bdi
+              >, {{ entry.recordedAtUtc | businessDate: 'instant' }}
+            </li>
+          }
+        </ul>
+      </details>
+    }
+
+    <h3 i18n="@@compliance.vendorTitle">Approved-vendor status by trade</h3>
+    @if (item.vendor.length) {
+      <div class="prj-table-wrap">
+        <table class="prj-table">
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@compliance.colTrade">Trade</th>
+              <th scope="col" i18n="@@compliance.colStatus">Status</th>
+              <th scope="col" i18n="@@compliance.colReason">Reason</th>
+              @if (canSetVendor()) {
+                <th scope="col" i18n="@@compliance.colChange">Change</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (vendor of item.vendor; track vendor.tradeId) {
+              <tr>
+                <td>
+                  <bdi>{{ vendor.tradeName }}</bdi> · <bdi dir="ltr">{{ vendor.tradeCode }}</bdi>
+                </td>
+                <td>
+                  <span class="prj-chip">{{ vendorLabel(vendor.status) }}</span>
+                  @if (vendor.setByName) {
+                    <span class="prj-hint tnd-block"
+                      ><bdi>{{ vendor.setByName }}</bdi
+                      >, {{ vendor.setAtUtc | businessDate: 'instant' }}</span
+                    >
+                  }
+                </td>
+                <td>
+                  <bdi>{{ vendor.reason ?? '—' }}</bdi>
+                </td>
+                @if (canSetVendor()) {
+                  <td>
+                    <label
+                      class="prj-visually-hidden"
+                      [for]="'vendor-' + vendor.tradeId"
+                      i18n="@@compliance.colStatus"
+                      >Status</label
+                    >
+                    <select
+                      [id]="'vendor-' + vendor.tradeId"
+                      [name]="'vendor-' + vendor.tradeId"
+                      [(ngModel)]="vendorStatus[vendor.tradeId]"
+                    >
+                      <option value="" disabled i18n="@@compliance.chooseType">Choose…</option>
+                      @for (status of statuses; track status) {
+                        <option [value]="status">{{ vendorLabel(status) }}</option>
+                      }
+                    </select>
+                    <label
+                      class="prj-visually-hidden"
+                      [for]="'vendor-reason-' + vendor.tradeId"
+                      i18n="@@compliance.colReason"
+                      >Reason</label
+                    >
+                    <input
+                      [id]="'vendor-reason-' + vendor.tradeId"
+                      [name]="'vendor-reason-' + vendor.tradeId"
+                      maxlength="500"
+                      [(ngModel)]="vendorReason[vendor.tradeId]"
+                      i18n-placeholder="@@compliance.reasonPlaceholder"
+                      placeholder="Reason"
+                    />
+                    <button
+                      type="button"
+                      class="prj-btn prj-btn--ghost"
+                      [disabled]="busy() || !vendorStatus[vendor.tradeId]"
+                      (click)="setVendor(vendor.tradeId)"
+                      i18n="@@common.save"
+                    >
+                      Save
+                    </button>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@directory.noTrades">No trades recorded yet.</p>
+    }
+  }
+</section>

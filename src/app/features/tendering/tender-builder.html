@@ -1,0 +1,1216 @@
+@if (lockMessage()) {
+  <p class="prj-note" role="note">{{ lockMessage() }}</p>
+}
+@if (!canEdit() && !lockMessage()) {
+  <p class="prj-note" role="note" i18n="@@tenderBuilder.readOnly">
+    You can follow this draft; preparing it is done by procurement.
+  </p>
+}
+
+<div class="tnd-builder">
+  <nav
+    class="tnd-steps"
+    aria-label="Tender builder steps"
+    i18n-aria-label="@@tenderBuilder.stepsLabel"
+  >
+    <ol role="list">
+      @for (item of steps; track item; let index = $index) {
+        <li>
+          <button
+            type="button"
+            class="tnd-step"
+            [class.is-current]="step() === item"
+            [attr.aria-current]="step() === item ? 'step' : null"
+            (click)="go(item)"
+          >
+            <span class="tnd-step-index" aria-hidden="true"
+              ><bdi dir="ltr">{{ index + 1 }}</bdi></span
+            >
+            <span class="tnd-step-text">
+              <span>{{ stepLabel(item) }}</span>
+              @if (item !== 'review' && item !== 'documents') {
+                <small>
+                  @if (stepComplete(item)) {
+                    <ng-container i18n="@@tenderBuilder.stepComplete">Complete</ng-container>
+                  } @else {
+                    <ng-container i18n="@@tenderBuilder.stepNeedsWork"
+                      >Needs attention</ng-container
+                    >
+                  }
+                </small>
+              }
+            </span>
+          </button>
+        </li>
+      }
+    </ol>
+  </nav>
+
+  <div class="tnd-step-body">
+    @if (error()) {
+      <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+    }
+
+    @switch (step()) {
+      @case ('basics') {
+        <form class="prj-form" (ngSubmit)="save('documents')" aria-labelledby="basics-title">
+          <!-- CF-020 (B-020-2): the errors of an invalid submit, first in the form. -->
+          <app-error-summary />
+          <h2 id="basics-title">{{ stepLabel('basics') }}</h2>
+          <fieldset class="prj-fieldset" [disabled]="!canEdit()">
+            <legend i18n="@@tenderBuilder.typeLegend">Tender type</legend>
+            @for (type of types; track type) {
+              <label class="tnd-choice">
+                <input
+                  type="radio"
+                  name="type"
+                  [attr.name]="'type'"
+                  [value]="type"
+                  [(ngModel)]="form.type"
+                />
+                {{ typeLabel(type) }}
+              </label>
+            }
+          </fieldset>
+          <div class="prj-grid">
+            <div class="prj-field prj-span-all">
+              <label for="tender-title" i18n="@@tenderField.title">Title</label>
+              <input
+                id="tender-title"
+                name="title"
+                required
+                maxlength="200"
+                [disabled]="!canEdit()"
+                [attr.aria-invalid]="fieldInvalid('title')"
+                [attr.aria-describedby]="fieldInvalid('title') ? 'tender-title-error' : null"
+                [(ngModel)]="form.title"
+              />
+              @if (fieldInvalid('title')) {
+                <p
+                  id="tender-title-error"
+                  class="prj-error-text"
+                  i18n="@@tenderBuilder.titleRequired"
+                >
+                  Enter a title.
+                </p>
+              }
+            </div>
+            <div class="prj-field prj-span-all">
+              <label for="tender-scope" i18n="@@tenderField.scope">Scope and instructions</label>
+              <textarea
+                id="tender-scope"
+                name="scopeInstructions"
+                rows="8"
+                maxlength="8000"
+                aria-describedby="tender-scope-help"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.scopeInstructions"
+              ></textarea>
+              <p id="tender-scope-help" class="prj-hint" i18n="@@tenderBuilder.scopeHelp">
+                What bidders are asked to price and deliver, and how. Bidders see this exactly as
+                written once the tender is published.
+              </p>
+            </div>
+          </div>
+          <fieldset class="prj-fieldset" [disabled]="!canEdit()">
+            <legend i18n="@@tenderBuilder.contactLegend">
+              Procurement contact shown to bidders
+            </legend>
+            <div class="prj-grid">
+              <div class="prj-field">
+                <label for="tender-contact-name" i18n="@@tenderField.contactName"
+                  >Procurement contact</label
+                >
+                <input
+                  id="tender-contact-name"
+                  name="contactName"
+                  maxlength="160"
+                  autocomplete="name"
+                  [(ngModel)]="form.contactName"
+                />
+              </div>
+              <div class="prj-field">
+                <label for="tender-contact-email" i18n="@@tenderField.contactEmail"
+                  >Contact email</label
+                >
+                <input
+                  id="tender-contact-email"
+                  name="contactEmail"
+                  type="email"
+                  dir="ltr"
+                  maxlength="254"
+                  autocomplete="email"
+                  [(ngModel)]="form.contactEmail"
+                />
+              </div>
+              <div class="prj-field">
+                <label for="tender-contact-phone" i18n="@@tenderField.contactPhone"
+                  >Contact phone</label
+                >
+                <input
+                  id="tender-contact-phone"
+                  name="contactPhone"
+                  type="tel"
+                  dir="ltr"
+                  maxlength="40"
+                  autocomplete="tel"
+                  [(ngModel)]="form.contactPhone"
+                />
+              </div>
+              <div class="prj-field">
+                <label for="tender-email-locale" i18n="@@tenderField.emailLocale"
+                  >Email language</label
+                >
+                <select
+                  id="tender-email-locale"
+                  name="emailLocale"
+                  aria-describedby="tender-email-locale-help"
+                  [(ngModel)]="form.emailLocale"
+                >
+                  <option value="en" i18n="@@tenderBuilder.english">English</option>
+                  <option value="ar" i18n="@@tenderBuilder.arabic">Arabic</option>
+                </select>
+                <p
+                  id="tender-email-locale-help"
+                  class="prj-hint"
+                  i18n="@@tenderBuilder.emailLocaleHelp"
+                >
+                  Invitation and reminder emails, and the bidder's invitation page, use this
+                  language.
+                </p>
+              </div>
+            </div>
+          </fieldset>
+          @if (canEdit()) {
+            <div class="prj-form-actions">
+              <button class="prj-btn" type="submit" [disabled]="busy()">
+                @if (busy()) {
+                  <ng-container i18n="@@common.working">Working…</ng-container>
+                } @else {
+                  <ng-container i18n="@@tenderBuilder.saveContinue">Save and continue</ng-container>
+                }
+              </button>
+            </div>
+          }
+        </form>
+      }
+
+      @case ('documents') {
+        <section class="prj-section" aria-labelledby="documents-title">
+          <h2 id="documents-title">{{ stepLabel('documents') }}</h2>
+          <p class="prj-hint" i18n="@@tenderBuilder.documentsIntro">
+            Drawings, specifications and priced BOQ templates bidders need. Once published, the
+            documents are part of what every bidder received and cannot be removed.
+          </p>
+          @if (tender().documents.length === 0) {
+            <p class="prj-note" i18n="@@tenderBuilder.noDocuments">No documents yet.</p>
+          } @else {
+            <ul class="tnd-docs" role="list">
+              @for (document of tender().documents; track document.id) {
+                <li>
+                  <a [href]="documentUrl(document)" [attr.download]="document.fileName"
+                    ><bdi>{{ document.fileName }}</bdi></a
+                  >
+                  <span class="prj-hint">
+                    <bdi>{{ size(document.sizeBytes) }}</bdi> ·
+                    <bdi>{{ document.uploadedByName }}</bdi> ·
+                    {{ document.uploadedAtUtc | businessDate: 'instant' }}
+                  </span>
+                  @if (canEdit()) {
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      (click)="open({ kind: 'removeDocument', document })"
+                    >
+                      <ng-container i18n="@@tenderBuilder.remove">Remove</ng-container>
+                      <span class="prj-visually-hidden"
+                        >&ngsp;<bdi>{{ document.fileName }}</bdi></span
+                      >
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+          }
+          @if (canEdit()) {
+            <div class="prj-field">
+              <label for="tender-document" i18n="@@tenderBuilder.addDocument">Add a document</label>
+              <input
+                id="tender-document"
+                type="file"
+                [accept]="accept"
+                aria-describedby="tender-document-help"
+                [disabled]="busy()"
+                (change)="upload($event)"
+              />
+              <p id="tender-document-help" class="prj-hint" i18n="@@tenderBuilder.documentHelp">
+                PDF, Word, Excel, PowerPoint, DWG, PNG, JPG, CSV or text, up to {{ maxMegabytes }}
+                MB each. Files are checked for type and size; they are not scanned for viruses, so
+                attach only files you trust.
+              </p>
+              @if (busy()) {
+                <p class="prj-hint" role="status" i18n="@@tenderBuilder.uploading">Uploading…</p>
+              }
+            </div>
+          }
+          <div class="prj-form-actions">
+            <button
+              class="prj-btn"
+              type="button"
+              (click)="go('requirements')"
+              i18n="@@tenderBuilder.continue"
+            >
+              Continue
+            </button>
+          </div>
+        </section>
+      }
+
+      @case ('requirements') {
+        <form class="prj-form" (ngSubmit)="save('invitees')" aria-labelledby="requirements-title">
+          <!-- CF-020 (B-020-2): the errors of an invalid submit, first in the form. -->
+          <app-error-summary />
+          <h2 id="requirements-title">{{ stepLabel('requirements') }}</h2>
+          <p class="prj-hint" i18n="@@tenderBuilder.requirementsIntro">
+            What every response must contain. Bidders see these requirements when they open their
+            invitation.
+          </p>
+          <div class="prj-grid">
+            <div class="prj-field">
+              <span class="prj-legend" id="tender-currency-label" i18n="@@tenderField.currency"
+                >Bid currency</span
+              >
+              @if (tender().currency; as currency) {
+                <strong aria-describedby="tender-currency-hint"
+                  ><bdi dir="ltr">{{ currency }}</bdi></strong
+                >
+                <span
+                  id="tender-currency-hint"
+                  class="prj-hint"
+                  i18n="@@tenderBuilder.currencyFromProject"
+                  >Inherited from the project. Every bid on this tender is priced in it; publication
+                  freezes it.</span
+                >
+              } @else {
+                <span class="prj-error-text" i18n="@@tenderBuilder.currencyMissing"
+                  >The project has no currency yet. Set it on the project before publishing.</span
+                >
+              }
+            </div>
+            <div class="prj-field">
+              <label for="tender-validity" i18n="@@tenderBuilder.validity"
+                >Bid validity (days)</label
+              >
+              <input
+                id="tender-validity"
+                name="bidValidityDays"
+                inputmode="numeric"
+                dir="ltr"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.bidValidityDays"
+              />
+            </div>
+            <div class="prj-field prj-span-all">
+              <label class="tnd-choice">
+                <input
+                  type="checkbox"
+                  name="technicalProposalRequired"
+                  [disabled]="!canEdit()"
+                  [(ngModel)]="form.technicalProposalRequired"
+                />
+                <ng-container i18n="@@tenderBuilder.technicalRequired"
+                  >A technical proposal is required</ng-container
+                >
+              </label>
+            </div>
+            <div class="prj-field prj-span-all">
+              <label class="tnd-choice">
+                <input
+                  type="checkbox"
+                  name="durationRequired"
+                  [disabled]="!canEdit()"
+                  [(ngModel)]="form.durationRequired"
+                />
+                <ng-container i18n="@@tenderBuilder.durationRequired"
+                  >Bidders must state a proposed duration</ng-container
+                >
+              </label>
+              <small class="prj-hint tnd-block" i18n="@@tenderBuilder.durationRequiredHint"
+                >Without it, a bid can leave the duration blank: it then scores 0 on schedule and
+                the award has no duration to measure delivery against.</small
+              >
+            </div>
+            <fieldset class="prj-fieldset prj-span-all">
+              <legend i18n="@@tenderBuilder.scheduleLegend">Price schedule</legend>
+              <app-schedule-editor
+                idPrefix="tender-schedule"
+                [tenderId]="tender().id"
+                [editable]="canEdit()"
+                [(items)]="form.schedule"
+              />
+            </fieldset>
+            <fieldset class="prj-fieldset prj-span-all">
+              <legend i18n="@@tenderBuilder.criteriaLegend">Evaluation criteria</legend>
+              @if (tender().criteriaRequired && !tender().criteria?.pinned) {
+                <p class="prj-hint" i18n="@@tenderBuilder.criteriaRequiredHint">
+                  Your company requires this tender to declare its technical scorecard policy and
+                  its recommendation policy before it is published.
+                </p>
+              }
+              @if (tender().criteria?.pinned) {
+                @if (tender().criteria; as declared) {
+                  <p i18n="@@tenderBuilder.criteriaPinned">
+                    Declared at publication: <bdi>{{ declared.evaluationPolicyName }}</bdi> (version
+                    {{ declared.evaluationPolicyVersionNumber }}) for technical scoring and
+                    <bdi>{{ declared.recommendationPolicyName }}</bdi> (version
+                    {{ declared.recommendationPolicyVersionNumber }}) for the recommendation.
+                  </p>
+                  @if (declared.disclosed) {
+                    <p class="prj-hint" i18n="@@tenderBuilder.criteriaShownToBidders">
+                      Bidders are shown the criteria and weights.
+                    </p>
+                  }
+                }
+              } @else if (tender().status !== 'Draft') {
+                <p class="prj-hint" i18n="@@tenderBuilder.criteriaNotDeclared">
+                  No criteria were declared at publication.
+                </p>
+              } @else {
+                <div class="prj-grid">
+                  <div class="prj-field">
+                    <label for="tender-evaluation-policy" i18n="@@tenderBuilder.evaluationPolicy"
+                      >Technical scorecard policy</label
+                    >
+                    <select
+                      id="tender-evaluation-policy"
+                      name="evaluationPolicyId"
+                      [disabled]="!canEdit()"
+                      [(ngModel)]="form.evaluationPolicyId"
+                    >
+                      <option value="" i18n="@@tenderBuilder.criteriaNone">Not declared</option>
+                      @for (option of tender().criteriaOptions?.evaluation ?? []; track option.id) {
+                        <option [value]="option.id">
+                          {{ option.name }} · v{{ option.versionNumber }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                  <div class="prj-field">
+                    <label
+                      for="tender-recommendation-policy"
+                      i18n="@@tenderBuilder.recommendationPolicy"
+                      >Recommendation policy</label
+                    >
+                    <select
+                      id="tender-recommendation-policy"
+                      name="recommendationPolicyId"
+                      [disabled]="!canEdit()"
+                      [(ngModel)]="form.recommendationPolicyId"
+                    >
+                      <option value="" i18n="@@tenderBuilder.criteriaNone">Not declared</option>
+                      @for (
+                        option of tender().criteriaOptions?.recommendation ?? [];
+                        track option.id
+                      ) {
+                        <option [value]="option.id">
+                          {{ option.name }} · v{{ option.versionNumber }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                </div>
+                <label class="tnd-choice">
+                  <input
+                    type="checkbox"
+                    name="criteriaDisclosed"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.criteriaDisclosed"
+                  />
+                  <span i18n="@@tenderBuilder.criteriaDisclose"
+                    >Show the criteria and weights to bidders</span
+                  >
+                </label>
+                <p class="prj-hint" i18n="@@tenderBuilder.criteriaHint">
+                  Publication records the versions in force, before any price is seen. Choosing
+                  other criteria after opening needs a reason and is flagged to approvers.
+                </p>
+              }
+            </fieldset>
+            <fieldset class="prj-fieldset prj-span-all">
+              <legend i18n="@@tenderBuilder.pricingLegend">Pricing basis</legend>
+              @if (tender().pricingBasisRequired) {
+                <p class="prj-hint" i18n="@@tenderBuilder.pricingRequiredHint">
+                  Your company requires every tender to state its VAT basis before it is published.
+                </p>
+              }
+              <div class="prj-grid">
+                <div class="prj-field">
+                  <label for="tender-vat" i18n="@@tenderBuilder.vatTreatment">VAT treatment</label>
+                  <select
+                    id="tender-vat"
+                    name="vatTreatment"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.vatTreatment"
+                  >
+                    <option value="" i18n="@@tenderBuilder.vatNotStated">Not stated</option>
+                    @for (treatment of vatTreatments; track treatment) {
+                      <option [value]="treatment">{{ vatLabel(treatment) }}</option>
+                    }
+                  </select>
+                </div>
+                @if (form.vatTreatment && form.vatTreatment !== 'NotApplicable') {
+                  <div class="prj-field">
+                    <label for="tender-vat-rate" i18n="@@tenderBuilder.vatRate">VAT rate (%)</label>
+                    <input
+                      id="tender-vat-rate"
+                      name="vatRatePercent"
+                      dir="ltr"
+                      inputmode="decimal"
+                      [disabled]="!canEdit()"
+                      [(ngModel)]="form.vatRatePercent"
+                    />
+                  </div>
+                }
+                <div class="prj-field prj-span-all">
+                  <label for="tender-pricing-note" i18n="@@tenderBuilder.pricingNote"
+                    >Pricing note (optional)</label
+                  >
+                  <input
+                    id="tender-pricing-note"
+                    name="pricingNote"
+                    maxlength="500"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.pricingNote"
+                  />
+                </div>
+              </div>
+            </fieldset>
+            <fieldset class="prj-fieldset prj-span-all">
+              <legend i18n="@@tenderBuilder.termsLegend">Requested commercial terms</legend>
+              <p class="prj-hint" i18n="@@tenderBuilder.termsHint">
+                Every bid answers these, and leveling shows the answers side by side. Percentages
+                have at most two decimals; nothing is rounded.
+              </p>
+              <div class="prj-grid">
+                <div class="prj-field">
+                  <label for="tender-retention" i18n="@@tenderBuilder.retention"
+                    >Retention (%)</label
+                  >
+                  <input
+                    id="tender-retention"
+                    name="retentionPercent"
+                    dir="ltr"
+                    inputmode="decimal"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.retentionPercent"
+                  />
+                </div>
+                <div class="prj-field">
+                  <label for="tender-advance" i18n="@@tenderBuilder.advance"
+                    >Advance payment (%)</label
+                  >
+                  <input
+                    id="tender-advance"
+                    name="advancePaymentPercent"
+                    dir="ltr"
+                    inputmode="decimal"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.advancePaymentPercent"
+                  />
+                </div>
+                <div class="prj-field">
+                  <label for="tender-security" i18n="@@tenderBuilder.security"
+                    >Performance security (%)</label
+                  >
+                  <input
+                    id="tender-security"
+                    name="performanceSecurityPercent"
+                    dir="ltr"
+                    inputmode="decimal"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.performanceSecurityPercent"
+                  />
+                </div>
+                <div class="prj-field">
+                  <label class="tnd-choice">
+                    <input
+                      type="checkbox"
+                      name="bidBondRequired"
+                      [disabled]="!canEdit()"
+                      [(ngModel)]="form.bidBondRequired"
+                    />
+                    <ng-container i18n="@@tenderBuilder.bidBond"
+                      >A bid bond is required</ng-container
+                    >
+                  </label>
+                </div>
+                <div class="prj-field prj-span-all">
+                  <label for="tender-payment-note" i18n="@@tenderBuilder.paymentNote"
+                    >Payment terms note (optional)</label
+                  >
+                  <textarea
+                    id="tender-payment-note"
+                    name="paymentTermsNote"
+                    rows="2"
+                    maxlength="2000"
+                    [disabled]="!canEdit()"
+                    [(ngModel)]="form.paymentTermsNote"
+                  ></textarea>
+                </div>
+              </div>
+            </fieldset>
+            <div class="prj-field prj-span-all">
+              <label for="tender-required-docs" i18n="@@tenderField.requiredDocuments"
+                >Required documents</label
+              >
+              <textarea
+                id="tender-required-docs"
+                name="requiredDocuments"
+                rows="4"
+                aria-describedby="tender-required-docs-help"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.requiredDocuments"
+              ></textarea>
+              <p
+                id="tender-required-docs-help"
+                class="prj-hint"
+                i18n="@@tenderBuilder.requiredDocsHelp"
+              >
+                One per line, for example "Priced BOQ" or "Method statement" (up to 20).
+              </p>
+            </div>
+            <div class="prj-field prj-span-all">
+              <label for="tender-instructions" i18n="@@tenderField.submissionInstructions"
+                >Submission instructions</label
+              >
+              <textarea
+                id="tender-instructions"
+                name="submissionInstructions"
+                rows="4"
+                maxlength="4000"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.submissionInstructions"
+              ></textarea>
+            </div>
+          </div>
+          @if (canEdit()) {
+            <div class="prj-form-actions">
+              <button class="prj-btn" type="submit" [disabled]="busy()">
+                <ng-container i18n="@@tenderBuilder.saveContinue">Save and continue</ng-container>
+              </button>
+            </div>
+          }
+        </form>
+      }
+
+      @case ('invitees') {
+        <section class="prj-section" aria-labelledby="invitees-title">
+          <h2 id="invitees-title">{{ stepLabel('invitees') }}</h2>
+          @if (tender().approvedShortlist; as shortlist) {
+            <p class="prj-hint" i18n="@@tenderBuilder.shortlistSource">
+              From the approved shortlist, round {{ shortlist.round }}, approved by
+              <bdi>{{ shortlist.approvedByName }}</bdi> on
+              {{ shortlist.approvedAtUtc | businessDate: 'instant' }}. Each firm is re-checked when
+              the tender is published.
+            </p>
+            @if (shortlist.fastPath) {
+              <p>
+                <span class="prj-chip" i18n="@@tenderBuilder.fastPathChip"
+                  >Low-value fast path</span
+                >
+              </p>
+            }
+            @if (canEdit() && uninvited().length) {
+              <div class="prj-actions">
+                <button
+                  class="prj-btn"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="inviteAll()"
+                  i18n="@@tenderBuilder.inviteAll"
+                >
+                  Invite all shortlisted ({{ uninvited().length }})
+                </button>
+              </div>
+            }
+            @if (skipped().length) {
+              <div class="prj-note" role="status">
+                <p i18n="@@tenderBuilder.inviteAllSkipped">These firms were not invited:</p>
+                <ul>
+                  @for (skip of skipped(); track skip.subcontractorCode) {
+                    <li>
+                      <bdi dir="ltr">{{ skip.subcontractorCode }}</bdi> —
+                      @if (skip.reason === 'not_active') {
+                        <ng-container i18n="@@tenderBuilder.skipNotActive"
+                          >not active in the directory</ng-container
+                        >
+                      } @else {
+                        <ng-container i18n="@@tenderBuilder.skipNoContact"
+                          >no contact with an email address</ng-container
+                        >
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          } @else {
+            <p class="prj-note prj-note--error" role="alert" i18n="@@tenderBuilder.noShortlist">
+              No shortlist is approved for this work package right now, so nobody can be invited or
+              published to. Approve the shortlist in Sourcing again.
+            </p>
+          }
+          @if (inviteeWarnings().length) {
+            <p class="prj-note prj-note--error" role="alert" i18n="@@tenderBuilder.inviteeWarnings">
+              Some invitees are no longer on the approved shortlist or not active in the directory.
+              Remove them before publishing.
+            </p>
+          }
+          <div class="prj-table-wrap" role="region" aria-labelledby="invitees-caption" tabindex="0">
+            <table class="prj-table">
+              <caption
+                id="invitees-caption"
+                class="prj-visually-hidden"
+                i18n="@@tenderBuilder.inviteesCaption"
+              >
+                Approved shortlist and invitees
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" i18n="@@tenderBuilder.colFirm">Subcontractor</th>
+                  <th scope="col" i18n="@@tenderBuilder.colDirectory">Directory status</th>
+                  <th scope="col" i18n="@@tenderBuilder.colRecipient">Recipient</th>
+                  <th scope="col">
+                    <span class="prj-visually-hidden" i18n="@@common.actions">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (member of members(); track member.subcontractorId) {
+                  @let invitation = invitationOf(member);
+                  <tr>
+                    <td>
+                      <bdi dir="ltr" class="tnd-code">{{ member.code }}</bdi>
+                      <bdi>{{ member.legalName }}</bdi>
+                    </td>
+                    <td>
+                      <span class="prj-chip prj-chip--{{ member.currentStanding }}">{{
+                        standingLabel(member.currentStanding)
+                      }}</span>
+                    </td>
+                    <td>
+                      @if (emailContacts(member).length === 0) {
+                        <span class="prj-hint" i18n="@@tenderBuilder.noEmailContact"
+                          >No contact with an email address. Add one in the directory.</span
+                        >
+                      } @else {
+                        <label
+                          class="prj-visually-hidden"
+                          [attr.for]="'recipient-' + member.subcontractorId"
+                          ><ng-container i18n="@@tenderBuilder.recipientFor"
+                            >Recipient for</ng-container
+                          >&ngsp;<bdi>{{ member.legalName }}</bdi></label
+                        >
+                        <select
+                          [id]="'recipient-' + member.subcontractorId"
+                          [disabled]="!canEdit() || busy()"
+                          [ngModel]="chosenContact(member)"
+                          (ngModelChange)="
+                            choices[member.subcontractorId] = $event;
+                            invitation && changeRecipient(invitation, $event)
+                          "
+                        >
+                          @for (contact of emailContacts(member); track contact.contactId) {
+                            <option [value]="contact.contactId">
+                              {{ contact.name }} — {{ contact.email }}
+                            </option>
+                          }
+                        </select>
+                      }
+                    </td>
+                    <td>
+                      @if (invitation) {
+                        <span class="prj-chip" i18n="@@tenderBuilder.added">Added</span>
+                        @if (canEdit()) {
+                          &ngsp;
+                          <button
+                            class="prj-btn prj-btn--ghost"
+                            type="button"
+                            (click)="open({ kind: 'removeInvitee', invitation })"
+                          >
+                            <ng-container i18n="@@tenderBuilder.remove">Remove</ng-container>
+                            <span class="prj-visually-hidden"
+                              >&ngsp;<bdi>{{ member.legalName }}</bdi></span
+                            >
+                          </button>
+                        }
+                      } @else if (canEdit()) {
+                        <button
+                          class="prj-btn"
+                          type="button"
+                          [disabled]="
+                            busy() || member.currentStanding !== 'Active' || !chosenContact(member)
+                          "
+                          (click)="addInvitee(member)"
+                        >
+                          <ng-container i18n="@@tenderBuilder.invite">Invite</ng-container>
+                          <span class="prj-visually-hidden"
+                            >&ngsp;<bdi>{{ member.legalName }}</bdi></span
+                          >
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+                @for (invitation of inviteeWarnings(); track invitation.id) {
+                  @if (!memberFor(invitation)) {
+                    <tr class="tnd-row-warning">
+                      <td>
+                        <bdi dir="ltr" class="tnd-code">{{ invitation.subcontractorCode }}</bdi>
+                        <bdi>{{ invitation.subcontractorName }}</bdi>
+                      </td>
+                      <td colspan="2">
+                        <span class="tnd-attention" i18n="@@tenderBuilder.notOnShortlist"
+                          >No longer on the approved shortlist</span
+                        >
+                      </td>
+                      <td>
+                        @if (canEdit()) {
+                          <button
+                            class="prj-btn prj-btn--ghost"
+                            type="button"
+                            (click)="open({ kind: 'removeInvitee', invitation })"
+                          >
+                            <ng-container i18n="@@tenderBuilder.remove">Remove</ng-container>
+                          </button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="prj-hint" i18n="@@tenderBuilder.inviteeCount">
+            Invitees: {{ invitees().length }}. Each receives its own personal link; no bidder can
+            see who else is invited.
+          </p>
+          <div class="prj-form-actions">
+            <button
+              class="prj-btn"
+              type="button"
+              (click)="go('dates')"
+              i18n="@@tenderBuilder.continue"
+            >
+              Continue
+            </button>
+          </div>
+        </section>
+      }
+
+      @case ('dates') {
+        <form class="prj-form" (ngSubmit)="save('review')" aria-labelledby="dates-title">
+          <!-- CF-020 (B-020-2): the errors of an invalid submit, first in the form. -->
+          <app-error-summary />
+          <h2 id="dates-title">{{ stepLabel('dates') }}</h2>
+          <div class="prj-grid">
+            <div class="prj-field prj-span-all">
+              <label for="tender-zone" i18n="@@tenderField.timeZone">Time zone</label>
+              <select
+                id="tender-zone"
+                name="timeZoneId"
+                dir="ltr"
+                aria-describedby="tender-zone-help"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.timeZoneId"
+              >
+                @for (zone of zones(); track zone) {
+                  <option [value]="zone">{{ zone }}</option>
+                }
+              </select>
+              <p id="tender-zone-help" class="prj-hint" i18n="@@tenderBuilder.zoneHelp">
+                Deadlines are entered and shown to bidders in this time zone, with its UTC offset,
+                so nobody has to guess.
+              </p>
+            </div>
+            <div class="prj-field">
+              <label for="tender-deadline" i18n="@@tenderField.deadline">Submission deadline</label>
+              <input
+                id="tender-deadline"
+                name="submissionDeadlineLocal"
+                type="datetime-local"
+                dir="ltr"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.submissionDeadlineLocal"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="tender-questions" i18n="@@tenderField.questionsDeadline"
+                >Questions deadline</label
+              >
+              <input
+                id="tender-questions"
+                name="questionsDeadlineLocal"
+                type="datetime-local"
+                dir="ltr"
+                aria-describedby="tender-questions-help"
+                [disabled]="!canEdit()"
+                [(ngModel)]="form.questionsDeadlineLocal"
+              />
+              <p id="tender-questions-help" class="prj-hint" i18n="@@tenderBuilder.questionsHelp">
+                Optional. Shown to bidders as the last day for questions.
+              </p>
+            </div>
+          </div>
+          <fieldset class="prj-fieldset" [disabled]="!canEdit()">
+            <legend i18n="@@tenderBuilder.remindersLegend">Automatic reminders</legend>
+            <p class="prj-hint" i18n="@@tenderBuilder.remindersHelp">
+              Sent to invitees who have not declined, before the deadline. Choose up to
+              {{ maxReminders }}.
+            </p>
+            <div class="tnd-reminder-options">
+              @for (day of reminderOptions; track day) {
+                <label class="tnd-choice">
+                  <input
+                    type="checkbox"
+                    [checked]="form.reminderDays.includes(day)"
+                    [disabled]="reminderDisabled(day)"
+                    (change)="toggleReminder(day, $any($event.target).checked)"
+                  />
+                  <span i18n="@@tenderBuilder.daysBefore">{day, plural,
+                    =1 {1 day before}
+                    other {{{ day }} days before}
+                  }</span>
+                </label>
+              }
+            </div>
+            @if (form.reminderDays.length) {
+              <ul class="prj-hint tnd-plan" role="list">
+                @for (plan of reminderPlan(); track plan.day) {
+                  @let day = plan.day;
+                  <li>
+                    <span i18n="@@tenderBuilder.daysBefore">{day, plural,
+                      =1 {1 day before}
+                      other {{{ day }} days before}
+                    }</span
+                    >:
+                    @if (plan.local) {
+                      <bdi>{{ describe(plan.local) }}</bdi>
+                    } @else if (form.submissionDeadlineLocal) {
+                      <span class="tnd-attention" i18n="@@tenderBuilder.reminderPast"
+                        >already past, so it will not be sent</span
+                      >
+                    } @else {
+                      <span i18n="@@tenderBuilder.reminderNeedsDeadline"
+                        >set the deadline first</span
+                      >
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </fieldset>
+          @if (canEdit()) {
+            <div class="prj-form-actions">
+              <button class="prj-btn" type="submit" [disabled]="busy()">
+                <ng-container i18n="@@tenderBuilder.saveContinue">Save and continue</ng-container>
+              </button>
+            </div>
+          }
+        </form>
+      }
+
+      @case ('review') {
+        <section class="prj-section" aria-labelledby="review-title">
+          <h2 id="review-title">{{ stepLabel('review') }}</h2>
+          @if (dirty()) {
+            <p class="prj-note prj-note--error" role="alert" i18n="@@tenderBuilder.unsaved">
+              Some changes are not saved yet. Save them before publishing.
+            </p>
+          }
+          @if (shortBidPeriod(); as period) {
+            <p class="prj-note tnd-attention-box" role="note" i18n="@@tenderBuilder.shortBidPeriod">
+              The deadline leaves firms less than {{ period.normalDays }} days to bid, your
+              company's normal period. Publishing is allowed; it is refused below
+              {{ period.minimumHours }}
+              hour(s).
+            </p>
+          }
+          <!-- CF-013 AC3: a missing policy is a warning only; publishing stays allowed. -->
+          @for (warning of policyWarnings(); track warning) {
+            <p class="prj-note tnd-attention-box" role="note" data-testid="policy-warning">
+              {{ warning }}
+            </p>
+          }
+          @if (tender().missingForPublication.length) {
+            <div class="prj-note" role="note">
+              <strong i18n="@@tenderBuilder.missingTitle">Still needed before publishing</strong>
+              <ul role="list">
+                @for (field of tender().missingForPublication; track field) {
+                  <li>{{ fieldLabel(field) }}</li>
+                }
+              </ul>
+            </div>
+          }
+          <dl class="tnd-review">
+            <div>
+              <dt i18n="@@tenders.colReference">Reference</dt>
+              <dd>
+                <bdi dir="ltr">{{ tender().reference }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@tenderBuilder.typeLegend">Tender type</dt>
+              <dd>{{ typeLabel(tender().type) }}</dd>
+            </div>
+            <div>
+              <dt i18n="@@tenderField.deadline">Submission deadline</dt>
+              <dd>
+                <bdi>{{ deadlineShown() }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@tenderField.invitees">Invitees</dt>
+              <dd>
+                <bdi dir="ltr">{{ invitees().length }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@tenderBuilder.stepDocuments">Documents</dt>
+              <dd>
+                <bdi dir="ltr">{{ tender().documents.length }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@tenderField.currency">Bid currency</dt>
+              <dd>
+                <bdi dir="ltr">{{ tender().currency ?? '—' }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@tenderBuilder.scheduleLegend">Price schedule</dt>
+              <dd>
+                @if (tender().schedule?.length) {
+                  <span i18n="@@tenderBuilder.scheduleItems"
+                    >{{ tender().schedule?.length }} items, frozen at publication</span
+                  >
+                } @else {
+                  <span i18n="@@tenderBuilder.lumpSum">Lump sum</span>
+                }
+              </dd>
+            </div>
+          </dl>
+
+          <h3 i18n="@@tenderBuilder.emailPreviewTitle">Invitation email</h3>
+          @if (previewError()) {
+            <p class="prj-note prj-note--error" role="alert">{{ previewError() }}</p>
+          } @else if (preview(); as email) {
+            <dl class="tnd-review">
+              <div>
+                <dt i18n="@@tenderBuilder.from">From</dt>
+                <dd>
+                  <bdi>{{ email.fromName ?? '—' }}</bdi>
+                  @if (email.fromAddress) {
+                    &ngsp;<bdi dir="ltr">&lt;{{ email.fromAddress }}&gt;</bdi>
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt i18n="@@tenderBuilder.replyTo">Replies go to</dt>
+                <dd>
+                  <bdi dir="ltr">{{ email.replyToAddress ?? '—' }}</bdi>
+                </dd>
+              </div>
+              <div>
+                <dt i18n="@@templateField.subject">Subject</dt>
+                <dd>
+                  <bdi>{{ email.subject }}</bdi>
+                </dd>
+              </div>
+            </dl>
+            @if (!email.senderReady) {
+              <p class="prj-note prj-note--error" role="alert">
+                <ng-container i18n="@@tenderBuilder.senderNotReady"
+                  >Emails cannot be sent right now:</ng-container
+                >&ngsp;{{ failureLabel(email.senderProblem) }}.
+              </p>
+            }
+            <pre
+              class="tnd-email"
+              [attr.dir]="email.locale === 'ar' ? 'rtl' : 'ltr'"
+              [attr.lang]="email.locale"
+              >{{ email.textBody }}</pre>
+            <p class="prj-hint" i18n="@@tenderBuilder.previewNote">
+              The link above is a placeholder; each invitee receives a personal link. A mail server
+              accepting an email does not guarantee it reaches the inbox.
+            </p>
+          } @else {
+            <p class="prj-hint" i18n="@@tenderBuilder.previewLoading">Preparing the preview…</p>
+          }
+
+          @if (tender().publishRequestedAtUtc) {
+            <p class="prj-note" role="status" i18n="@@tenderBuilder.readyToPublish">
+              Ready to publish — marked by <bdi>{{ tender().publishRequestedByName }}</bdi
+              >, {{ tender().publishRequestedAtUtc | businessDate: 'instant' }}. Any change clears
+              it.
+            </p>
+          }
+          @if (tender().requireIndependentPublish) {
+            <p class="prj-hint" i18n="@@tenderBuilder.fourEyes">
+              Your company requires the tender to be published by someone other than who prepared or
+              last changed it.
+            </p>
+          }
+          <div class="prj-form-actions">
+            @if (can('Tenders.Edit') && !tender().publishRequestedAtUtc) {
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="busy() || dirty() || tender().missingForPublication.length > 0"
+                (click)="requestPublish()"
+                i18n="@@tenderBuilder.requestPublish"
+              >
+                Mark ready to publish
+              </button>
+            }
+            @if (canPublish()) {
+              <button
+                class="prj-btn"
+                type="button"
+                [disabled]="
+                  busy() ||
+                  dirty() ||
+                  tender().missingForPublication.length > 0 ||
+                  inviteeWarnings().length > 0
+                "
+                (click)="open({ kind: 'publish' })"
+              >
+                <ng-container i18n="@@tenderBuilder.publish"
+                  >Publish and send invitations</ng-container
+                >
+              </button>
+            } @else if (can('Tenders.Edit')) {
+              <p class="prj-hint" i18n="@@tenderBuilder.publishByManager">
+                A Procurement Manager or Company Admin publishes the tender.
+              </p>
+            }
+            @if (canCancel()) {
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="open({ kind: 'cancel' })"
+              >
+                <ng-container i18n="@@tenderBuilder.cancelDraft">Cancel draft</ng-container>
+              </button>
+            }
+          </div>
+        </section>
+      }
+    }
+  </div>
+</div>
+
+@if (dialog(); as current) {
+  @switch (current.kind) {
+    @case ('publish') {
+      <app-confirm-dialog
+        heading="Publish this tender?"
+        i18n-heading="@@tenderBuilder.publishHeading"
+        confirmLabel="Publish and send"
+        i18n-confirmLabel="@@tenderBuilder.publishConfirm"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="close()"
+      >
+        <p i18n="@@tenderBuilder.publishBody">
+          An invitation email goes to every invitee (invitees: {{ invitees().length }}), each with a
+          personal link. What bidders see — scope, requirements, documents and deadline — is frozen
+          and can no longer be edited here. The tender uses one of your plan's active-tender places.
+        </p>
+        @for (warning of policyWarnings(); track warning) {
+          <p class="prj-note tnd-attention-box" role="note" data-testid="policy-warning">
+            {{ warning }}
+          </p>
+        }
+        @if (dialogError()) {
+          <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+        }
+      </app-confirm-dialog>
+    }
+    @case ('cancel') {
+      <app-confirm-dialog
+        heading="Cancel this draft?"
+        i18n-heading="@@tenderBuilder.cancelHeading"
+        confirmLabel="Cancel draft"
+        i18n-confirmLabel="@@tenderBuilder.cancelDraft"
+        [danger]="true"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="close()"
+      >
+        <p i18n="@@tenderBuilder.cancelBody">
+          Nothing has been sent. The draft stays on record as cancelled, and a new tender can be
+          created for the work package.
+        </p>
+        <div class="prj-field">
+          <label for="cancel-reason" i18n="@@tenderField.reason">Reason</label>
+          <textarea
+            id="cancel-reason"
+            rows="3"
+            [attr.maxlength]="reasonMax"
+            [attr.aria-invalid]="!!dialogError()"
+            [attr.aria-describedby]="dialogError() ? 'cancel-reason-error' : null"
+            [(ngModel)]="cancelReason"
+            (input)="dialogError.set('')"
+          ></textarea>
+        </div>
+        @if (dialogError()) {
+          <p id="cancel-reason-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+        }
+      </app-confirm-dialog>
+    }
+    @case ('removeDocument') {
+      <app-confirm-dialog
+        heading="Remove this document?"
+        i18n-heading="@@tenderBuilder.removeDocumentHeading"
+        confirmLabel="Remove document"
+        i18n-confirmLabel="@@tenderBuilder.removeDocument"
+        [danger]="true"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="close()"
+      >
+        <p>
+          <bdi>{{ current.document.fileName }}</bdi>
+        </p>
+        <p i18n="@@tenderBuilder.removeDocumentBody">
+          It will not be part of the published tender.
+        </p>
+        @if (dialogError()) {
+          <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+        }
+      </app-confirm-dialog>
+    }
+    @case ('removeInvitee') {
+      <app-confirm-dialog
+        heading="Remove this invitee?"
+        i18n-heading="@@tenderBuilder.removeInviteeHeading"
+        confirmLabel="Remove invitee"
+        i18n-confirmLabel="@@tenderBuilder.removeInvitee"
+        [danger]="true"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="close()"
+      >
+        <p>
+          <bdi dir="ltr">{{ current.invitation.subcontractorCode }}</bdi> ·
+          <bdi>{{ current.invitation.subcontractorName }}</bdi>
+        </p>
+        <p i18n="@@tenderBuilder.removeInviteeBody">Nothing was sent to this firm yet.</p>
+        @if (dialogError()) {
+          <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+        }
+      </app-confirm-dialog>
+    }
+  }
+}

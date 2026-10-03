@@ -1,0 +1,80 @@
+.aud-filters {
+  flex-wrap: wrap;
+}
+
+.aud-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aud-when,
+.aud-what {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  align-items: center;
+  margin: 0 0 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.aud-what code {
+  font-size: 0.9rem;
+}
+
+.aud-ref {
+  font-family: var(--font-label);
+  color: var(--color-muted);
+}
+
+.aud-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.aud-details div {
+  display: flex;
+  gap: 0.35rem;
+  min-inline-size: 0;
+}
+
+.aud-details dt {
+  color: var(--color-muted);
+}
+
+.aud-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.aud-when .prj-chip {
+  white-space: normal;
+}
+
+/* CF-122 (ADR-148): the request an entry was recorded in. */
+.aud-request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.aud-request-show {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.aud-agent {
+  max-inline-size: 32rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-muted);
+}

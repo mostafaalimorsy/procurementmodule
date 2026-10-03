@@ -1,0 +1,320 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/projects" i18n="@@nav.projects">Projects</a><span aria-hidden="true">/</span>
+    <span>
+      @if (projectLabel(); as label) {
+        <bdi>{{ label }}</bdi>
+      } @else {
+        <ng-container i18n="@@project.crumb">Project</ng-container>
+      }
+    </span>
+    <span aria-hidden="true">/</span>
+    <span>
+      @if (isEdit) {
+        <ng-container i18n="@@packageForm.editCrumb">Edit work package</ng-container>
+      } @else {
+        <ng-container i18n="@@packageForm.newCrumb">New work package</ng-container>
+      }
+    </span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@packageForm.eyebrow">Procurement scope</p>
+      <h1>
+        @if (isEdit) {
+          @if (title) {
+            <bdi>{{ title }}</bdi>
+          } @else {
+            <ng-container i18n="@@packageForm.editCrumb">Edit work package</ng-container>
+          }
+        } @else {
+          <ng-container i18n="@@packageForm.createTitle">Add a work package</ng-container>
+        }
+      </h1>
+      <p i18n="@@packageForm.intro">
+        A work package is a scope you will procure as one lot. It stays a draft until you activate
+        it, and it is priced in the project currency.
+      </p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@common.loading">Loading…</p>
+  } @else {
+    <form
+      class="prj-form"
+      novalidate
+      (ngSubmit)="save()"
+      (input)="edited($event)"
+      (change)="edited($event)"
+    >
+      <!-- CF-020 (B-020-2): the errors of an invalid submit, first in the form. -->
+      <app-error-summary />
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@packageForm.scope">Scope</legend>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="wp-code"
+              ><ng-container i18n="@@packageForm.code">Package code</ng-container>
+              <span aria-hidden="true">*</span></label
+            >
+            <input
+              dir="ltr"
+              class="ltr-token"
+              id="wp-code"
+              name="code"
+              required
+              maxlength="32"
+              autocomplete="off"
+              [(ngModel)]="code"
+              [attr.aria-invalid]="
+                (submitted && codeInvalid) || serverError('code') ? 'true' : null
+              "
+              [attr.aria-describedby]="
+                submitted && codeInvalid
+                  ? 'wp-code-error'
+                  : serverError('code')
+                    ? 'wp-code-server-error'
+                    : 'wp-code-hint'
+              "
+            />
+            @if (submitted && codeInvalid) {
+              <span id="wp-code-error" class="prj-error-text" i18n="@@packageForm.codeError">
+                Use 2–32 letters, digits, dash, underscore or slash — for example
+                <bdi dir="ltr">HVAC-01</bdi>.
+              </span>
+            } @else if (serverError('code'); as message) {
+              <span id="wp-code-server-error" class="prj-error-text">{{ message }}</span>
+            } @else {
+              <span id="wp-code-hint" class="prj-hint" i18n="@@packageForm.codeHint">
+                Unique within this project. The same code may be reused on other projects.
+              </span>
+            }
+          </div>
+          <div class="prj-field">
+            <label for="wp-title"
+              ><ng-container i18n="@@project.title">Title</ng-container>
+              <span aria-hidden="true">*</span></label
+            >
+            <input
+              id="wp-title"
+              name="title"
+              required
+              maxlength="200"
+              [(ngModel)]="title"
+              [attr.aria-invalid]="
+                (submitted && titleInvalid) || serverError('title') ? 'true' : null
+              "
+              [attr.aria-describedby]="
+                submitted && titleInvalid
+                  ? 'wp-title-error'
+                  : serverError('title')
+                    ? 'wp-title-server-error'
+                    : null
+              "
+            />
+            @if (submitted && titleInvalid) {
+              <span id="wp-title-error" class="prj-error-text" i18n="@@packageForm.titleError"
+                >A title is required.</span
+              >
+            } @else if (serverError('title'); as message) {
+              <span id="wp-title-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+          <div class="prj-field">
+            <label for="wp-category" i18n="@@packageForm.category">Trade / category</label>
+            <select
+              id="wp-category"
+              name="tradeId"
+              [attr.aria-invalid]="serverError('category') ? 'true' : null"
+              [attr.aria-describedby]="
+                serverError('category') ? 'wp-category-server-error' : 'wp-category-hint'
+              "
+              [(ngModel)]="tradeChoice"
+              (ngModelChange)="edited()"
+            >
+              <option value="" i18n="@@packageForm.noCategory">No category yet</option>
+              @if (legacyCategory; as legacy) {
+                <option [value]="legacyChoice" i18n="@@packageForm.keepLegacy">
+                  Keep “{{ legacy }}” (recorded before trades were used)
+                </option>
+              }
+              @for (trade of tradeOptions; track trade.id) {
+                <option [value]="trade.id">{{ trade.name }} ({{ trade.code }})</option>
+              }
+            </select>
+            @if (serverError('category'); as message) {
+              <span id="wp-category-server-error" class="prj-error-text">{{ message }}</span>
+            }
+            <span id="wp-category-hint" class="prj-hint">
+              @if (trades()?.length === 0) {
+                <ng-container i18n="@@packageForm.noTrades"
+                  >The company's trades define categories. Ask a trade manager to add them in the
+                  subcontractor directory.</ng-container
+                >
+              } @else {
+                <ng-container i18n="@@packageForm.categoryHint"
+                  >Categories are the company's trades, so history is never split by spelling. A
+                  trade is needed before sourcing starts.</ng-container
+                >
+              }
+            </span>
+          </div>
+          <div class="prj-field prj-span-all">
+            <label for="wp-scope" i18n="@@packages.scopeSummary">Scope summary</label>
+            <textarea
+              id="wp-scope"
+              name="scopeSummary"
+              maxlength="4000"
+              [(ngModel)]="scopeSummary"
+              [attr.aria-invalid]="serverError('scopeSummary') ? 'true' : null"
+              [attr.aria-describedby]="serverError('scopeSummary') ? 'wp-scope-server-error' : null"
+            ></textarea>
+            @if (serverError('scopeSummary'); as message) {
+              <span id="wp-scope-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+          <div class="prj-field prj-span-all">
+            <label for="wp-description" i18n="@@packages.notes">Notes</label>
+            <textarea
+              id="wp-description"
+              name="description"
+              maxlength="4000"
+              [(ngModel)]="description"
+              [attr.aria-invalid]="serverError('description') ? 'true' : null"
+              [attr.aria-describedby]="
+                serverError('description') ? 'wp-description-server-error' : null
+              "
+            ></textarea>
+            @if (serverError('description'); as message) {
+              <span id="wp-description-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@packageForm.commercial">Commercial and programme</legend>
+        <div class="prj-grid">
+          @if (estimateEditable) {
+            <div class="prj-field">
+              <label for="wp-value" i18n="@@project.estimated">Estimated value</label>
+              <input
+                dir="ltr"
+                id="wp-value"
+                name="estimatedValue"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                [(ngModel)]="estimatedValue"
+                [attr.aria-invalid]="
+                  (submitted && valueInvalid) || serverError('estimatedValue') ? 'true' : null
+                "
+                [attr.aria-describedby]="
+                  submitted && valueInvalid
+                    ? 'wp-value-error'
+                    : serverError('estimatedValue')
+                      ? 'wp-value-server-error'
+                      : 'wp-value-hint'
+                "
+              />
+              @if (submitted && valueInvalid) {
+                <span id="wp-value-error" class="prj-error-text" i18n="@@packageForm.valueInvalid">
+                  Enter a non-negative amount with at most {{ valueDecimals }} decimal places.
+                </span>
+              } @else if (serverError('estimatedValue'); as message) {
+                <span id="wp-value-server-error" class="prj-error-text">{{ message }}</span>
+              } @else {
+                <span id="wp-value-hint" class="prj-hint">
+                  @if (currency()) {
+                    <ng-container i18n="@@packageForm.pricedIn"
+                      >Priced in <bdi dir="ltr">{{ currency() }}</bdi
+                      >.</ng-container
+                    >
+                  } @else {
+                    <ng-container i18n="@@packageForm.noCurrency"
+                      >Set a project currency to price this scope.</ng-container
+                    >
+                  }
+                </span>
+              }
+            </div>
+            @if (estimateReasonNeeded) {
+              <div class="prj-field prj-span-all">
+                <label for="wp-estimate-reason" i18n="@@packageForm.estimateReason"
+                  >Why the estimate changes (required)</label
+                >
+                <textarea
+                  id="wp-estimate-reason"
+                  name="estimateReason"
+                  rows="2"
+                  aria-required="true"
+                  [attr.maxlength]="reasonMax"
+                  [(ngModel)]="estimateReason"
+                  [attr.aria-invalid]="submitted && reasonInvalid ? 'true' : null"
+                  aria-describedby="wp-estimate-reason-hint"
+                ></textarea>
+                <span
+                  id="wp-estimate-reason-hint"
+                  [class]="submitted && reasonInvalid ? 'prj-error-text' : 'prj-hint'"
+                  i18n="@@packageForm.estimateReasonHint"
+                  >A tender of this package was published, so the change and its reason are kept in
+                  the estimate history that approvers see (at least
+                  {{ reasonMin }} characters).</span
+                >
+              </div>
+            }
+          }
+          <div class="prj-field">
+            <label for="wp-start" i18n="@@packages.plannedStart">Planned start</label>
+            <input id="wp-start" name="plannedStart" type="date" [(ngModel)]="plannedStartDate" />
+          </div>
+          <div class="prj-field">
+            <label for="wp-end" i18n="@@packages.plannedEnd">Planned end</label>
+            <input
+              id="wp-end"
+              name="plannedEnd"
+              type="date"
+              [(ngModel)]="plannedEndDate"
+              [attr.aria-invalid]="datesOutOfOrder || serverError('plannedEndDate') ? 'true' : null"
+              [attr.aria-describedby]="
+                datesOutOfOrder
+                  ? 'wp-end-error'
+                  : serverError('plannedEndDate')
+                    ? 'wp-end-server-error'
+                    : null
+              "
+            />
+            @if (datesOutOfOrder) {
+              <span id="wp-end-error" class="prj-error-text" i18n="@@packageForm.datesError">
+                The planned end date cannot be before the planned start date.
+              </span>
+            } @else if (serverError('plannedEndDate'); as message) {
+              <span id="wp-end-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="prj-form-actions">
+        <button class="prj-btn" type="submit" [disabled]="saving()">
+          @if (saving()) {
+            <ng-container i18n="@@common.saving">Saving…</ng-container>
+          } @else if (isEdit) {
+            <ng-container i18n="@@common.saveChanges">Save changes</ng-container>
+          } @else {
+            <ng-container i18n="@@packages.add">Add work package</ng-container>
+          }
+        </button>
+        <a class="prj-btn prj-btn--ghost" [routerLink]="cancelLink()" i18n="@@common.cancel"
+          >Cancel</a
+        >
+      </div>
+    </form>
+  }
+</section>

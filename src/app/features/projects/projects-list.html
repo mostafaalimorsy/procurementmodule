@@ -1,0 +1,254 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/" i18n="@@nav.overview">Overview</a><span aria-hidden="true">/</span
+    ><span i18n="@@nav.projects">Projects</span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@projects.eyebrow">Portfolio</p>
+      <h1 i18n="@@nav.projects">Projects</h1>
+      <p i18n="@@projects.intro">
+        Every engagement your company is procuring for, and the scopes inside each one.
+      </p>
+    </div>
+    @if (can(permissions.create)) {
+      <div class="prj-actions">
+        <a class="prj-btn" routerLink="/projects/new" i18n="@@projects.new">New project</a>
+      </div>
+    }
+  </div>
+
+  <form class="prj-filters" role="search" (ngSubmit)="applyFilters()">
+    <div class="prj-field prj-field--grow">
+      <label for="project-search" i18n="@@common.search">Search</label>
+      <input
+        id="project-search"
+        name="search"
+        type="search"
+        autocomplete="off"
+        placeholder="Code, name, client or location"
+        i18n-placeholder="@@projects.searchPlaceholder"
+        [(ngModel)]="search"
+        (ngModelChange)="searchChanged()"
+      />
+    </div>
+    <div class="prj-field">
+      <label for="project-status" i18n="@@project.status">Status</label>
+      <select
+        id="project-status"
+        name="status"
+        [(ngModel)]="status"
+        (ngModelChange)="applyFilters()"
+      >
+        <option value="" i18n="@@projects.allStatuses">All statuses</option>
+        @for (option of statuses; track option) {
+          <option [value]="option">{{ statusLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    @if (isProjectManager()) {
+      <label class="tnd-choice">
+        <input type="checkbox" name="mine" [(ngModel)]="mine" (ngModelChange)="applyFilters()" />
+        <span i18n="@@projects.mine">Only projects I manage</span>
+      </label>
+    }
+    @if (hasFilters) {
+      <button
+        class="prj-btn prj-btn--ghost"
+        type="button"
+        (click)="clearFilters()"
+        i18n="@@projects.clearFilters"
+      >
+        Clear filters
+      </button>
+    }
+  </form>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="reload()" i18n="@@common.retry">
+        Try again
+      </button>
+    </p>
+  }
+
+  <!-- Politely announced so a screen-reader user hears the result count change after filtering. -->
+  <div aria-live="polite" aria-atomic="true">
+    @if (loading()) {
+      <p class="prj-visually-hidden" i18n="@@projects.loading">Loading projects</p>
+      <div class="prj-table-wrap" aria-hidden="true">
+        <div style="display: grid; gap: 0.75rem; padding: 1rem">
+          @for (row of [1, 2, 3, 4, 5]; track row) {
+            <p class="prj-skeleton"></p>
+          }
+        </div>
+      </div>
+    } @else if (result(); as page) {
+      @if (page.totalCount === 0) {
+        <div class="prj-empty">
+          @if (hasFilters) {
+            <h2 i18n="@@projects.noMatchTitle">No projects match those filters</h2>
+            <p i18n="@@projects.noMatchHelp">
+              Try a different search term, or clear the filters to see the whole portfolio.
+            </p>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="clearFilters()"
+              i18n="@@projects.clearFilters"
+            >
+              Clear filters
+            </button>
+          } @else {
+            <h2 i18n="@@projects.emptyTitle">No projects yet</h2>
+            <p i18n="@@projects.emptyHelp">
+              A project is the engagement your procurement work hangs from — a hospital expansion, a
+              tower fit-out, a maintenance contract. Create one, then break it into work packages.
+            </p>
+            @if (can(permissions.create)) {
+              <a class="prj-btn" routerLink="/projects/new" i18n="@@projects.createFirst"
+                >Create the first project</a
+              >
+            } @else {
+              <p i18n="@@projects.askToCreate">
+                Ask a Procurement Manager or Company Admin to create the first project.
+              </p>
+            }
+          }
+        </div>
+      } @else {
+        <p class="prj-visually-hidden">
+          <span i18n="@@projects.found">{page.totalCount, plural,
+            =1 {1 project found}
+            other {{{ page.totalCount }} projects found}
+          }</span>
+        </p>
+        <div class="prj-table-wrap">
+          <table class="prj-table">
+            <caption class="prj-visually-hidden" i18n="@@projects.caption">
+              Projects, sortable by code, name, status and start date
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" [attr.aria-sort]="sortState('Code')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('Code')"
+                  >
+                    <ng-container i18n="@@project.code">Code</ng-container>
+                  </button>
+                </th>
+                <th scope="col" [attr.aria-sort]="sortState('Name')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('Name')"
+                  >
+                    <ng-container i18n="@@projects.colProject">Project</ng-container>
+                  </button>
+                </th>
+                <th scope="col" i18n="@@project.client">Client</th>
+                <th scope="col" [attr.aria-sort]="sortState('Status')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('Status')"
+                  >
+                    <ng-container i18n="@@project.status">Status</ng-container>
+                  </button>
+                </th>
+                <th scope="col" [attr.aria-sort]="sortState('StartDate')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('StartDate')"
+                  >
+                    <ng-container i18n="@@project.start">Start</ng-container>
+                  </button>
+                </th>
+                <th scope="col" i18n="@@projects.colResponsible">Responsible</th>
+                <th scope="col" class="prj-numeric" i18n="@@projects.colPackages">Packages</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (project of page.items; track project.id) {
+                <tr>
+                  <td>
+                    <code dir="ltr" class="ltr-token">{{ project.code }}</code>
+                  </td>
+                  <td>
+                    <a [routerLink]="['/projects', project.id]"
+                      ><bdi>{{ project.name }}</bdi></a
+                    >
+                    @if (project.location) {
+                      <div class="prj-hint">
+                        <bdi>{{ project.location }}</bdi>
+                      </div>
+                    }
+                  </td>
+                  <td>
+                    <bdi>{{ project.clientName || '—' }}</bdi>
+                  </td>
+                  <td>
+                    <span class="prj-chip prj-chip--{{ project.status }}">{{
+                      statusLabel(project.status)
+                    }}</span>
+                  </td>
+                  <td>{{ project.startDate | businessDate }}</td>
+                  <td>
+                    <bdi>{{ project.projectManagerName || '—' }}</bdi>
+                    @if (project.procurementOwnerName) {
+                      <div class="prj-hint" i18n="@@projects.procurementHint">
+                        Procurement: <bdi>{{ project.procurementOwnerName }}</bdi>
+                      </div>
+                    }
+                  </td>
+                  <td class="prj-numeric">{{ project.workPackageCount | businessNumber }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (page.totalPages > 1) {
+          <nav class="prj-pager" aria-label="Project pages" i18n-aria-label="@@projects.pages">
+            <span>
+              <span i18n="@@common.pageOf"
+                >Page <bdi dir="ltr">{{ page.page }}</bdi> of
+                <bdi dir="ltr">{{ page.totalPages }}</bdi></span
+              >
+              ·
+              <span i18n="@@projects.count">{page.totalCount, plural,
+                =1 {1 project}
+                other {{{ page.totalCount }} projects}
+              }</span>
+            </span>
+            <span class="prj-actions">
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="page.page <= 1"
+                (click)="goToPage(page.page - 1)"
+                i18n="@@common.previous"
+              >
+                Previous
+              </button>
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="page.page >= page.totalPages"
+                (click)="goToPage(page.page + 1)"
+                i18n="@@common.next"
+              >
+                Next
+              </button>
+            </span>
+          </nav>
+        }
+      }
+    }
+  </div>
+</section>

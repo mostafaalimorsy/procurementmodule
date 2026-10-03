@@ -1,0 +1,138 @@
+<p class="eyebrow" i18n="@@packages.eyebrow">Commercial terms</p>
+<div class="toolbar">
+  <h1 i18n="@@packages.title">Packages</h1>
+  @if (!editing() && catalogue()) {
+    <button type="button" (click)="create()" i18n="@@packages.new">New package</button>
+  }
+</div>
+<p i18n="@@packages.intro">
+  Package revisions define company entitlements. Tenant roles determine what each person may do.
+</p>
+@if (error()) {
+  <p role="alert" class="error">{{ error() }}</p>
+}
+@if (notice()) {
+  <p role="status" class="notice">{{ notice() }}</p>
+}
+@if (loading()) {
+  <p role="status" i18n="@@platformPackages.loading">Loading packages…</p>
+}
+
+@if (editing(); as mode) {
+  @if (catalogue(); as entitlementCatalogue) {
+    <section class="panel" aria-labelledby="builder-title">
+      <h2 id="builder-title">
+        @if (mode.mode === 'revise') {
+          <ng-container i18n="@@packages.editTerms">Edit package terms</ng-container>
+        } @else {
+          <ng-container i18n="@@packages.createTitle">Create package</ng-container>
+        }
+      </h2>
+      <app-package-builder
+        [catalogue]="entitlementCatalogue"
+        [base]="base()"
+        [packageCode]="mode.mode === 'revise' ? mode.pack.code : ''"
+        [busy]="busy()"
+        (submitted)="save($event)"
+        (cancelled)="editing.set(null)"
+      />
+    </section>
+  }
+}
+
+<section aria-label="Package list" i18n-aria-label="@@packages.listLabel">
+  @for (pack of packages(); track pack.id) {
+    <article class="panel package-card" [attr.aria-labelledby]="'package-' + pack.id">
+      <div class="toolbar">
+        <div>
+          <h2 [id]="'package-' + pack.id">
+            <bdi>{{ current(pack).displayName }}</bdi>
+          </h2>
+          <p class="muted">
+            <bdi dir="ltr">{{ pack.code }}</bdi> ·
+            @if (pack.isActive) {
+              <ng-container i18n="@@status.active">Active</ng-container>
+            } @else {
+              <ng-container i18n="@@packages.inactive">Inactive</ng-container>
+            }
+          </p>
+        </div>
+        <div class="actions">
+          <button
+            type="button"
+            class="secondary"
+            [disabled]="busy() || !pack.isActive || !catalogue()"
+            (click)="edit(pack)"
+          >
+            <ng-container i18n="@@packages.editTerms">Edit package terms</ng-container>
+          </button>
+          <button type="button" class="secondary" [disabled]="busy()" (click)="toggle(pack)">
+            @if (pack.isActive) {
+              <ng-container i18n="@@packages.deactivate">Deactivate</ng-container>
+            } @else {
+              <ng-container i18n="@@packages.activate">Activate</ng-container>
+            }
+          </button>
+        </div>
+      </div>
+      <app-package-terms [features]="current(pack).features" [limits]="current(pack).limits" />
+      <details>
+        <summary i18n="@@packages.history">Revision history</summary>
+        <ol class="revisions" reversed>
+          @for (revision of pack.revisions; track revision.id) {
+            <li>
+              <p>
+                <strong
+                  ><ng-container i18n="@@plan.revision"
+                    >revision <bdi dir="ltr">{{ revision.number }}</bdi></ng-container
+                  ></strong
+                >
+                ·
+                @if (revision.id === current(pack).id) {
+                  <span class="state-chip" i18n="@@revision.current">Current</span>
+                } @else {
+                  <span class="state-chip state-chip--muted" i18n="@@revision.superseded"
+                    >Superseded</span
+                  >
+                }
+                · {{ revision.createdAtUtc | businessDate: 'instant' }} ·
+                <span i18n="@@revision.assigned">{revision.assignedCompanies ?? 0, plural,
+                  =0 {No companies assigned}
+                  =1 {1 company assigned}
+                  other {{{ revision.assignedCompanies }} companies assigned}
+                }</span>
+                @if (revision.workflowIssue) {
+                  ·
+                  <span
+                    class="state-chip state-chip--suspended"
+                    data-testid="revision-incomplete"
+                    i18n="@@revision.incompleteWorkflow"
+                    >Incomplete workflow — not assignable</span
+                  >
+                } @else if (revision.workflowEndsAt) {
+                  ·
+                  <span class="state-chip state-chip--muted" i18n="@@revision.workflowEnds"
+                    >Ends at {{ featureName(revision.workflowEndsAt) }}</span
+                  >
+                }
+              </p>
+              <p>
+                <bdi>{{ revision.displayName }}</bdi>
+                @if (revision.description) {
+                  — <bdi>{{ revision.description }}</bdi>
+                }
+              </p>
+              <app-package-terms [features]="revision.features" [limits]="revision.limits" />
+            </li>
+          }
+        </ol>
+      </details>
+    </article>
+  } @empty {
+    @if (!loading()) {
+      <p i18n="@@packages.empty">
+        No packages yet. Create the first package to enable company provisioning.
+      </p>
+    }
+  }
+</section>

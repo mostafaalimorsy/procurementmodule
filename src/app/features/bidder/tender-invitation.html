@@ -1,0 +1,574 @@
+<div class="bid-page">
+  <header class="bid-header">
+    <div class="bid-identity">
+      @if (invitation(); as item) {
+        @if (logo()) {
+          <!-- Decorative: the company name is written right next to it. -->
+          <img class="bid-logo" [src]="logo()" alt="" />
+        } @else {
+          <span class="bid-initial" aria-hidden="true">{{ item.buyerCompanyName.charAt(0) }}</span>
+        }
+        <span class="bid-identity__text">
+          <strong class="bid-buyer-name"
+            ><bdi>{{ item.buyerCompanyName }}</bdi></strong
+          >
+          <span class="bid-system" i18n="@@bidder.via">Tender portal · via {{ systemName }}</span>
+        </span>
+      } @else {
+        <span class="bid-identity__text">
+          <strong class="bid-brand" i18n="@@bidder.header">Tender invitation</strong>
+          <span class="bid-system">{{ systemName }}</span>
+        </span>
+      }
+    </div>
+    <app-language-selector />
+  </header>
+
+  <main id="main-content" class="bid-main" tabindex="-1">
+    @if (loading()) {
+      <p class="prj-note" role="status" i18n="@@bidder.loading">Opening your invitation…</p>
+    } @else if (invalid()) {
+      <section class="bid-card" aria-labelledby="bid-invalid-title">
+        <h1 id="bid-invalid-title" i18n="@@bidder.invalidTitle">This link cannot be used</h1>
+        <p role="alert">{{ invalid() }}</p>
+      </section>
+    } @else if (invitation(); as item) {
+      @if (mode() === 'bid' && bid()) {
+        <app-bid-workspace
+          [token]="token"
+          [invitation]="item"
+          [initial]="bid()!"
+          (back)="backToOverview()"
+          (submitted)="submitted()"
+        />
+      } @else {
+        <section class="bid-card bid-hero" aria-labelledby="bid-title">
+          <p class="bid-buyer" i18n="@@bidder.buyerInvites">
+            <bdi>{{ item.buyerCompanyName }}</bdi> invites you to submit a bid
+          </p>
+          <h1 id="bid-title" tabindex="-1">
+            <bdi>{{ item.title }}</bdi>
+          </h1>
+          <p class="bid-meta">
+            <bdi dir="ltr">{{ item.reference }}</bdi> · {{ typeLabel(item.type) }} ·
+            <bdi>{{ item.projectName }}</bdi> · <bdi dir="ltr">{{ item.workPackageCode }}</bdi> ·
+            <bdi>{{ item.workPackageTitle }}</bdi>
+          </p>
+          <p i18n="@@bidder.forFirm">
+            Addressed to <bdi>{{ item.recipientName }}</bdi> for
+            <strong
+              ><bdi>{{ item.subcontractorName }}</bdi></strong
+            >.
+          </p>
+          <dl class="bid-dates">
+            <div>
+              <dt i18n="@@tenderField.deadline">Submission deadline</dt>
+              <dd>
+                <strong
+                  ><bdi>{{ deadline() }}</bdi></strong
+                >
+                @if (originalDeadline()) {
+                  <span class="prj-chip bid-extended" i18n="@@deadlineState.deadlineExtended"
+                    >Deadline extended</span
+                  >
+                  <small class="prj-hint bid-block" i18n="@@bidder.firstPublishedDeadline"
+                    >First published deadline: <bdi>{{ originalDeadline() }}</bdi></small
+                  >
+                }
+              </dd>
+            </div>
+            @if (questions()) {
+              <div>
+                <dt i18n="@@tenderField.questionsDeadline">Questions deadline</dt>
+                <dd>
+                  <bdi>{{ questions() }}</bdi>
+                </dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        @if (item.buyerPreview) {
+          <p class="prj-note" role="note" i18n="@@bidder.buyerPreview">
+            You are signed in to the buyer's workspace, so this is a preview of what the invited
+            firm sees. Opening it here is not recorded, and answers can only come from the firm.
+          </p>
+        }
+        @if (!item.buyerPreview && item.linkAccess === 'ViewOnly') {
+          <p class="prj-note" role="note" i18n="@@bidder.viewOnly">
+            This is a view-only copy of the invitation. To answer or bid, open the personal link in
+            the invitation email your company received; the buyer can resend it.
+          </p>
+        } @else if (!item.buyerPreview && item.linkAccess === 'Shown') {
+          <p class="prj-note" role="note" i18n="@@bidder.linkShown">
+            For your protection this link can now only show the invitation. Ask the buyer to send
+            you a new invitation link to answer or continue your bid; anything you saved is kept.
+          </p>
+        }
+        @if (item.state === 'Cancelled') {
+          <p class="prj-note prj-note--error" role="alert" i18n="@@bidder.cancelled">
+            The buyer has cancelled this tender. No response is needed.
+          </p>
+        } @else if (item.state === 'Closed' && item.closedEarlyAt) {
+          <p class="prj-note" role="note" i18n="@@bidder.closedEarly">
+            The buyer closed this tender on <bdi>{{ closedEarly() }}</bdi
+            >, before its deadline. It no longer accepts submissions or changes. A bid you submitted
+            is kept exactly as you submitted it.
+          </p>
+        } @else if (item.state === 'Closed') {
+          <p class="prj-note" role="note" i18n="@@bidder.closed">
+            The submission deadline has passed. This tender no longer accepts responses.
+          </p>
+        }
+
+        @if (communicationsError()) {
+          <p class="prj-note prj-note--error" role="alert">{{ communicationsError() }}</p>
+        }
+        @if (communications(); as view) {
+          <app-bidder-updates
+            part="addenda"
+            [token]="token"
+            [invitation]="item"
+            [view]="view"
+            (updated)="communicationsUpdated($event)"
+            (download)="downloadUpdate($event)"
+          />
+        }
+
+        @if (!item.buyerPreview && (item.bid || item.canBid)) {
+          <section class="bid-card bid-card--bid" aria-labelledby="bid-yours-title">
+            <h2 id="bid-yours-title" i18n="@@bidder.yourBid">Your bid</h2>
+            @if (item.bid?.status === 'Submitted') {
+              <p class="bid-submitted" role="status">
+                <strong i18n="@@bidder.bidSubmitted">Submitted</strong>&ngsp;·&ngsp;<span
+                  i18n="@@bidWorkspace.reference"
+                  >Bid reference</span
+                >&ngsp;<bdi dir="ltr" class="bid-code">{{ item.bid?.reference }}</bdi
+                >&ngsp;·&ngsp;{{ item.bid?.submittedAtUtc | businessDate: 'instant' }}
+              </p>
+              <p class="prj-hint" i18n="@@bidder.submittedHelp">
+                The system received your bid. It is not an approval or an award; the buyer reviews
+                bids after the deadline.
+              </p>
+              @if (item.bid?.tenderRevision && item.bid!.tenderRevision! < item.revision) {
+                <p
+                  class="prj-note bid-attention"
+                  role="note"
+                  i18n="@@bidder.revisedAfterSubmission"
+                >
+                  Your bid answered tender revision {{ item.bid?.tenderRevision }}. The buyer has
+                  since issued an addendum (now revision {{ item.revision }}). Your submitted bid
+                  stays exactly as submitted; contact the buyer if the change affects it.
+                </p>
+              }
+              <div class="prj-actions">
+                <button
+                  class="prj-btn"
+                  type="button"
+                  [disabled]="opening()"
+                  (click)="openBid()"
+                  i18n="@@bidder.viewSubmitted"
+                >
+                  View your submitted bid
+                </button>
+              </div>
+            } @else if (item.bid && item.invitationStatus === 'BidStarted') {
+              <p>
+                <span i18n="@@bidder.draftSaved">Draft in progress</span>&ngsp;·&ngsp;<span
+                  i18n="@@bidWorkspace.reference"
+                  >Bid reference</span
+                >&ngsp;<bdi dir="ltr" class="bid-code">{{ item.bid.reference }}</bdi>
+                @if (item.bid.draftSavedAtUtc) {
+                  &ngsp;·&ngsp;<span i18n="@@bidder.lastSaved"
+                    >last saved {{ item.bid.draftSavedAtUtc | businessDate: 'instant' }}</span
+                  >
+                }
+              </p>
+              @if (item.bid.tenderRevision && item.bid.tenderRevision < item.revision) {
+                <p class="prj-note bid-attention" role="note" i18n="@@bidder.revisedAfterStart">
+                  The tender was updated after you started (now revision {{ item.revision }}). Your
+                  draft is kept as you saved it. Review the changes before submitting.
+                </p>
+              }
+              @if ((item.outstandingAcknowledgements ?? 0) > 0) {
+                <p
+                  class="prj-note bid-attention"
+                  role="note"
+                  i18n="@@bidder.acknowledgeBeforeSubmit"
+                >
+                  Acknowledge the addenda above before you submit your bid.
+                </p>
+              }
+              @if (item.state === 'Open') {
+                <div class="prj-actions">
+                  <button
+                    class="prj-btn"
+                    type="button"
+                    [disabled]="opening()"
+                    (click)="openBid()"
+                    i18n="@@bidder.continueBid"
+                  >
+                    Continue your bid
+                  </button>
+                </div>
+              } @else {
+                @if (item.state === 'Cancelled') {
+                  <p class="prj-hint" i18n="@@bidder.draftCancelled">
+                    The buyer has cancelled this tender: your draft is kept but can no longer be
+                    submitted.
+                  </p>
+                } @else if (item.closedEarlyAt) {
+                  <p class="prj-hint" i18n="@@bidder.draftClosedEarly">
+                    The buyer closed this tender early: your draft is kept but can no longer be
+                    submitted.
+                  </p>
+                } @else {
+                  <p class="prj-hint" i18n="@@bidder.draftClosed">
+                    The deadline has passed: your draft is kept but can no longer be submitted.
+                  </p>
+                }
+                <div class="prj-actions">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="opening()"
+                    (click)="openBid()"
+                    i18n="@@bidder.viewDraft"
+                  >
+                    View your draft
+                  </button>
+                </div>
+              }
+            } @else if (item.canBid) {
+              <p i18n="@@bidder.startHelp">
+                Prepare your commercial and technical response here, attach supporting files, review
+                and submit before the deadline. Your draft is saved as you go and only your company
+                sees it until you submit.
+              </p>
+              <div class="prj-actions">
+                <button class="prj-btn" type="button" [disabled]="opening()" (click)="startBid()">
+                  @if (item.bid) {
+                    <ng-container i18n="@@bidder.resumeBid">Resume your bid</ng-container>
+                  } @else {
+                    <ng-container i18n="@@bidder.startBid">Start your bid</ng-container>
+                  }
+                </button>
+              </div>
+            }
+            <p class="prj-hint">
+              <span i18n="@@bidder.pricesIn">Prices are in</span>&ngsp;<bdi
+                dir="ltr"
+                class="bid-code"
+                >{{ item.currency }}</bdi
+              >
+              ({{ currencyName(item.currency) }})
+            </p>
+          </section>
+        }
+
+        @if (item.buyerPreview || !item.linkAccess || item.linkAccess === 'Firm') {
+          <section class="bid-card" aria-labelledby="bid-answer-title">
+            <h2 id="bid-answer-title" i18n="@@bidder.answerTitle">Your answer</h2>
+            <p>
+              <ng-container i18n="@@bidder.currentAnswer">Current answer:</ng-container
+              >&ngsp;<strong>{{
+                item.invitationStatus === 'Invited' ? noAnswer : statusLabel(item.invitationStatus)
+              }}</strong>
+              @if (item.declineReason) {
+                ({{ reasonLabel(item.declineReason) }})
+              }
+            </p>
+            @if (notice()) {
+              <p id="bid-notice" class="prj-note" role="status" tabindex="-1">{{ notice() }}</p>
+            }
+            @if (error()) {
+              <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+            }
+            @if (item.canRespond) {
+              @if (remaining(); as left) {
+                <p class="prj-hint">
+                  <span i18n="@@bidder.timeLeft">Time left:</span>&ngsp;
+                  @if (left.days === 0 && left.hours === 0) {
+                    <span i18n="@@bidder.lessThanHour">less than an hour</span>
+                  } @else {
+                    @if (left.days > 0) {
+                      <span i18n="@@bidder.daysLeft">{left.days, plural,
+                        =1 {1 day}
+                        other {{{ left.days }} days}
+                      }</span
+                      >&ngsp;
+                    }
+                    @if (left.hours > 0) {
+                      <span i18n="@@bidder.hoursLeft">{left.hours, plural,
+                        =1 {1 hour}
+                        other {{{ left.hours }} hours}
+                      }</span>
+                    }
+                  }
+                </p>
+              }
+              @if (declining()) {
+                <form class="prj-form" (ngSubmit)="decline()" aria-labelledby="bid-decline-title">
+                  <h3 id="bid-decline-title" tabindex="-1" i18n="@@bidder.declineTitle">
+                    Decline this tender
+                  </h3>
+                  <fieldset
+                    class="prj-fieldset"
+                    [attr.aria-describedby]="reasonMissing() ? 'bid-reason-error' : null"
+                  >
+                    <legend i18n="@@bidder.reasonLegend">Why are you declining?</legend>
+                    @for (option of reasons; track option) {
+                      <label class="bid-choice">
+                        <input
+                          type="radio"
+                          name="reason"
+                          [attr.name]="'reason'"
+                          [value]="option"
+                          [(ngModel)]="reason"
+                          (change)="reasonMissing.set(false)"
+                        />
+                        {{ reasonLabel(option) }}
+                      </label>
+                    }
+                  </fieldset>
+                  <div class="prj-field">
+                    <label for="bid-comment" i18n="@@bidder.comment"
+                      >Comment for the buyer (optional)</label
+                    >
+                    <textarea
+                      id="bid-comment"
+                      name="comment"
+                      rows="3"
+                      [attr.maxlength]="commentMax"
+                      [attr.aria-describedby]="reasonMissing() ? 'bid-reason-error' : null"
+                      [(ngModel)]="comment"
+                      (input)="reasonMissing.set(false)"
+                    ></textarea>
+                  </div>
+                  @if (reasonMissing()) {
+                    <p id="bid-reason-error" class="prj-error-text" role="alert">
+                      {{ reasonHint }}
+                    </p>
+                  }
+                  <div class="prj-actions">
+                    <button
+                      class="prj-btn prj-btn--danger"
+                      type="submit"
+                      [disabled]="busy()"
+                      i18n="@@bidder.declineSubmit"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      (click)="declining.set(false)"
+                      i18n="@@common.cancel"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              } @else {
+                <div class="prj-actions">
+                  @if (
+                    item.invitationStatus !== 'IntendsToBid' &&
+                    item.invitationStatus !== 'BidStarted'
+                  ) {
+                    <button
+                      class="prj-btn"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="intend()"
+                      i18n="@@bidder.intend"
+                    >
+                      We intend to bid
+                    </button>
+                  }
+                  @if (item.invitationStatus !== 'Declined') {
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="startDecline()"
+                      i18n="@@bidder.decline"
+                    >
+                      Decline
+                    </button>
+                  } @else {
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="startDecline()"
+                      i18n="@@bidder.changeReason"
+                    >
+                      Change decline reason
+                    </button>
+                  }
+                </div>
+                <p class="prj-hint" i18n="@@bidder.answerHelp">
+                  Saying you intend to bid is not a bid. You can change your answer until the
+                  deadline.
+                </p>
+              }
+            }
+          </section>
+        }
+
+        <section class="bid-card" aria-labelledby="bid-scope-title">
+          <h2 id="bid-scope-title" i18n="@@tenderField.scope">Scope and instructions</h2>
+          <p class="bid-prewrap">
+            <bdi>{{ item.scopeInstructions }}</bdi>
+          </p>
+          <h3 i18n="@@bidder.requirementsTitle">What your response must include</h3>
+          <ul role="list">
+            <li i18n="@@bidder.currencyLine">
+              Prices in <bdi dir="ltr">{{ item.currency }}</bdi>
+            </li>
+            @if (item.bidValidityDays) {
+              <li>
+                <span i18n="@@bidder.validityLine">{item.bidValidityDays, plural,
+                  =1 {Bid valid for 1 day}
+                  other {Bid valid for {{ item.bidValidityDays }} days}
+                }</span>
+              </li>
+            }
+            @if (item.technicalProposalRequired) {
+              <li i18n="@@tenderBuilder.technicalRequired">A technical proposal is required</li>
+            }
+            @if (item.durationRequired) {
+              <li i18n="@@bidder.durationRequired">A proposed duration is required</li>
+            }
+            @if (item.schedule?.length) {
+              <li i18n="@@bidder.scheduleRequired">
+                Price the buyer's schedule of {{ item.schedule?.length }} items, item by item
+              </li>
+            }
+            @if (item.pricing; as basis) {
+              <li i18n="@@bidder.vatBasis">
+                Prices {{ vatLabel(basis.treatment) }}
+                @if (basis.vatRatePercent) {
+                  (<bdi dir="ltr">{{ basis.vatRatePercent }}%</bdi>)
+                }
+              </li>
+            }
+            @if (item.terms; as asked) {
+              @if (asked.retentionPercent !== null) {
+                <li i18n="@@bidder.retention">
+                  Retention requested: <bdi dir="ltr">{{ asked.retentionPercent }}%</bdi>
+                </li>
+              }
+              @if (asked.advancePaymentPercent !== null) {
+                <li i18n="@@bidder.advance">
+                  Advance payment requested: <bdi dir="ltr">{{ asked.advancePaymentPercent }}%</bdi>
+                </li>
+              }
+              @if (asked.performanceSecurityPercent !== null) {
+                <li i18n="@@bidder.security">
+                  Performance security requested:
+                  <bdi dir="ltr">{{ asked.performanceSecurityPercent }}%</bdi>
+                </li>
+              }
+              @if (asked.bidBondRequired) {
+                <li i18n="@@bidder.bidBond">A bid bond is required</li>
+              }
+            }
+            @for (required of item.requiredDocuments; track required) {
+              <li>
+                <bdi>{{ required }}</bdi>
+              </li>
+            }
+          </ul>
+          @if (item.criteria; as criteria) {
+            <h3 i18n="@@bidder.criteriaTitle">How bids are evaluated</h3>
+            @if (criteria.recommendationCriteria.length) {
+              <p class="prj-hint" i18n="@@bidder.criteriaRecommendation">Overall ranking:</p>
+              <ul role="list">
+                @for (criterion of criteria.recommendationCriteria; track criterion.name) {
+                  <li>
+                    {{ kindLabel(criterion.name) }} ·
+                    <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                  </li>
+                }
+              </ul>
+            }
+            @if (criteria.technicalCriteria.length) {
+              <p class="prj-hint" i18n="@@bidder.criteriaTechnical">Technical score:</p>
+              <ul role="list">
+                @for (criterion of criteria.technicalCriteria; track criterion.name) {
+                  <li>
+                    <bdi>{{ criterion.name }}</bdi> · <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                  </li>
+                }
+              </ul>
+            }
+          }
+          @if (item.submissionInstructions) {
+            <h3 i18n="@@tenderField.submissionInstructions">Submission instructions</h3>
+            <p class="bid-prewrap">
+              <bdi>{{ item.submissionInstructions }}</bdi>
+            </p>
+          }
+        </section>
+
+        @if (item.documents.length) {
+          <section class="bid-card" aria-labelledby="bid-documents-title">
+            <h2 id="bid-documents-title" i18n="@@tenderBuilder.stepDocuments">Documents</h2>
+            <ul class="bid-docs" role="list">
+              @for (document of item.documents; track document.id) {
+                <li>
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="download(document)"
+                  >
+                    <ng-container i18n="@@bidder.download">Download</ng-container>&ngsp;<bdi>{{
+                      document.fileName
+                    }}</bdi>
+                  </button>
+                  <span class="prj-hint"
+                    ><bdi>{{ size(document.sizeBytes) }}</bdi></span
+                  >
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        @if (communications(); as view) {
+          <app-bidder-updates
+            part="clarifications"
+            [token]="token"
+            [invitation]="item"
+            [view]="view"
+            (updated)="communicationsUpdated($event)"
+            (download)="downloadUpdate($event)"
+          />
+        }
+
+        <section class="bid-card" aria-labelledby="bid-contact-title">
+          <h2 id="bid-contact-title" i18n="@@bidder.contactTitle">Questions about this tender</h2>
+          <p>
+            <bdi>{{ item.contactName }}</bdi> ·
+            <a [href]="'mailto:' + item.contactEmail"
+              ><bdi dir="ltr">{{ item.contactEmail }}</bdi></a
+            >
+            @if (item.contactPhone) {
+              · <bdi dir="ltr">{{ item.contactPhone }}</bdi>
+            }
+          </p>
+          <p class="prj-hint" i18n="@@bidder.privacy">
+            This link is personal to your company. Please do not forward it. Published
+            {{ item.publishedAtUtc | businessDate: 'instant' }} · revision {{ item.revision }}.
+          </p>
+          <p class="prj-hint" i18n="@@bidder.trust">
+            This invitation comes from <bdi>{{ item.buyerCompanyName }}</bdi> through
+            {{ systemName }}. If you did not expect it, contact the buyer before continuing.
+          </p>
+        </section>
+      }
+    }
+  </main>
+</div>

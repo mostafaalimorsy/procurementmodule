@@ -1,0 +1,219 @@
+<section class="prj-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@audit.eyebrow">Company administration</p>
+      <h1 i18n="@@audit.title">Audit log</h1>
+      <p i18n="@@audit.intro">
+        Every recorded action in your company: who, when and on which record. Details show
+        identifiers, codes, counts and states only — never amounts, notes, contact data or secrets.
+      </p>
+    </div>
+  </div>
+
+  <form class="prj-filters aud-filters" (ngSubmit)="apply()">
+    <div class="prj-field">
+      <label for="audit-area" i18n="@@audit.area">Area</label>
+      <select id="audit-area" name="area" [(ngModel)]="area">
+        <option value="" i18n="@@sourcing.filterAll">All</option>
+        @for (option of areas; track option) {
+          <option [value]="option">{{ areaLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    <div class="prj-field">
+      <label for="audit-action" i18n="@@audit.action">Action</label>
+      <select id="audit-action" name="action" [(ngModel)]="action">
+        <option value="" i18n="@@sourcing.filterAll">All</option>
+        @for (option of facets()?.actions ?? []; track option) {
+          <option [value]="option">{{ actionLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    <div class="prj-field">
+      <label for="audit-actor" i18n="@@audit.actor">Actor</label>
+      <select id="audit-actor" name="actor" [(ngModel)]="actor">
+        <option value="" i18n="@@sourcing.filterAll">All</option>
+        @for (option of facets()?.actors ?? []; track option.accountId) {
+          <option [value]="option.accountId">{{ option.displayName }}</option>
+        }
+        <option value="Bidder" i18n="@@audit.actorBidder">
+          An invited firm (through its link)
+        </option>
+        <option value="System" i18n="@@audit.actorSystem">The system</option>
+        <option value="Platform" i18n="@@audit.actorPlatform">Platform operator</option>
+      </select>
+    </div>
+    <div class="prj-field">
+      <label for="audit-from" i18n="@@audit.from">From (UTC day)</label>
+      <input id="audit-from" name="from" type="date" [(ngModel)]="from" />
+    </div>
+    <div class="prj-field">
+      <label for="audit-to" i18n="@@audit.to">To (UTC day)</label>
+      <input id="audit-to" name="to" type="date" [(ngModel)]="to" />
+    </div>
+    <div class="prj-field">
+      <label for="audit-reference" i18n="@@audit.reference">Reference or code</label>
+      <input
+        id="audit-reference"
+        name="reference"
+        maxlength="64"
+        dir="ltr"
+        [(ngModel)]="reference"
+      />
+    </div>
+    <div class="prj-field">
+      <label for="audit-request" i18n="@@audit.requestId">Request id</label>
+      <input id="audit-request" name="requestId" maxlength="64" dir="ltr" [(ngModel)]="requestId" />
+    </div>
+    <div class="prj-actions">
+      <button class="prj-btn" type="submit" i18n="@@audit.apply">Apply filters</button>
+      @if (filtered()) {
+        <button class="prj-btn prj-btn--ghost" type="button" (click)="clear()" i18n="@@audit.clear">
+          Clear filters
+        </button>
+      }
+      <button
+        class="prj-btn prj-btn--ghost"
+        type="button"
+        [disabled]="exporting()"
+        (click)="exportCsv()"
+      >
+        @if (exporting()) {
+          <span i18n="@@audit.exporting">Exporting…</span>
+        } @else {
+          <span i18n="@@audit.export">Export CSV</span>
+        }
+      </button>
+    </div>
+  </form>
+  <p class="prj-hint" role="status" aria-live="polite">{{ exportNotice() }}</p>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" role="status" i18n="@@audit.loading">Loading the audit log…</p>
+  } @else if (result(); as page) {
+    @if (page.items.length === 0) {
+      <div class="prj-empty">
+        @if (filtered()) {
+          <h2 i18n="@@audit.filteredEmptyTitle">No entry matches these filters</h2>
+          <p i18n="@@audit.filteredEmptyBody">Change or clear the filters to see more.</p>
+        } @else if (page.totalCount > 0) {
+          <h2 i18n="@@audit.pageEmptyTitle">No entry on this page</h2>
+        } @else {
+          <h2 i18n="@@audit.emptyTitle">Nothing recorded yet</h2>
+        }
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@audit.count">
+        Entries: <bdi dir="ltr">{{ page.totalCount }}</bdi>
+      </p>
+      <ol class="aud-list" role="list">
+        @for (entry of page.items; track entry.id) {
+          <li class="prj-card">
+            <p class="aud-when">
+              <bdi>{{ entry.occurredAtUtc | businessDate: 'instant' }}</bdi>
+              · <span class="prj-chip">{{ areaLabel(entry.area) }}</span>
+            </p>
+            <p class="aud-what">
+              <bdi>{{ actorLabel(entry) }}</bdi>
+              <!-- CF-100 (ADR-160): the event by name; the code on hover and in the export; the reference opens its record via search. -->
+              <span class="aud-action" [title]="entry.action">{{ actionLabel(entry.action) }}</span>
+              @if (entry.reference) {
+                <a class="aud-ref" [routerLink]="['/search']" [queryParams]="{ q: entry.reference }"
+                  ><bdi dir="ltr">{{ entry.reference }}</bdi></a
+                >
+              }
+              @if (entry.targetErased) {
+                <span i18n="@@audit.concerningErased">concerning an erased user</span>
+              } @else if (entry.targetName) {
+                <span i18n="@@audit.concerning"
+                  >concerning <bdi>{{ entry.targetName }}</bdi></span
+                >
+              }
+            </p>
+            @if (entry.details.length > 0) {
+              <dl class="aud-details">
+                @for (detail of entry.details; track detail.key) {
+                  <div>
+                    <dt [title]="detail.key">{{ detailLabel(detail.key) }}</dt>
+                    <dd>
+                      <bdi>{{ detail.value }}</bdi>
+                    </dd>
+                  </div>
+                }
+              </dl>
+            }
+            @if (entry.request; as request) {
+              <p class="prj-hint aud-request" data-testid="audit-request">
+                @if (request.requestId) {
+                  <span i18n="@@audit.request"
+                    >Request <code dir="ltr">{{ request.requestId }}</code></span
+                  >
+                  <button
+                    class="prj-btn prj-btn--ghost aud-request-show"
+                    type="button"
+                    (click)="showRequest(request.requestId)"
+                    i18n="@@audit.requestShow"
+                  >
+                    Entries of this request
+                  </button>
+                }
+                @if (request.sourceAddress) {
+                  <span i18n="@@audit.requestFrom"
+                    >from <bdi dir="ltr">{{ request.sourceAddress }}</bdi></span
+                  >
+                }
+                @if (request.userAgent) {
+                  <bdi dir="ltr" class="aud-agent" [title]="request.userAgent">{{
+                    request.userAgent
+                  }}</bdi>
+                }
+              </p>
+            } @else if (entry.actorKind === 'User' || entry.actorKind === 'Platform') {
+              <!-- CF-122 AC8: a person's event from before request capture says so, rather than showing nothing. -->
+              <p class="prj-hint aud-request" data-testid="audit-request-missing">
+                <span i18n="@@audit.requestNotRecorded">Request not recorded</span>
+              </p>
+            }
+          </li>
+        }
+      </ol>
+      @if (page.totalPages > 1) {
+        <nav class="prj-pager" aria-label="Audit log pages" i18n-aria-label="@@audit.pages">
+          <span i18n="@@common.pageOf"
+            >Page <bdi dir="ltr">{{ page.page }}</bdi> of
+            <bdi dir="ltr">{{ page.totalPages }}</bdi></span
+          >
+          <span class="prj-actions">
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page <= 1"
+              (click)="goToPage(page.page - 1)"
+              i18n="@@common.previous"
+            >
+              Previous
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page >= page.totalPages"
+              (click)="goToPage(page.page + 1)"
+              i18n="@@common.next"
+            >
+              Next
+            </button>
+          </span>
+        </nav>
+      }
+    }
+  }
+</section>

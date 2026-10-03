@@ -1,0 +1,754 @@
+<section class="prj-page dc-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/tenders" i18n="@@nav.tenders">Tenders</a><span aria-hidden="true">/</span>
+    <a [routerLink]="['/tenders', tenderId()]">
+      @if (workspace(); as view) {
+        <bdi dir="ltr">{{ view.tenderReference }}</bdi>
+      } @else {
+        <ng-container i18n="@@tenders.crumb">Tender</ng-container>
+      }
+    </a>
+    <span aria-hidden="true">/</span>
+    <span i18n="@@negotiation.crumb">Negotiation rounds</span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  <div role="status" aria-live="polite">
+    @if (notice()) {
+      <p id="negotiation-notice" class="prj-note" tabindex="-1">{{ notice() }}</p>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@negotiation.loading">Loading the negotiation rounds…</p>
+  } @else if (workspace(); as view) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ view.tenderReference }}</bdi> ·
+          <ng-container i18n="@@negotiation.eyebrow">Negotiation and BAFO</ng-container>
+        </p>
+        <h1>
+          <bdi>{{ view.tenderTitle }}</bdi>
+        </h1>
+        <p class="prj-hint">
+          <span i18n="@@negotiation.roundsUsed"
+            >Rounds issued: {{ view.rounds.length }} of at most {{ view.maximumRounds }}</span
+          >
+          ·
+          <span i18n="@@negotiation.zone"
+            >Time zone <bdi dir="ltr">{{ view.timeZoneId }}</bdi></span
+          >
+        </p>
+      </div>
+      @if (view.access.manage && !readOnly()) {
+        <button
+          class="prj-btn"
+          type="button"
+          [disabled]="!!view.issueBlocker"
+          [attr.aria-describedby]="view.issueBlocker ? 'negotiation-blocker' : null"
+          (click)="startIssue()"
+          i18n="@@negotiation.issue"
+        >
+          Issue a round
+        </button>
+      }
+    </div>
+    <app-tender-stage-header
+      [tenderId]="view.tenderId"
+      page="negotiation"
+      [refresh]="view.rounds.length"
+    />
+
+    <p class="prj-hint" i18n="@@negotiation.boundary">
+      A round asks selected firms for a revised offer or a best and final offer. It never reopens
+      the tender and never changes a submitted revision: each response is a new revision of the
+      firm's own bid. Nothing here ranks, selects or awards a firm.
+    </p>
+    <div class="dc-links">
+      <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tenderId(), 'evaluation']">
+        <ng-container i18n="@@negotiation.toEvaluation">Evaluation</ng-container>
+      </a>
+      @if (view.rounds.length) {
+        <a
+          class="prj-btn prj-btn--ghost"
+          [routerLink]="['/tenders', tenderId(), 'negotiation', 'comparison']"
+        >
+          <ng-container i18n="@@negotiation.toComparison"
+            >Original, revised and final comparison</ng-container
+          >
+        </a>
+      }
+      @if (decisionAvailable()) {
+        <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tenderId(), 'decision']">
+          <ng-container i18n="@@negotiation.toDecision">Recommendation and decision</ng-container>
+        </a>
+      }
+    </div>
+
+    @if (view.tenderAwarded) {
+      <p class="prj-note" role="note" i18n="@@negotiation.awardedNote">
+        The tender was awarded. Its negotiation history is kept read-only.
+      </p>
+    } @else if (view.tenderCancelled) {
+      <p class="prj-note prj-note--error" role="note" i18n="@@negotiation.cancelledNote">
+        The tender was cancelled. Its negotiation history is kept read-only.
+      </p>
+    } @else if (view.access.manage && view.issueBlocker) {
+      <p id="negotiation-blocker" class="prj-note tnd-attention-box" role="note">
+        <strong i18n="@@negotiation.blockedTitle">A round cannot be issued now.</strong>
+        {{ blocker() }}
+      </p>
+    }
+
+    <!-- ------------------------------------------------ rounds -->
+    <section class="prj-section" aria-labelledby="rounds-title">
+      <h2 id="rounds-title" i18n="@@negotiation.roundsTitle">Rounds</h2>
+      @for (round of view.rounds; track round.id) {
+        <article class="dc-round" [attr.aria-labelledby]="'round-title-' + round.id">
+          <header class="dc-round__head">
+            <h3 [id]="'round-title-' + round.id">
+              <span i18n="@@negotiation.roundTitle">Round {{ round.number }}</span> ·
+              {{ typeLabel(round.type) }}
+            </h3>
+            <span
+              class="prj-chip dc-state"
+              [class.dc-state--good]="round.status === 'Open' && !round.deadlinePassed"
+              [class.dc-state--warn]="round.status === 'Open' && round.deadlinePassed"
+              [class.dc-state--muted]="round.status !== 'Open'"
+              >{{ statusLabel(round) }}</span
+            >
+          </header>
+          <dl class="dc-facts">
+            <div>
+              <dt i18n="@@negotiation.scope">Scope to revise</dt>
+              <dd>{{ scopeLabel(round.scope) }}</dd>
+            </div>
+            <div>
+              <dt i18n="@@negotiation.deadline">Response deadline</dt>
+              <dd>
+                <bdi>{{ deadlineShown(round) }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@negotiation.issuedBy">Issued</dt>
+              <dd>
+                {{ round.issuedAtUtc | businessDate: 'instant' }}
+                <small class="prj-hint tnd-block"
+                  ><bdi>{{ round.issuedByName }}</bdi></small
+                >
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@negotiation.responses">Responses</dt>
+              <dd>
+                <span i18n="@@negotiation.responsesValue"
+                  >{{ round.submittedCount }} of {{ round.participants.length }}</span
+                >
+              </dd>
+            </div>
+            @if (round.closedAtUtc) {
+              <div>
+                <dt i18n="@@negotiation.roundClosedAt">Round closed</dt>
+                <dd>
+                  {{ round.closedAtUtc | businessDate: 'instant' }}
+                  <small class="prj-hint tnd-block"
+                    ><bdi>{{ round.closedByName }}</bdi></small
+                  >
+                  @if (round.earlyCloseReason) {
+                    <small class="prj-hint tnd-block"
+                      ><bdi>{{ round.earlyCloseReason }}</bdi></small
+                    >
+                  }
+                </dd>
+              </div>
+            }
+            @if (round.cancelledAtUtc) {
+              <div>
+                <dt i18n="@@negotiation.cancelledAt">Cancelled</dt>
+                <dd>
+                  {{ round.cancelledAtUtc | businessDate: 'instant' }}
+                  <small class="prj-hint tnd-block"
+                    ><bdi>{{ round.cancelledByName }}</bdi></small
+                  >
+                  @if (round.cancellationReason) {
+                    <small class="prj-hint tnd-block"
+                      ><bdi>{{ round.cancellationReason }}</bdi></small
+                    >
+                  }
+                </dd>
+              </div>
+            }
+          </dl>
+          @if (round.purpose !== null || round.instructions !== null) {
+            <div class="dc-texts">
+              @if (round.purpose) {
+                <div>
+                  <h4 i18n="@@negotiation.purpose">Internal purpose (not sent to firms)</h4>
+                  <p class="ev-prose">
+                    <bdi>{{ round.purpose }}</bdi>
+                  </p>
+                </div>
+              }
+              @if (round.instructions) {
+                <div>
+                  <h4 i18n="@@negotiation.instructions">Instructions sent to the firms</h4>
+                  <p class="ev-prose">
+                    <bdi>{{ round.instructions }}</bdi>
+                  </p>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="prj-hint" i18n="@@negotiation.textsRestricted">
+              The purpose and instructions are visible to commercial readers only.
+            </p>
+          }
+
+          <div class="prj-table-wrap">
+            <table class="prj-table ev-table">
+              <caption class="prj-visually-hidden" i18n="@@negotiation.participantsCaption">
+                Firms in round
+                {{
+                  round.number
+                }}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" i18n="@@evaluation.colFirm">Firm</th>
+                  <th scope="col" i18n="@@negotiation.colStatus">Status</th>
+                  <th scope="col" i18n="@@negotiation.colEmail">Email</th>
+                  <th scope="col" i18n="@@negotiation.colRevisions">Revisions</th>
+                  <th scope="col" i18n="@@negotiation.colActivity">Activity</th>
+                  @if (view.access.manage && round.status === 'Open') {
+                    <th scope="col" i18n="@@negotiation.colActions">Actions</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (participant of round.participants; track participant.id) {
+                  <tr>
+                    <th scope="row">
+                      <bdi dir="ltr" class="tnd-code">{{ participant.subcontractorCode }}</bdi
+                      >{{ ' ' }}
+                      <span class="tnd-block"
+                        ><bdi>{{ participant.subcontractorName }}</bdi></span
+                      >
+                      <small class="prj-hint tnd-block"
+                        ><bdi>{{ participant.recipientName }}</bdi> ·
+                        <bdi dir="ltr">{{ participant.recipientEmail }}</bdi></small
+                      >
+                    </th>
+                    <td>{{ participantLabel(participant.status) }}</td>
+                    <td>
+                      @if (participant.emailStatus) {
+                        {{ emailLabel(participant.emailStatus) }}
+                      } @else {
+                        <span class="prj-hint">—</span>
+                      }
+                    </td>
+                    <td>
+                      <span class="tnd-block" i18n="@@negotiation.baseRevision"
+                        >Asked to revise: revision {{ participant.baseRevisionNumber }}</span
+                      >
+                      @if (participant.submittedRevisionNumber !== null) {
+                        <span class="tnd-block" i18n="@@negotiation.submittedRevision"
+                          >Submitted: revision {{ participant.submittedRevisionNumber }}</span
+                        >
+                      }
+                    </td>
+                    <td>
+                      @if (participant.firstViewedAtUtc) {
+                        <small class="tnd-block" i18n="@@negotiation.viewed"
+                          >Viewed
+                          {{ participant.firstViewedAtUtc | businessDate: 'instant' }}</small
+                        >
+                      }
+                      @if (participant.startedAtUtc) {
+                        <small class="tnd-block" i18n="@@negotiation.started"
+                          >Started {{ participant.startedAtUtc | businessDate: 'instant' }}</small
+                        >
+                      }
+                      @if (participant.submittedAtUtc) {
+                        <small class="tnd-block" i18n="@@negotiation.submitted"
+                          >Submitted
+                          {{ participant.submittedAtUtc | businessDate: 'instant' }}</small
+                        >
+                      }
+                      @if (participant.declinedAtUtc) {
+                        <small class="tnd-block" i18n="@@negotiation.declined"
+                          >Declined {{ participant.declinedAtUtc | businessDate: 'instant' }}</small
+                        >
+                      }
+                      @if (participant.withdrawnAtUtc) {
+                        <small class="tnd-block" i18n="@@negotiation.withdrawnAt"
+                          >Removed {{ participant.withdrawnAtUtc | businessDate: 'instant' }} by
+                          <bdi>{{ participant.withdrawnByName }}</bdi></small
+                        >
+                      }
+                      @if (
+                        !participant.firstViewedAtUtc &&
+                        !participant.submittedAtUtc &&
+                        !participant.withdrawnAtUtc
+                      ) {
+                        <span class="prj-hint" i18n="@@negotiation.notViewed">Not opened yet</span>
+                      }
+                    </td>
+                    @if (view.access.manage && round.status === 'Open') {
+                      <td>
+                        @if (canReplace(round, participant)) {
+                          <button
+                            class="prj-btn prj-btn--ghost ev-btn-small"
+                            type="button"
+                            (click)="startReplace(round, participant)"
+                          >
+                            <ng-container i18n="@@negotiation.replaceLink"
+                              >Send a new link</ng-container
+                            >
+                            <span class="prj-visually-hidden"
+                              ><bdi>{{ participant.subcontractorCode }}</bdi></span
+                            >
+                          </button>
+                        }
+                        @if (canWithdraw(round, participant)) {
+                          <button
+                            class="prj-btn prj-btn--ghost prj-btn--danger ev-btn-small"
+                            type="button"
+                            (click)="startWithdraw(round, participant)"
+                          >
+                            <ng-container i18n="@@negotiation.withdraw"
+                              >Remove from round</ng-container
+                            >
+                            <span class="prj-visually-hidden"
+                              ><bdi>{{ participant.subcontractorCode }}</bdi></span
+                            >
+                          </button>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (view.access.manage && round.status === 'Open' && !readOnly()) {
+            <div class="prj-actions">
+              <button class="prj-btn" type="button" (click)="startClose(round)">
+                @if (round.deadlinePassed) {
+                  <ng-container i18n="@@negotiation.close">Close the round</ng-container>
+                } @else {
+                  <ng-container i18n="@@negotiation.closeEarly">Close early</ng-container>
+                }
+              </button>
+              <button
+                class="prj-btn prj-btn--ghost prj-btn--danger"
+                type="button"
+                (click)="startCancel(round)"
+                i18n="@@negotiation.cancel"
+              >
+                Cancel the round
+              </button>
+            </div>
+          }
+        </article>
+      } @empty {
+        <p class="prj-hint" i18n="@@negotiation.none">No round has been issued for this tender.</p>
+      }
+    </section>
+
+    <!-- ------------------------------------------------ notes -->
+    @if (view.access.viewCommercial) {
+      <section class="prj-section" aria-labelledby="notes-title">
+        <h2 id="notes-title" i18n="@@negotiation.notesTitle">Negotiation notes</h2>
+        <p class="prj-hint" i18n="@@negotiation.notesHint">
+          Internal notes for commercial readers. Each is kept with its author and time and never
+          sent to a firm.
+        </p>
+        @for (note of view.notes; track note.id) {
+          <article class="ev-note">
+            <p class="ev-prose">
+              <bdi>{{ note.text }}</bdi>
+            </p>
+            <p class="prj-hint">
+              <bdi>{{ note.authorName }}</bdi> · {{ note.writtenAtUtc | businessDate: 'instant' }}
+              @if (roundNumber(note.roundId); as number) {
+                · <span i18n="@@negotiation.roundTitle">Round {{ number }}</span>
+              }
+              @if (firmName(note.openingBidId); as firm) {
+                · <bdi>{{ firm }}</bdi>
+              }
+            </p>
+          </article>
+        } @empty {
+          <p class="prj-hint" i18n="@@negotiation.noNotes">No notes yet.</p>
+        }
+        @if (view.access.note && !readOnly()) {
+          <div class="dc-note-form">
+            <div class="prj-field">
+              <label for="note-round" i18n="@@negotiation.noteRound">Round (optional)</label>
+              <select id="note-round" [(ngModel)]="noteRound">
+                <option value="" i18n="@@negotiation.noteAnyRound">Whole negotiation</option>
+                @for (round of view.rounds; track round.id) {
+                  <option [value]="round.id" i18n="@@negotiation.roundTitle">
+                    Round {{ round.number }}
+                  </option>
+                }
+              </select>
+            </div>
+            <div class="prj-field">
+              <label for="note-firm" i18n="@@negotiation.noteFirm">Firm (optional)</label>
+              <select id="note-firm" [(ngModel)]="noteBid">
+                <option value="" i18n="@@negotiation.noteAnyFirm">No specific firm</option>
+                @for (candidate of view.candidates; track candidate.openingBidId) {
+                  <option [value]="candidate.openingBidId">
+                    {{ candidate.subcontractorCode }} — {{ candidate.subcontractorName }}
+                  </option>
+                }
+              </select>
+            </div>
+            <div class="prj-field dc-note-form__text">
+              <label for="note-text" i18n="@@negotiation.noteText">Note</label>
+              <textarea
+                id="note-text"
+                rows="3"
+                [attr.maxlength]="noteMax"
+                [attr.aria-invalid]="noteError() ? 'true' : null"
+                [attr.aria-describedby]="noteError() ? 'note-error' : null"
+                [(ngModel)]="noteText"
+                (input)="noteError.set('')"
+              ></textarea>
+            </div>
+            @if (noteError()) {
+              <p id="note-error" class="prj-error-text" role="alert">{{ noteError() }}</p>
+            }
+            <div class="prj-actions">
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="busy()"
+                (click)="addNote()"
+                i18n="@@negotiation.addNote"
+              >
+                Add note
+              </button>
+            </div>
+          </div>
+        }
+      </section>
+    }
+  }
+</section>
+
+@if (dialog() === 'issue') {
+  <app-confirm-dialog
+    heading="Issue a negotiation round"
+    i18n-heading="@@negotiation.issueHeading"
+    confirmLabel="Issue the round"
+    i18n-confirmLabel="@@negotiation.issueConfirm"
+    [busy]="busy()"
+    (confirmed)="confirmIssue()"
+    (cancelled)="closeDialog()"
+  >
+    <fieldset class="prj-fieldset dc-choice-group">
+      <legend i18n="@@negotiation.typeLegend">Kind of round</legend>
+      @for (type of types; track type) {
+        <label class="tnd-choice">
+          <input type="radio" name="round-type" [value]="type" [(ngModel)]="form.type" />
+          <span>{{ typeLabel(type) }}</span>
+        </label>
+      }
+      @if (form.type === 'Bafo') {
+        <small class="prj-hint" i18n="@@negotiation.bafoHint"
+          >The firms are told this is their best and final offer.</small
+        >
+      }
+    </fieldset>
+    <div class="prj-field">
+      <label for="round-scope" i18n="@@negotiation.scope">Scope to revise</label>
+      <select id="round-scope" [(ngModel)]="form.scope" (ngModelChange)="clearError()">
+        @for (scope of scopes; track scope) {
+          <option [value]="scope">{{ scopeLabel(scope) }}</option>
+        }
+      </select>
+      <small class="prj-hint" i18n="@@negotiation.scopeRule"
+        >Commercial: firms may revise prices and commercial terms only; their technical answers stay
+        as submitted. Technical: the technical answers only. Both: the whole response. New files are
+        allowed in every scope.</small
+      >
+    </div>
+    <div class="prj-field">
+      <label for="round-purpose"
+        ><span i18n="@@negotiation.purpose">Internal purpose (not sent to firms)</span>&ngsp;<span
+          class="prj-hint"
+          i18n="@@bidWorkspace.requiredMark"
+          >(required)</span
+        ></label
+      >
+      <textarea
+        id="round-purpose"
+        rows="2"
+        aria-required="true"
+        [attr.aria-invalid]="errorField() === 'purpose' ? 'true' : null"
+        [attr.aria-describedby]="errorField() === 'purpose' ? 'negotiation-dialog-error' : null"
+        [attr.maxlength]="purposeMax"
+        [(ngModel)]="form.purpose"
+        (input)="clearError()"
+      ></textarea>
+    </div>
+    <div class="prj-field">
+      <label for="round-instructions"
+        ><span i18n="@@negotiation.instructions">Instructions sent to the firms</span>&ngsp;<span
+          class="prj-hint"
+          i18n="@@bidWorkspace.requiredMark"
+          >(required)</span
+        ></label
+      >
+      <textarea
+        id="round-instructions"
+        rows="4"
+        aria-required="true"
+        [attr.aria-invalid]="errorField() === 'instructions' ? 'true' : null"
+        [attr.aria-describedby]="
+          errorField() === 'instructions' ? 'negotiation-dialog-error' : null
+        "
+        [attr.maxlength]="instructionsMax"
+        [(ngModel)]="form.instructions"
+        (input)="clearError()"
+      ></textarea>
+    </div>
+    <div class="prj-field">
+      <label for="round-deadline"
+        ><span i18n="@@negotiation.deadline">Response deadline</span>&ngsp;<span
+          class="prj-hint"
+          i18n="@@bidWorkspace.requiredMark"
+          >(required)</span
+        ></label
+      >
+      <input
+        id="round-deadline"
+        type="datetime-local"
+        aria-required="true"
+        [attr.aria-invalid]="errorField() === 'deadline' ? 'true' : null"
+        [attr.aria-describedby]="
+          errorField() === 'deadline' ? 'round-zone negotiation-dialog-error' : 'round-zone'
+        "
+        [(ngModel)]="form.deadline"
+        (input)="clearError()"
+      />
+      <small id="round-zone" class="prj-hint" i18n="@@negotiation.deadlineZone"
+        >In <bdi dir="ltr">{{ workspace()?.timeZoneId }}</bdi
+        >, the tender's time zone.</small
+      >
+    </div>
+    <fieldset class="prj-fieldset dc-choice-group">
+      <legend i18n="@@negotiation.participantsLegend">Firms to include</legend>
+      @for (candidate of workspace()?.candidates ?? []; track candidate.openingBidId) {
+        <label class="tnd-choice">
+          <input
+            type="checkbox"
+            [disabled]="!candidate.invitable"
+            [checked]="!!form.selected[candidate.openingBidId]"
+            (change)="toggleCandidate(candidate.openingBidId, $any($event.target).checked)"
+          />
+          <span>
+            <bdi dir="ltr" class="tnd-code">{{ candidate.subcontractorCode }}</bdi
+            >{{ ' ' }}<bdi>{{ candidate.subcontractorName }}</bdi>
+            <small class="prj-hint tnd-block">
+              @if (candidate.currentRound > 0) {
+                <ng-container i18n="@@negotiation.candidateRevised"
+                  >Response in force: revision {{ candidate.currentRevisionNumber }} (round
+                  {{ candidate.currentRound }})</ng-container
+                >
+              } @else {
+                <ng-container i18n="@@negotiation.candidateOriginal"
+                  >Response in force: revision {{ candidate.currentRevisionNumber }} (as
+                  opened)</ng-container
+                >
+              }
+              @if (!candidate.invitable) {
+                <span class="tnd-attention tnd-block">{{
+                  candidateBlocker(candidate.blocker)
+                }}</span>
+              }
+            </small>
+          </span>
+        </label>
+      }
+      <small class="prj-hint" role="status">
+        <span i18n="@@negotiation.selectedCount">Selected: {{ selectedCount() }}</span>
+      </small>
+    </fieldset>
+    <label class="tnd-choice tnd-close-confirm">
+      <input type="checkbox" [(ngModel)]="form.confirmed" (change)="clearError()" />
+      <span i18n="@@negotiation.confirmIssue"
+        >I confirm: each selected firm is emailed its own round link with these instructions and
+        deadline. A round cannot be edited once issued.</span
+      >
+    </label>
+    @if (dialogError()) {
+      <p id="negotiation-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (dialog() === 'close' && target(); as current) {
+  <app-confirm-dialog
+    heading="Close the round?"
+    i18n-heading="@@negotiation.closeHeading"
+    confirmLabel="Close the round"
+    i18n-confirmLabel="@@negotiation.close"
+    [busy]="busy()"
+    (confirmed)="confirmAction()"
+    (cancelled)="closeDialog()"
+  >
+    @if (current.round.deadlinePassed) {
+      <p i18n="@@negotiation.closeBody">
+        The deadline has passed. Closing freezes who responded with which revision; those responses
+        can then be taken into the evaluation. Firms that did not answer keep their earlier
+        response.
+      </p>
+    } @else {
+      <p i18n="@@negotiation.closeEarlyBody">
+        The deadline has not passed yet. Closing now stops every firm from responding and freezes
+        the responses received so far. The reason is recorded with your name.
+      </p>
+      <div class="prj-field">
+        <label for="close-reason"
+          ><span i18n="@@tenderField.reason">Reason</span>&ngsp;<span
+            class="prj-hint"
+            i18n="@@bidWorkspace.requiredMark"
+            >(required)</span
+          ></label
+        >
+        <textarea
+          id="close-reason"
+          rows="3"
+          aria-required="true"
+          [attr.aria-invalid]="errorField() === 'reason' ? 'true' : null"
+          [attr.aria-describedby]="errorField() === 'reason' ? 'negotiation-dialog-error' : null"
+          [attr.maxlength]="purposeMax"
+          [(ngModel)]="reason"
+          (input)="clearError()"
+        ></textarea>
+      </div>
+      <label class="tnd-choice tnd-close-confirm">
+        <input type="checkbox" [(ngModel)]="closeConfirmed" (change)="clearError()" />
+        <span i18n="@@negotiation.closeEarlyConfirm"
+          >I confirm the round closes before its deadline.</span
+        >
+      </label>
+    }
+    @if (dialogError()) {
+      <p id="negotiation-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (dialog() === 'cancel') {
+  <app-confirm-dialog
+    heading="Cancel the round?"
+    i18n-heading="@@negotiation.cancelHeading"
+    confirmLabel="Cancel the round"
+    i18n-confirmLabel="@@negotiation.cancel"
+    [danger]="true"
+    [busy]="busy()"
+    (confirmed)="confirmAction()"
+    (cancelled)="closeDialog()"
+  >
+    <p i18n="@@negotiation.cancelBody">
+      Nothing submitted in a cancelled round is ever evaluated; every firm keeps its earlier
+      response. The round links stop working. The reason is recorded with your name.
+    </p>
+    <div class="prj-field">
+      <label for="cancel-reason"
+        ><span i18n="@@tenderField.reason">Reason</span>&ngsp;<span
+          class="prj-hint"
+          i18n="@@bidWorkspace.requiredMark"
+          >(required)</span
+        ></label
+      >
+      <textarea
+        id="cancel-reason"
+        rows="3"
+        aria-required="true"
+        [attr.aria-invalid]="errorField() === 'reason' ? 'true' : null"
+        [attr.aria-describedby]="errorField() === 'reason' ? 'negotiation-dialog-error' : null"
+        [attr.maxlength]="purposeMax"
+        [(ngModel)]="reason"
+        (input)="clearError()"
+      ></textarea>
+    </div>
+    @if (dialogError()) {
+      <p id="negotiation-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (dialog() === 'withdraw' && target(); as current) {
+  <app-confirm-dialog
+    heading="Remove the firm from the round?"
+    i18n-heading="@@negotiation.withdrawHeading"
+    confirmLabel="Remove from round"
+    i18n-confirmLabel="@@negotiation.withdraw"
+    [danger]="true"
+    [busy]="busy()"
+    (confirmed)="confirmAction()"
+    (cancelled)="closeDialog()"
+  >
+    <p i18n="@@negotiation.withdrawBody">
+      <bdi dir="ltr">{{ current.participant?.subcontractorCode }}</bdi> can no longer respond in
+      this round and its round link stops working. Its earlier response stays in force.
+    </p>
+    <div class="prj-field">
+      <label for="withdraw-reason"
+        ><span i18n="@@tenderField.reason">Reason</span>&ngsp;<span
+          class="prj-hint"
+          i18n="@@bidWorkspace.requiredMark"
+          >(required)</span
+        ></label
+      >
+      <textarea
+        id="withdraw-reason"
+        rows="3"
+        aria-required="true"
+        [attr.aria-invalid]="errorField() === 'reason' ? 'true' : null"
+        [attr.aria-describedby]="errorField() === 'reason' ? 'negotiation-dialog-error' : null"
+        [attr.maxlength]="purposeMax"
+        [(ngModel)]="reason"
+        (input)="clearError()"
+      ></textarea>
+    </div>
+    @if (dialogError()) {
+      <p id="negotiation-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (dialog() === 'replace' && target(); as current) {
+  <app-confirm-dialog
+    heading="Send a new round link?"
+    i18n-heading="@@negotiation.replaceHeading"
+    confirmLabel="Send a new link"
+    i18n-confirmLabel="@@negotiation.replaceLink"
+    [busy]="busy()"
+    (confirmed)="confirmAction()"
+    (cancelled)="closeDialog()"
+  >
+    <p i18n="@@negotiation.replaceBody">
+      A new round link is emailed to
+      <bdi dir="ltr">{{ current.participant?.recipientEmail }}</bdi
+      >. The earlier link stops working at once; anything the firm saved is kept.
+    </p>
+    @if (dialogError()) {
+      <p id="negotiation-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}

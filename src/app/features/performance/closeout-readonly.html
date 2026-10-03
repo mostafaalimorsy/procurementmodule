@@ -1,0 +1,444 @@
+@let workspace = view();
+@let base = workspace.baseline;
+@let execution = workspace.execution;
+@let commercial = workspace.commercial;
+@switch (step()) {
+  @case ('schedule') {
+    <section class="prj-section" aria-labelledby="schedule-title">
+      <h2 id="schedule-title">
+        <span i18n="@@closeout.scheduleTitle"> Actual schedule and mobilization </span>
+      </h2>
+      <dl class="pf-readonly">
+        <div>
+          <dt><span i18n="@@closeout.outcomeType">How did the subcontract end?</span></dt>
+          <dd>
+            @if (execution.outcomeType) {
+              {{ outcomeLabel(execution.outcomeType) }}
+              <small class="prj-hint">{{ outcomeEffect(execution.outcomeType) }}</small>
+            } @else {
+              <ng-container *ngTemplateOutlet="none" />
+            }
+          </dd>
+        </div>
+        @if (notCompleted()) {
+          <div>
+            <dt>
+              <span i18n="@@closeout.percentComplete"
+                >Share of the work completed by the subcontractor, % (optional)</span
+              >
+            </dt>
+            <dd>
+              @if (execution.percentComplete != null) {
+                <bdi dir="ltr">{{ execution.percentComplete }}%</bdi>
+              } @else {
+                <ng-container *ngTemplateOutlet="none" />
+              }
+            </dd>
+          </div>
+        }
+        <div>
+          <dt><span i18n="@@closeout.actualStart">Actual start date</span></dt>
+          <dd>
+            @if (execution.actualStartDate) {
+              <bdi>{{ execution.actualStartDate | businessDate: 'date' }}</bdi>
+            } @else {
+              <ng-container *ngTemplateOutlet="none" />
+            }
+          </dd>
+        </div>
+        <div>
+          @if (notCompleted()) {
+            <dt><span i18n="@@closeout.effectiveEnd">Effective end date</span></dt>
+          } @else {
+            <dt><span i18n="@@closeout.actualCompletion">Actual completion</span></dt>
+          }
+          <dd>
+            @if (execution.actualCompletionDate) {
+              <bdi>{{ execution.actualCompletionDate | businessDate: 'date' }}</bdi>
+            } @else {
+              <ng-container *ngTemplateOutlet="none" />
+            }
+          </dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.scheduleExplanation"
+              >Why did the work take longer than awarded? (required when it did)</span
+            >
+          </dt>
+          <dd class="pf-readonly-text">
+            <ng-container
+              *ngTemplateOutlet="text; context: { $implicit: execution.scheduleExplanation }"
+            />
+          </dd>
+        </div>
+        @if (execution.earlyWorksDeclared || beforeAward()) {
+          <div>
+            <dt>
+              <span i18n="@@closeout.earlyWorksDeclare"
+                >Works started or finished before the award: early works are declared</span
+              >
+            </dt>
+            <dd>
+              @if (execution.earlyWorksDeclared) {
+                <ng-container i18n="@@closeout.earlyWorksDeclaredValue">Declared</ng-container>
+              } @else {
+                <ng-container i18n="@@closeout.earlyWorksNotDeclared">Not declared</ng-container>
+              }
+            </dd>
+          </div>
+          @if (execution.earlyWorksDeclared) {
+            <div class="pf-readonly-wide">
+              <dt>
+                <span i18n="@@closeout.earlyWorksNote"
+                  >What were the early works, and on what basis? (required)</span
+                >
+              </dt>
+              <dd class="pf-readonly-text">
+                <ng-container
+                  *ngTemplateOutlet="text; context: { $implicit: execution.earlyWorksNote }"
+                />
+              </dd>
+            </div>
+          }
+        }
+      </dl>
+      <h3><span i18n="@@closeout.mobilization">Mobilization</span></h3>
+      <dl class="pf-readonly">
+        <div>
+          <dt><span i18n="@@closeout.mobilization">Mobilization</span></dt>
+          <dd>{{ mobilizationLabel(execution.mobilization) }}</dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt><span i18n="@@closeout.mobilizationNote">Mobilization note (optional)</span></dt>
+          <dd class="pf-readonly-text">
+            <ng-container
+              *ngTemplateOutlet="text; context: { $implicit: execution.mobilizationNote }"
+            />
+          </dd>
+        </div>
+      </dl>
+    </section>
+  }
+
+  @case ('commercial') {
+    <section class="prj-section" aria-labelledby="commercial-title">
+      <h2 id="commercial-title">
+        <span i18n="@@closeout.commercialTitle"> Actual commercial outcome </span>
+      </h2>
+      <dl class="pf-readonly">
+        @if (shows(commercial.actualFinalCost)) {
+          <div>
+            <dt>
+              <span i18n="@@closeout.actualFinalCostCurrency"
+                >Actual final cost (<bdi dir="ltr">{{ base.currency }}</bdi
+                >)</span
+              >
+            </dt>
+            <dd>
+              <ng-container
+                *ngTemplateOutlet="amount; context: { $implicit: commercial.actualFinalCost }"
+              />
+            </dd>
+          </div>
+        }
+        @if (shows(commercial.costExplanation)) {
+          <div class="pf-readonly-wide">
+            <dt>
+              <span i18n="@@closeout.costExplanation"
+                >Why does the final cost exceed the award value? (required when it does)</span
+              >
+            </dt>
+            <dd class="pf-readonly-text">
+              <ng-container
+                *ngTemplateOutlet="text; context: { $implicit: commercial.costExplanation }"
+              />
+            </dd>
+          </div>
+        }
+        @if (notCompleted() && shows(commercial.costToCompleteByOthers)) {
+          <div>
+            <dt>
+              <span i18n="@@closeout.costToComplete"
+                >Cost to complete by others (<bdi dir="ltr">{{ base.currency }}</bdi
+                >, optional)</span
+              >
+            </dt>
+            <dd>
+              <ng-container
+                *ngTemplateOutlet="
+                  amount;
+                  context: { $implicit: commercial.costToCompleteByOthers }
+                "
+              />
+            </dd>
+          </div>
+        }
+        @if (shows(commercial.commercialFeedback)) {
+          <div class="pf-readonly-wide">
+            <dt>
+              <span i18n="@@closeout.commercialFeedback"
+                >Commercial feedback (internal, optional)</span
+              >
+            </dt>
+            <dd class="pf-readonly-text">
+              <ng-container
+                *ngTemplateOutlet="text; context: { $implicit: commercial.commercialFeedback }"
+              />
+            </dd>
+          </div>
+        }
+        @if (shows(commercial.evidenceNote)) {
+          <div class="pf-readonly-wide">
+            <dt>
+              <span i18n="@@closeout.commercialEvidence"
+                >Evidence reference, e.g. final account number (optional)</span
+              >
+            </dt>
+            <dd class="pf-readonly-text">
+              <ng-container
+                *ngTemplateOutlet="text; context: { $implicit: commercial.evidenceNote }"
+              />
+            </dd>
+          </div>
+        }
+      </dl>
+    </section>
+  }
+
+  @case ('quality') {
+    <section class="prj-section" aria-labelledby="quality-title">
+      <h2 id="quality-title"><span i18n="@@closeout.qualityTitle">Quality and HSE</span></h2>
+      <dl class="pf-readonly">
+        <div>
+          <dt><span i18n="@@closeout.qualityRating"> Quality rating </span></dt>
+          <dd>
+            <bdi>{{ ratingLabel(execution.qualityRating) }}</bdi>
+          </dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.qualityComment"
+              >Quality comment (required for a rating of 1 or 2)</span
+            >
+          </dt>
+          <dd class="pf-readonly-text">
+            <ng-container
+              *ngTemplateOutlet="text; context: { $implicit: execution.qualityComment }"
+            />
+          </dd>
+        </div>
+        <div>
+          <dt><span i18n="@@closeout.hseRating"> HSE / safety rating </span></dt>
+          <dd>
+            <bdi>{{ ratingLabel(execution.hseRating) }}</bdi>
+          </dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.hseComment">HSE comment (required for a rating of 1 or 2)</span>
+          </dt>
+          <dd class="pf-readonly-text">
+            <ng-container *ngTemplateOutlet="text; context: { $implicit: execution.hseComment }" />
+          </dd>
+        </div>
+      </dl>
+    </section>
+  }
+
+  @case ('issues') {
+    <section class="prj-section" aria-labelledby="issues-title">
+      <h2 id="issues-title">
+        <span i18n="@@closeout.issuesTitle">Variations, claims and disputes</span>
+      </h2>
+      <h3><span i18n="@@closeout.variations">Variations</span></h3>
+      <dl class="pf-readonly">
+        <div>
+          <dt><span i18n="@@closeout.count">Number</span></dt>
+          <dd>
+            <ng-container
+              *ngTemplateOutlet="count; context: { $implicit: commercial.variationCount }"
+            />
+          </dd>
+        </div>
+        @if (shows(commercial.variationValue)) {
+          <div>
+            <dt>
+              <span i18n="@@closeout.totalValue"
+                >Total value (<bdi dir="ltr">{{ base.currency }}</bdi
+                >, optional)</span
+              >
+            </dt>
+            <dd>
+              <ng-container
+                *ngTemplateOutlet="amount; context: { $implicit: commercial.variationValue }"
+              />
+            </dd>
+          </div>
+        }
+        <div>
+          <dt><span i18n="@@closeout.variationCause">Main cause (optional)</span></dt>
+          <dd>{{ causeLabel(commercial.variationCause) }}</dd>
+        </div>
+        @if (shows(commercial.variationNote)) {
+          <div class="pf-readonly-wide">
+            <dt><span i18n="@@closeout.note">Note (optional)</span></dt>
+            <dd class="pf-readonly-text">
+              <ng-container
+                *ngTemplateOutlet="text; context: { $implicit: commercial.variationNote }"
+              />
+            </dd>
+          </div>
+        }
+      </dl>
+      <h3><span i18n="@@closeout.claims">Claims</span></h3>
+      <dl class="pf-readonly">
+        <div>
+          <dt><span i18n="@@closeout.count">Number</span></dt>
+          <dd>
+            <ng-container
+              *ngTemplateOutlet="count; context: { $implicit: commercial.claimCount }"
+            />
+          </dd>
+        </div>
+        @if (shows(commercial.claimedValue)) {
+          <div>
+            <dt>
+              <span i18n="@@closeout.claimedValue"
+                >Total claimed (<bdi dir="ltr">{{ base.currency }}</bdi
+                >, optional)</span
+              >
+            </dt>
+            <dd>
+              <ng-container
+                *ngTemplateOutlet="amount; context: { $implicit: commercial.claimedValue }"
+              />
+            </dd>
+          </div>
+        }
+        <div>
+          <dt><span i18n="@@closeout.unresolved">Unresolved</span></dt>
+          <dd>
+            <ng-container
+              *ngTemplateOutlet="count; context: { $implicit: commercial.unresolvedClaimCount }"
+            />
+          </dd>
+        </div>
+        @if (shows(commercial.claimNote)) {
+          <div class="pf-readonly-wide">
+            <dt><span i18n="@@closeout.note">Note (optional)</span></dt>
+            <dd class="pf-readonly-text">
+              <ng-container
+                *ngTemplateOutlet="text; context: { $implicit: commercial.claimNote }"
+              />
+            </dd>
+          </div>
+        }
+      </dl>
+      <h3><span i18n="@@closeout.disputes">Disputes</span></h3>
+      <dl class="pf-readonly">
+        <div>
+          <dt><span i18n="@@closeout.count">Number</span></dt>
+          <dd>
+            <ng-container
+              *ngTemplateOutlet="count; context: { $implicit: commercial.disputeCount }"
+            />
+          </dd>
+        </div>
+        <div>
+          <dt><span i18n="@@closeout.unresolved">Unresolved</span></dt>
+          <dd>
+            <ng-container
+              *ngTemplateOutlet="count; context: { $implicit: commercial.unresolvedDisputeCount }"
+            />
+          </dd>
+        </div>
+        @if (shows(commercial.disputeNote)) {
+          <div class="pf-readonly-wide">
+            <dt><span i18n="@@closeout.note">Note (optional)</span></dt>
+            <dd class="pf-readonly-text">
+              <ng-container
+                *ngTemplateOutlet="text; context: { $implicit: commercial.disputeNote }"
+              />
+            </dd>
+          </div>
+        }
+      </dl>
+    </section>
+  }
+
+  @case ('feedback') {
+    <section class="prj-section" aria-labelledby="feedback-title">
+      <h2 id="feedback-title">
+        <span i18n="@@closeout.feedbackTitle"> Feedback and would-work-again </span>
+      </h2>
+      <dl class="pf-readonly">
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.rehire"> Would you work with this subcontractor again? </span>
+          </dt>
+          <dd>{{ rehireLabel(execution.wouldWorkAgain) }}</dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.rehireRationale"
+              >Rationale (required for Conditional or No)</span
+            >
+          </dt>
+          <dd class="pf-readonly-text">
+            <ng-container
+              *ngTemplateOutlet="text; context: { $implicit: execution.wouldWorkAgainRationale }"
+            />
+          </dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.executionFeedback">Project manager feedback (optional)</span>
+          </dt>
+          <dd class="pf-readonly-text">
+            <ng-container
+              *ngTemplateOutlet="text; context: { $implicit: execution.executionFeedback }"
+            />
+          </dd>
+        </div>
+        <div class="pf-readonly-wide">
+          <dt>
+            <span i18n="@@closeout.executionEvidence"
+              >Evidence reference, e.g. completion certificate (optional)</span
+            >
+          </dt>
+          <dd class="pf-readonly-text">
+            <ng-container
+              *ngTemplateOutlet="text; context: { $implicit: execution.evidenceNote }"
+            />
+          </dd>
+        </div>
+      </dl>
+    </section>
+  }
+}
+
+<ng-template #none
+  ><span class="pf-readonly-none" i18n="@@closeout.notRecorded">Not recorded</span></ng-template
+>
+<ng-template #text let-value>
+  @if (value) {
+    {{ value }}
+  } @else {
+    <ng-container *ngTemplateOutlet="none" />
+  }
+</ng-template>
+<ng-template #amount let-value>
+  @if (value) {
+    <bdi dir="ltr">{{ money(value) }} {{ base.currency }}</bdi>
+  } @else {
+    <ng-container *ngTemplateOutlet="none" />
+  }
+</ng-template>
+<ng-template #count let-value>
+  @if (value != null) {
+    <bdi dir="ltr">{{ value }}</bdi>
+  } @else {
+    <ng-container *ngTemplateOutlet="none" />
+  }
+</ng-template>

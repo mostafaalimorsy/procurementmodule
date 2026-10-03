@@ -1,0 +1,329 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/projects" i18n="@@nav.projects">Projects</a><span aria-hidden="true">/</span>
+    <span>
+      @if (isEdit) {
+        <ng-container i18n="@@common.edit">Edit</ng-container>
+      } @else {
+        <ng-container i18n="@@projects.new">New project</ng-container>
+      }
+    </span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow">
+        @if (isEdit) {
+          <ng-container i18n="@@projectForm.editEyebrow">Edit engagement</ng-container>
+        } @else {
+          <ng-container i18n="@@projectForm.newEyebrow">New engagement</ng-container>
+        }
+      </p>
+      <h1>
+        @if (isEdit) {
+          @if (name) {
+            <bdi>{{ name }}</bdi>
+          } @else {
+            <ng-container i18n="@@projectForm.editTitle">Edit project</ng-container>
+          }
+        } @else {
+          <ng-container i18n="@@projectForm.createTitle">Create a project</ng-container>
+        }
+      </h1>
+      <p i18n="@@projectForm.intro">
+        A project is created as a draft. Activate it when work is committed — that is the point it
+        uses one of your plan's active-project slots.
+      </p>
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@common.loading">Loading…</p>
+  } @else {
+    <form
+      class="prj-form"
+      novalidate
+      (ngSubmit)="save()"
+      (input)="edited($event)"
+      (change)="edited($event)"
+    >
+      <!-- CF-020 (B-020-2): the errors of an invalid submit, first in the form. -->
+      <app-error-summary />
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@projectForm.identification">Identification</legend>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="code"
+              ><ng-container i18n="@@projectForm.code">Project code</ng-container>
+              <span aria-hidden="true">*</span></label
+            >
+            <input
+              dir="ltr"
+              class="ltr-token"
+              id="code"
+              name="code"
+              required
+              maxlength="32"
+              autocomplete="off"
+              [(ngModel)]="code"
+              [attr.aria-invalid]="
+                (submitted && codeInvalid) || serverError('code') ? 'true' : null
+              "
+              [attr.aria-describedby]="
+                submitted && codeInvalid
+                  ? 'code-error'
+                  : serverError('code')
+                    ? 'code-server-error'
+                    : 'code-hint'
+              "
+            />
+            @if (submitted && codeInvalid) {
+              <span id="code-error" class="prj-error-text" i18n="@@projectForm.codeError">
+                Use 2–32 letters, digits, dash, underscore or slash — for example
+                <bdi dir="ltr">CMC-2026</bdi>.
+              </span>
+            } @else if (serverError('code'); as message) {
+              <span id="code-server-error" class="prj-error-text">{{ message }}</span>
+            } @else {
+              <span id="code-hint" class="prj-hint" i18n="@@projectForm.codeHint">
+                Your own reference, unique in this company. Stored in capitals.
+              </span>
+            }
+          </div>
+          <div class="prj-field">
+            <label for="name"
+              ><ng-container i18n="@@projectForm.name">Project name</ng-container>
+              <span aria-hidden="true">*</span></label
+            >
+            <input
+              id="name"
+              name="name"
+              required
+              maxlength="200"
+              [(ngModel)]="name"
+              [attr.aria-invalid]="
+                (submitted && nameInvalid) || serverError('name') ? 'true' : null
+              "
+              [attr.aria-describedby]="
+                submitted && nameInvalid
+                  ? 'name-error'
+                  : serverError('name')
+                    ? 'name-server-error'
+                    : null
+              "
+            />
+            @if (submitted && nameInvalid) {
+              <span id="name-error" class="prj-error-text" i18n="@@projectForm.nameError"
+                >A project name is required.</span
+              >
+            } @else if (serverError('name'); as message) {
+              <span id="name-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+          <div class="prj-field prj-span-all">
+            <label for="description" i18n="@@common.description">Description</label>
+            <textarea
+              id="description"
+              name="description"
+              maxlength="4000"
+              [(ngModel)]="description"
+              [attr.aria-invalid]="serverError('description') ? 'true' : null"
+              [attr.aria-describedby]="
+                serverError('description') ? 'description-server-error' : null
+              "
+            ></textarea>
+            @if (serverError('description'); as message) {
+              <span id="description-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@projectForm.clientSite">Client and site</legend>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="client" i18n="@@project.client">Client</label>
+            <input
+              id="client"
+              name="clientName"
+              maxlength="200"
+              [(ngModel)]="clientName"
+              [attr.aria-invalid]="serverError('clientName') ? 'true' : null"
+              [attr.aria-describedby]="serverError('clientName') ? 'client-server-error' : null"
+            />
+            @if (serverError('clientName'); as message) {
+              <span id="client-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+          <div class="prj-field">
+            <label for="location" i18n="@@project.location">Location</label>
+            <input
+              id="location"
+              name="location"
+              maxlength="200"
+              [(ngModel)]="location"
+              [attr.aria-invalid]="serverError('location') ? 'true' : null"
+              [attr.aria-describedby]="serverError('location') ? 'location-server-error' : null"
+            />
+            @if (serverError('location'); as message) {
+              <span id="location-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+          <div class="prj-field">
+            <label for="currency" i18n="@@project.currency">Currency</label>
+            <app-currency-select
+              inputId="currency"
+              [value]="currency || null"
+              [currencies]="currencies()"
+              [disabled]="!!currencyLock"
+              [invalid]="(submitted && currencyInvalid) || !!serverError('currency')"
+              [describedBy]="
+                submitted && currencyInvalid
+                  ? 'currency-error'
+                  : serverError('currency')
+                    ? 'currency-server-error'
+                    : 'currency-hint'
+              "
+              (valueChange)="chooseCurrency($event)"
+            />
+            @if (submitted && currencyInvalid) {
+              <span
+                id="currency-error"
+                class="prj-error-text"
+                i18n="@@projectForm.currencyRequired"
+              >
+                Choose the project's currency.
+              </span>
+            } @else if (serverError('currency'); as message) {
+              <span id="currency-server-error" class="prj-error-text">{{ message }}</span>
+            } @else if (currencyLock === 'tenders') {
+              <span id="currency-hint" class="prj-hint" i18n="@@projectForm.currencyLockedTenders">
+                The currency is fixed: a tender of this project has asked bidders for prices in it.
+              </span>
+            } @else if (currencyLock === 'estimates') {
+              <span
+                id="currency-hint"
+                class="prj-hint"
+                i18n="@@projectForm.currencyLockedEstimates"
+              >
+                The currency is fixed while work-package estimates are recorded in it. Remove the
+                estimates first to change it.
+              </span>
+            } @else if (!isEdit && !companyDefault()) {
+              <span id="currency-hint" class="prj-hint" i18n="@@projectForm.noCompanyDefault">
+                Your company has no default currency yet: choose one for this project. A Company
+                Admin can set the default in Company settings.
+              </span>
+            } @else {
+              <span id="currency-hint" class="prj-hint" i18n="@@projectForm.currencyHintPart7">
+                Work packages, tenders and bids of this project are priced in this currency.
+              </span>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@projectForm.programme">Programme</legend>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="start" i18n="@@projectForm.startDate">Start date</label>
+            <input id="start" name="startDate" type="date" [(ngModel)]="startDate" />
+          </div>
+          <div class="prj-field">
+            <label for="end" i18n="@@projectForm.expectedEndDate">Expected end date</label>
+            <input
+              id="end"
+              name="expectedEndDate"
+              type="date"
+              [(ngModel)]="expectedEndDate"
+              [attr.aria-invalid]="
+                datesOutOfOrder || serverError('expectedEndDate') ? 'true' : null
+              "
+              [attr.aria-describedby]="
+                datesOutOfOrder
+                  ? 'end-error'
+                  : serverError('expectedEndDate')
+                    ? 'end-server-error'
+                    : null
+              "
+            />
+            @if (datesOutOfOrder) {
+              <span id="end-error" class="prj-error-text" i18n="@@projectForm.datesError">
+                The expected end date cannot be before the start date.
+              </span>
+            } @else if (serverError('expectedEndDate'); as message) {
+              <span id="end-server-error" class="prj-error-text">{{ message }}</span>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="prj-fieldset">
+        <legend i18n="@@project.responsibility">Responsibility</legend>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="pm" i18n="@@project.manager">Project manager</label>
+            <select
+              id="pm"
+              name="projectManager"
+              [(ngModel)]="projectManagerAccountId"
+              [disabled]="!mayAssignManager()"
+              [attr.aria-describedby]="mayAssignManager() ? null : 'pm-hint'"
+            >
+              <option value="" i18n="@@common.notAssigned">Not assigned</option>
+              @for (person of people(); track person.accountId) {
+                <option [value]="person.accountId">
+                  {{ person.displayName }} — {{ roleLabel(person.role) }}
+                </option>
+              }
+            </select>
+            @if (!mayAssignManager()) {
+              <p class="prj-hint" id="pm-hint" i18n="@@project.managerAssignedByProcurement">
+                Only a Procurement Manager or Company Admin assigns the project manager.
+              </p>
+            }
+          </div>
+          <div class="prj-field">
+            <label for="owner" i18n="@@project.owner">Procurement owner</label>
+            <select id="owner" name="procurementOwner" [(ngModel)]="procurementOwnerAccountId">
+              <option value="" i18n="@@common.notAssigned">Not assigned</option>
+              @for (person of people(); track person.accountId) {
+                <option [value]="person.accountId">
+                  {{ person.displayName }} — {{ roleLabel(person.role) }}
+                </option>
+              }
+            </select>
+          </div>
+          <p class="prj-hint prj-span-all" i18n="@@projectForm.responsibilityHint">
+            Naming someone records who is accountable. It does not change what they are allowed to
+            do — that comes from their role.
+          </p>
+        </div>
+      </fieldset>
+
+      <div class="prj-form-actions">
+        <button class="prj-btn" type="submit" [disabled]="saving()">
+          @if (saving()) {
+            <ng-container i18n="@@common.saving">Saving…</ng-container>
+          } @else if (isEdit) {
+            <ng-container i18n="@@common.saveChanges">Save changes</ng-container>
+          } @else {
+            <ng-container i18n="@@projectForm.create">Create project</ng-container>
+          }
+        </button>
+        <a
+          class="prj-btn prj-btn--ghost"
+          [routerLink]="isEdit ? ['/projects', existing()!.id] : ['/projects']"
+          i18n="@@common.cancel"
+          >Cancel</a
+        >
+      </div>
+    </form>
+  }
+</section>

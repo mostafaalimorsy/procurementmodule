@@ -1,0 +1,355 @@
+<section class="prj-page dc-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/tenders" i18n="@@nav.tenders">Tenders</a><span aria-hidden="true">/</span>
+    <a [routerLink]="['/tenders', tenderId()]">
+      @if (comparison(); as view) {
+        <bdi dir="ltr">{{ view.tenderReference }}</bdi>
+      } @else {
+        <ng-container i18n="@@tenders.crumb">Tender</ng-container>
+      }
+    </a>
+    <span aria-hidden="true">/</span>
+    <a [routerLink]="['/tenders', tenderId(), 'negotiation']" i18n="@@negotiation.crumb"
+      >Negotiation rounds</a
+    >
+    <span aria-hidden="true">/</span>
+    <span i18n="@@comparison.crumb">Comparison</span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@comparison.loading">Loading the comparison…</p>
+  } @else if (comparison(); as view) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ view.tenderReference }}</bdi> ·
+          <ng-container i18n="@@comparison.eyebrow">Negotiation</ng-container>
+        </p>
+        <h1 i18n="@@comparison.title">Original, revised and final responses</h1>
+        <p class="prj-hint" i18n="@@comparison.intro">
+          Every evidenced revision of a bid, side by side. "Changed" means the stored values differ
+          exactly; nothing here interprets what a change means.
+        </p>
+      </div>
+    </div>
+    <app-tender-stage-header [tenderId]="tenderId()" page="comparison" />
+    @if (!view.includesCommercial) {
+      <p class="prj-note" role="note" i18n="@@comparison.technicalOnly">
+        You see the technical comparison only. Amounts, priced lines, commercial terms and
+        commercial files are for commercial readers.
+      </p>
+    }
+
+    @if (view.bids.length > 1) {
+      <div class="prj-field dc-bid-pick">
+        <label for="comparison-bid" i18n="@@comparison.chooseBid">Bid shown</label>
+        <select id="comparison-bid" [ngModel]="selectedId" (ngModelChange)="pick($event)">
+          @for (item of view.bids; track item.openingBidId) {
+            <option [value]="item.openingBidId">
+              {{ item.subcontractorCode }} — {{ item.subcontractorName }}
+            </option>
+          }
+        </select>
+      </div>
+    }
+
+    @if (bid(); as current) {
+      <section class="prj-section" aria-labelledby="comparison-bid-title">
+        <h2 id="comparison-bid-title">
+          <bdi dir="ltr" class="tnd-code">{{ current.subcontractorCode }}</bdi
+          >{{ ' ' }}<bdi>{{ current.subcontractorName }}</bdi>
+        </h2>
+        <dl class="dc-facts">
+          <div>
+            <dt i18n="@@comparison.technicalChanged">Technical response</dt>
+            <dd>
+              @if (current.technicalChanged) {
+                <strong class="dc-changed" i18n="@@comparison.changedSinceOriginal"
+                  >Changed since the original</strong
+                >
+              } @else {
+                <span i18n="@@comparison.sameAsOriginal">Same as the original</span>
+              }
+            </dd>
+          </div>
+          @if (current.commercialChanged !== null) {
+            <div>
+              <dt i18n="@@comparison.commercialChanged">Commercial response</dt>
+              <dd>
+                @if (current.commercialChanged) {
+                  <strong class="dc-changed" i18n="@@comparison.changedSinceOriginal"
+                    >Changed since the original</strong
+                  >
+                } @else {
+                  <span i18n="@@comparison.sameAsOriginal">Same as the original</span>
+                }
+              </dd>
+            </div>
+          }
+          @if (view.includesCommercial) {
+            <div>
+              <dt i18n="@@comparison.originalTotal">Original total</dt>
+              <dd>
+                <bdi dir="ltr">{{ money(current.originalTotal) }} {{ view.currency }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@comparison.finalTotal">Final total (in force)</dt>
+              <dd>
+                <bdi dir="ltr">{{ money(current.finalTotal) }} {{ view.currency }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@comparison.change">Change</dt>
+              <dd>
+                <bdi dir="ltr">{{ signed(current.absoluteChange) }} {{ view.currency }}</bdi>
+                @if (current.percentChange !== null) {
+                  <small class="prj-hint tnd-block"
+                    ><bdi dir="ltr">{{ percent(current.percentChange) }}%</bdi></small
+                  >
+                }
+              </dd>
+            </div>
+          }
+        </dl>
+
+        <h3 i18n="@@comparison.revisionsTitle">Revisions</h3>
+        <div class="prj-table-wrap">
+          <table class="prj-table ev-table dc-matrix">
+            <caption class="prj-visually-hidden" i18n="@@comparison.revisionsCaption">
+              Revisions of this bid, from the original to the response in force
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@comparison.colItem">Item</th>
+                @for (column of current.revisions; track column.revisionId) {
+                  <th scope="col">
+                    {{ kindLabel(column.kind, column.round) }}
+                    <small class="prj-hint tnd-block" i18n="@@comparison.revisionNumber"
+                      >revision {{ column.number }}</small
+                    >
+                    @if (column.isCurrent) {
+                      <strong class="tnd-block dc-final" i18n="@@comparison.finalMarker"
+                        >Final — in force</strong
+                      >
+                    }
+                  </th>
+                }
+                <th scope="col" i18n="@@comparison.colOriginalToFinal">Original → final</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" i18n="@@comparison.rowSubmitted">Submitted</th>
+                @for (column of current.revisions; track column.revisionId) {
+                  <td>{{ column.submittedAtUtc | businessDate: 'instant' }}</td>
+                }
+                <td></td>
+              </tr>
+              @for (field of technicalFields(); track field.field) {
+                <ng-container
+                  *ngTemplateOutlet="
+                    fieldRow;
+                    context: { field: field, columns: current.revisions.length }
+                  "
+                />
+              }
+              @for (field of commercialFields(); track field.field) {
+                <ng-container
+                  *ngTemplateOutlet="
+                    fieldRow;
+                    context: { field: field, columns: current.revisions.length }
+                  "
+                />
+              }
+            </tbody>
+          </table>
+        </div>
+        <app-verification-details>
+          <ul role="list">
+            @for (column of current.revisions; track column.revisionId) {
+              <li>
+                {{ kindLabel(column.kind, column.round) }} ·
+                <span i18n="@@comparison.rowFingerprint">Fingerprint (SHA-256)</span>:
+                <code dir="ltr" class="dc-mono">{{ column.contentSha256 }}</code>
+              </li>
+            }
+          </ul>
+        </app-verification-details>
+
+        @if (view.includesCommercial) {
+          <h3 i18n="@@comparison.linesTitle">Priced lines</h3>
+          @if (current.lines.length) {
+            <div class="prj-table-wrap">
+              <table class="prj-table ev-table dc-matrix">
+                <caption class="prj-visually-hidden" i18n="@@comparison.linesCaption">
+                  Priced lines in each revision
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" i18n="@@comparison.colLine">Line</th>
+                    <!-- Re-audit AB: every priced-line amount and its column carry the currency. -->
+                    @for (column of current.revisions; track column.revisionId) {
+                      <th scope="col" class="dc-num">
+                        {{ kindLabel(column.kind, column.round) }}
+                        <small class="prj-hint tnd-block"
+                          ><bdi dir="ltr">{{ view.currency }}</bdi></small
+                        >
+                      </th>
+                    }
+                    <th scope="col" i18n="@@comparison.colChange">Original → final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of current.lines; track $index) {
+                    <tr>
+                      <th scope="row">
+                        <bdi>{{ line.description }}</bdi>
+                      </th>
+                      @for (amount of line.amounts; track $index) {
+                        <td class="dc-num">
+                          @if (amount === null) {
+                            <span class="prj-hint" i18n="@@comparison.absent"
+                              >Not in this revision</span
+                            >
+                          } @else {
+                            <bdi dir="ltr">{{ money(amount) }} {{ view.currency }}</bdi>
+                          }
+                        </td>
+                      }
+                      <td>
+                        @if (line.change === 'unchanged') {
+                          {{ changeLabel(line.change) }}
+                        } @else {
+                          <strong class="dc-changed">{{ changeLabel(line.change) }}</strong>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="prj-hint" i18n="@@comparison.noLines">No priced breakdown in any revision.</p>
+          }
+        }
+
+        @if (current.lists.length) {
+          <h3 i18n="@@comparison.listsTitle">Exclusions and deviations</h3>
+          <div class="prj-table-wrap">
+            <table class="prj-table ev-table dc-matrix">
+              <caption class="prj-visually-hidden" i18n="@@comparison.listsCaption">
+                Which revisions state each exclusion or deviation
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" i18n="@@comparison.colStatement">Statement</th>
+                  @for (column of current.revisions; track column.revisionId) {
+                    <th scope="col">{{ kindLabel(column.kind, column.round) }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of current.lists; track $index) {
+                  <tr>
+                    <th scope="row">
+                      <small class="prj-hint tnd-block">{{ fieldLabel(item.field) }}</small>
+                      <bdi>{{ item.text }}</bdi>
+                    </th>
+                    @for (stated of item.statedIn; track $index) {
+                      <td>
+                        @if (stated) {
+                          <span i18n="@@comparison.stated">Stated</span>
+                        } @else {
+                          <span class="prj-hint" i18n="@@comparison.notStated">Not stated</span>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        @if (current.files.length) {
+          <h3 i18n="@@comparison.filesTitle">Files</h3>
+          <div class="prj-table-wrap">
+            <table class="prj-table ev-table dc-matrix">
+              <caption class="prj-visually-hidden" i18n="@@comparison.filesCaption">
+                Which revisions include each file
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" i18n="@@comparison.colFile">File</th>
+                  @for (column of current.revisions; track column.revisionId) {
+                    <th scope="col">{{ kindLabel(column.kind, column.round) }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (file of current.files; track $index) {
+                  <tr>
+                    <th scope="row">
+                      <bdi>{{ file.fileName }}</bdi>
+                      <small class="prj-hint tnd-block">{{
+                        classificationLabel(file.classification)
+                      }}</small>
+                    </th>
+                    @for (present of file.presentIn; track $index) {
+                      <td>
+                        @if (present) {
+                          <span i18n="@@comparison.present">Included</span>
+                        } @else {
+                          <span class="prj-hint" i18n="@@comparison.notPresent">Not included</span>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    } @else {
+      <p class="prj-hint" i18n="@@comparison.none">There is no opened bid to compare.</p>
+    }
+  }
+</section>
+
+<ng-template #fieldRow let-field="field">
+  <tr>
+    <th scope="row">{{ fieldLabel(field.field) }}</th>
+    @for (item of field.values; track $index; let index = $index) {
+      <td>
+        <span class="ev-prose dc-value"
+          ><bdi [attr.dir]="field.field === 'totalAmount' ? 'ltr' : null">{{
+            shown(field, index)
+          }}</bdi></span
+        >
+        @if (field.changedFromPrevious[index]) {
+          <strong class="dc-changed tnd-block" i18n="@@comparison.changedMarker">Changed</strong>
+        }
+      </td>
+    }
+    <td>
+      @if (field.changedFromOriginal) {
+        <strong class="dc-changed" i18n="@@comparison.changedSinceOriginal"
+          >Changed since the original</strong
+        >
+      } @else {
+        <span class="prj-hint" i18n="@@comparison.sameAsOriginal">Same as the original</span>
+      }
+    </td>
+  </tr>
+</ng-template>

@@ -1,0 +1,499 @@
+:host {
+  display: block;
+}
+
+.breadcrumb {
+  display: flex;
+  gap: 0.6rem;
+  margin-block-end: 2rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.breadcrumb a {
+  color: var(--color-accent);
+}
+
+.page-heading,
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.page-heading {
+  padding-block-end: clamp(2rem, 5vw, 4rem);
+  border-block-end: 2px solid var(--color-ink);
+}
+
+.eyebrow,
+.section-index,
+.scope-note span {
+  margin: 0 0 0.65rem;
+  color: var(--color-accent);
+  font-family: var(--font-label);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 6vw, 4.8rem);
+  font-weight: 400;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.page-heading > div > p:last-child,
+.invite-panel > div > p:last-child,
+.invite-panel .invite-help {
+  max-inline-size: 42rem;
+  margin-block: 1rem 0;
+  color: var(--color-muted);
+}
+
+.scope-note {
+  min-inline-size: 12rem;
+  padding: 1rem;
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-surface);
+}
+
+.scope-note span,
+.scope-note strong {
+  display: block;
+}
+
+.invite-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(22rem, 1.2fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  padding-block: clamp(2.5rem, 6vw, 5rem);
+  border-block-end: 1px solid var(--color-border);
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+/* Sign-in security: the intro beside one compact settings card — MFA roles and the idle timeout as two groups, Save under them. */
+.security-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  padding-block: clamp(2rem, 4vw, 3rem);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.security-intro p {
+  max-inline-size: 42rem;
+  margin-block: 0.75rem 0;
+  color: var(--color-muted);
+}
+
+.security-form {
+  display: block;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.security-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1.25rem 2rem;
+}
+
+.security-group {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.security-group > legend {
+  margin-block-end: 0.5rem;
+  padding: 0;
+  color: var(--color-accent);
+  font-family: var(--font-label);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.security-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 0.15rem 1rem;
+}
+
+.security-form .security-role {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding-block: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.security-role input {
+  flex: none;
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  min-block-size: 0;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  accent-color: var(--color-accent);
+  cursor: inherit;
+}
+
+.security-role input:disabled {
+  cursor: not-allowed;
+}
+
+.security-role input:disabled + span {
+  color: var(--color-muted);
+}
+
+.security-role small {
+  display: block;
+}
+
+.security-group > label {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.security-group input[type='number'] {
+  inline-size: min(9rem, 100%);
+}
+
+.security-group .prj-hint {
+  margin: 0;
+}
+
+.security-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-block-start: 1.25rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--color-border);
+}
+
+form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 0.65rem 1rem;
+}
+
+form label {
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+form label:nth-of-type(3),
+form select,
+form button {
+  grid-column: 1 / -1;
+}
+
+input,
+select {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 2.8rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.2rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.primary,
+.compact {
+  inline-size: fit-content;
+  min-block-size: 2.65rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-accent);
+  border-radius: 0.2rem;
+  background: var(--color-accent);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+}
+
+.users-section {
+  padding-block-start: clamp(2.5rem, 6vw, 5rem);
+}
+
+.count {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.table-scroll {
+  margin-block-start: 1.5rem;
+  overflow-x: auto;
+}
+
+table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  text-align: start;
+}
+
+th,
+td {
+  padding: 1rem 0.75rem;
+  border-block-end: 1px solid var(--color-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+th {
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+td strong,
+td small {
+  display: block;
+}
+
+td small {
+  max-inline-size: 22rem;
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+}
+
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #76a497;
+  border-radius: 999px;
+  color: #145d4f;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.status.invited {
+  border-color: #c0a25b;
+  color: #735b20;
+}
+
+.status.suspended,
+.status.reset {
+  border-color: #c78e84;
+  color: #8f251d;
+}
+
+.role-control,
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.role-control select {
+  inline-size: min(15rem, 100%);
+}
+
+.compact {
+  min-block-size: 2.35rem;
+  padding: 0.45rem 0.65rem;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.text-button.warning {
+  color: var(--color-warning);
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.message {
+  margin-block: 1.5rem 0;
+  padding: 0.8rem 1rem;
+  border-inline-start: 3px solid currentColor;
+  font-size: 0.86rem;
+}
+
+.error {
+  background: #fff4f2;
+  color: #8f251d;
+}
+
+.notice {
+  background: #edf7f2;
+  color: #145d4f;
+}
+
+.empty {
+  margin-block-start: 1.5rem;
+  padding: 2rem;
+  border: 1px dashed var(--color-border);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 55rem) {
+  .page-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .invite-panel,
+  .security-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 42rem) {
+  form {
+    grid-template-columns: 1fr;
+  }
+
+  form label,
+  form input {
+    grid-column: 1;
+  }
+
+  thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  tr,
+  td {
+    display: block;
+  }
+
+  tr {
+    padding-block: 1rem;
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 0.35fr) minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 0.5rem 0;
+    border: 0;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--color-muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+// CF-035: additional roles beside the primary role.
+.extra-roles {
+  border: 0;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  legend {
+    font-size: 0.8rem;
+    color: var(--text-muted, #5b6472);
+    padding: 0;
+  }
+}
+.extra-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  input {
+    inline-size: auto;
+  }
+}
+.extra-role-chip {
+  margin-inline-start: 0.35rem;
+  font-size: 0.85rem;
+}
+
+// CF-078: the invitation email's delivery state under an invited user's status.
+.invitation-mail {
+  display: block;
+  margin-block-start: 0.25rem;
+  color: var(--color-muted);
+}
+
+.invitation-mail--failed {
+  color: var(--color-danger);
+}
+
+/* CF-114 (ADR-157): an invitation whose link no longer opens. */
+.invitation-expired {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* Red-team B-115-2: the allow-list, read only (layout from .prj-summary). */
+.allow-list h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.allow-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}

@@ -1,0 +1,167 @@
+<section class="plt-page prj-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@platformEmail.eyebrow">Platform operations</p>
+      <h1 i18n="@@platformEmail.title">Email</h1>
+      <p i18n="@@platformEmail.intro">
+        The platform's default mail server, used by every company without a server of its own, and
+        the controlled templates for tender emails.
+      </p>
+    </div>
+  </div>
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (settings(); as current) {
+    <app-mail-server-panel
+      [server]="current.server"
+      [adapter]="adapter"
+      [secretProtectionAvailable]="current.secretProtectionAvailable"
+      (changed)="load()"
+    />
+  }
+
+  <section class="prj-section" aria-labelledby="templates-title">
+    <h2 id="templates-title" i18n="@@templates.title">Email templates</h2>
+    <p class="prj-hint" i18n="@@templates.intro">
+      Plain text with placeholders from a fixed list. Values are inserted as text, never as code;
+      the invitation link is personal and may appear in the body only.
+    </p>
+    @if (templateError()) {
+      <p class="prj-note prj-note--error" role="alert">{{ templateError() }}</p>
+    }
+    @if (templateMessage()) {
+      <p class="prj-note" role="status">{{ templateMessage() }}</p>
+    }
+    <div class="mail-editor">
+      <ul class="mail-template-list" role="list">
+        @for (template of templates(); track template.key + template.locale) {
+          <li>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [attr.aria-pressed]="isSelected(template)"
+              (click)="open(template)"
+            >
+              {{ templateLabel(template.key) }} · {{ languageLabel(template.locale) }}
+              <small class="prj-hint" i18n="@@templates.version"
+                >(version {{ template.currentVersion }})</small
+              >
+            </button>
+          </li>
+        }
+      </ul>
+      <div>
+        @if (selected(); as current) {
+          <form class="prj-form" (ngSubmit)="save()" aria-labelledby="template-editor-title">
+            <h3 id="template-editor-title">
+              {{ templateLabel(current.key) }} · {{ languageLabel(current.locale) }}
+            </h3>
+            <p class="prj-hint">
+              @if (current.currentVersion === 0) {
+                <ng-container i18n="@@templates.builtIn"
+                  >The built-in text is in use (version 0).</ng-container
+                >
+              } @else {
+                <ng-container i18n="@@templates.inUse"
+                  >Version {{ current.currentVersion }} is in use.</ng-container
+                >
+              }
+            </p>
+            <div class="prj-field">
+              <label for="template-subject" i18n="@@templateField.subject">Subject</label>
+              <input
+                id="template-subject"
+                name="subject"
+                maxlength="200"
+                [attr.dir]="current.locale === 'ar' ? 'rtl' : 'ltr'"
+                [attr.lang]="current.locale"
+                [(ngModel)]="subject"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="template-body" i18n="@@templateField.body">Body</label>
+              <textarea
+                id="template-body"
+                name="body"
+                rows="14"
+                maxlength="5000"
+                aria-describedby="template-placeholders"
+                [attr.dir]="current.locale === 'ar' ? 'rtl' : 'ltr'"
+                [attr.lang]="current.locale"
+                [(ngModel)]="body"
+              ></textarea>
+            </div>
+            <div id="template-placeholders" class="prj-hint">
+              <span i18n="@@templates.placeholders">Placeholders you can use:</span>
+              <ul class="mail-placeholders" role="list">
+                @for (name of current.allowedPlaceholders; track name) {
+                  <li>
+                    <code class="prj-chip mail-code" dir="ltr">{{ token(name) }}</code>
+                  </li>
+                }
+              </ul>
+              <span i18n="@@templates.required">Required in the body:</span>
+              @for (name of current.requiredPlaceholders; track name) {
+                &ngsp;<code class="mail-code" dir="ltr">{{ token(name) }}</code>
+              }
+            </div>
+            <div class="prj-form-actions">
+              <button class="prj-btn" type="submit" [disabled]="busy()" i18n="@@templates.save">
+                Save as new version
+              </button>
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="showPreview()"
+                i18n="@@templates.preview"
+              >
+                Preview
+              </button>
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="restoreBuiltIn()"
+                i18n="@@templates.restore"
+              >
+                Use the built-in text
+              </button>
+            </div>
+          </form>
+          @if (preview(); as rendered) {
+            <h4 i18n="@@templates.previewTitle">Preview with example values</h4>
+            <p>
+              <strong
+                ><bdi>{{ rendered.subject }}</bdi></strong
+              >
+            </p>
+            <pre
+              class="mail-preview"
+              [attr.dir]="current.locale === 'ar' ? 'rtl' : 'ltr'"
+              [attr.lang]="current.locale"
+              >{{ rendered.textBody }}</pre>
+          }
+          <details>
+            <summary i18n="@@templates.history">Version history</summary>
+            <ul role="list">
+              @for (version of current.versions; track version.number) {
+                <li>
+                  @if (version.number === 0) {
+                    <span i18n="@@templates.builtInVersion">Version 0 · built-in text</span>
+                  } @else {
+                    <span i18n="@@templates.versionLine"
+                      >Version {{ version.number }} ·
+                      {{ version.createdAtUtc | businessDate: 'instant' }}</span
+                    >
+                  }
+                </li>
+              }
+            </ul>
+          </details>
+        } @else {
+          <p class="prj-hint" i18n="@@templates.choose">Choose a template to view or edit it.</p>
+        }
+      </div>
+    </div>
+  </section>
+</section>

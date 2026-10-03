@@ -1,0 +1,339 @@
+<section class="prj-page dc-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/tenders" i18n="@@nav.tenders">Tenders</a><span aria-hidden="true">/</span>
+    <a [routerLink]="['/tenders', tenderId()]">
+      @if (workspace(); as view) {
+        <bdi dir="ltr">{{ view.tenderReference }}</bdi>
+      } @else {
+        <ng-container i18n="@@tenders.crumb">Tender</ng-container>
+      }
+    </a>
+    <span aria-hidden="true">/</span>
+    <span i18n="@@decision.crumb">Recommendation and decision</span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  <div role="status" aria-live="polite">
+    @if (notice()) {
+      <p id="decision-notice" class="prj-note" tabindex="-1">{{ notice() }}</p>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@decision.loading">Loading the decision workspace…</p>
+  } @else if (notOpened()) {
+    <section class="prj-section" aria-labelledby="decision-empty-title">
+      <h1 id="decision-empty-title" i18n="@@decision.notOpenedTitle">No decision yet</h1>
+      <p i18n="@@decision.notOpenedBody">
+        The bids of this tender have not been opened. A recommendation and decision follow the
+        opening and a completed evaluation.
+      </p>
+      @if (readsEvaluation) {
+        <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tenderId(), 'evaluation']">
+          <ng-container i18n="@@negotiation.toEvaluation">Evaluation</ng-container>
+        </a>
+      }
+    </section>
+  } @else if (workspace(); as view) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ view.tenderReference }}</bdi> ·
+          <ng-container i18n="@@decision.eyebrow">Recommendation, approval and award</ng-container>
+        </p>
+        <h1>
+          <bdi>{{ view.tenderTitle }}</bdi>
+        </h1>
+        <p class="tnd-meta">
+          <span
+            class="prj-chip dc-state"
+            [class.dc-state--good]="view.status === 'Awarded' || view.status === 'Approved'"
+            [class.dc-state--muted]="!view.status"
+            >{{ statusLabel(view.status) }}</span
+          >
+        </p>
+        <!-- CF-003 (ADR-109): the decision / award pack and the award summary for finance. -->
+        <p class="prj-actions">
+          <a
+            class="prj-btn prj-btn--ghost"
+            [routerLink]="['/tenders', tenderId(), 'decision', 'print']"
+            i18n="@@decision.printPack"
+            >Decision pack (print)</a
+          >
+          @if (view.award) {
+            <a
+              class="prj-btn prj-btn--ghost"
+              [href]="awardSummaryUrl()"
+              download
+              i18n="@@decision.awardSummary"
+              >Award summary (CSV)</a
+            >
+          }
+        </p>
+      </div>
+    </div>
+    <app-tender-stage-header
+      [tenderId]="view.tenderId"
+      page="decision"
+      [refresh]="view.decisionVersion ?? view.status ?? 0"
+    />
+
+    <div
+      class="dc-tabs"
+      role="tablist"
+      aria-label="Decision sections"
+      i18n-aria-label="@@decision.sections"
+    >
+      @for (entry of tabs(); track entry; let index = $index) {
+        <button
+          type="button"
+          role="tab"
+          [id]="'decision-tab-' + entry"
+          [attr.aria-selected]="tab() === entry"
+          [attr.aria-controls]="'decision-panel-' + entry"
+          [attr.tabindex]="tab() === entry ? 0 : -1"
+          [class.is-active]="tab() === entry"
+          (click)="selectTab(entry)"
+          (keydown)="tabKey($event, index)"
+        >
+          {{ tabLabel(entry) }}
+        </button>
+      }
+    </div>
+
+    <div
+      [id]="'decision-panel-' + (tabs().includes(tab()) ? tab() : 'overview')"
+      role="tabpanel"
+      [attr.aria-labelledby]="'decision-tab-' + (tabs().includes(tab()) ? tab() : 'overview')"
+    >
+      @switch (tabs().includes(tab()) ? tab() : 'overview') {
+        @case ('recommendation') {
+          <!-- CF-038 AC1, CF-039 AC1/AC2: counts, limited competition, validity and lapsed bids beside the ranking. -->
+          <app-decision-controls [workspace]="view" />
+          <app-decision-recommendation
+            [tenderId]="tenderId()"
+            [workspace]="view"
+            (updated)="updated($event)"
+            (announce)="announce($event)"
+            (reload)="load($event)"
+          />
+        }
+        @case ('decision') {
+          <app-decision-controls [workspace]="view" />
+          <app-decision-prepare
+            [tenderId]="tenderId()"
+            [workspace]="view"
+            (updated)="updated($event)"
+            (announce)="announce($event)"
+            (reload)="load($event)"
+          />
+        }
+        @case ('approval') {
+          <app-decision-controls [workspace]="view" />
+          <app-decision-approval
+            [tenderId]="tenderId()"
+            [workspace]="view"
+            (updated)="updated($event)"
+            (announce)="announce($event)"
+            (reload)="load($event)"
+          />
+        }
+        @case ('award') {
+          <!-- CF-046 (ADR-110): the award's answer and withdrawal; after a release, the next award is issued from an approved new decision. -->
+          @if (view.award) {
+            <app-award-outcome
+              [tenderId]="tenderId()"
+              [workspace]="view"
+              (updated)="updated($event)"
+              (announce)="announce($event)"
+              (reload)="load($event)"
+            />
+          }
+          @if (view.award && view.status !== 'Approved') {
+            <app-award-baseline [award]="view.award" [timeZoneId]="view.timeZoneId" />
+          } @else {
+            <app-decision-approval
+              [tenderId]="tenderId()"
+              [workspace]="view"
+              (updated)="updated($event)"
+              (announce)="announce($event)"
+              (reload)="load($event)"
+            />
+          }
+        }
+        @case ('timeline') {
+          <section class="prj-section" aria-labelledby="timeline-title">
+            <h2 id="timeline-title" i18n="@@decision.timelineTitle">Decision history</h2>
+            @if (view.timeline.length) {
+              <ol class="dc-timeline" role="list">
+                @for (entry of view.timeline; track $index) {
+                  <li>
+                    <strong>{{ timelineLabel(entry.kind, entry.number, entry.step) }}</strong>
+                    <small class="prj-hint tnd-block"
+                      >{{ entry.atUtc | businessDate: 'instant' }} ·
+                      <bdi>{{ entry.actorName }}</bdi></small
+                    >
+                  </li>
+                }
+              </ol>
+            } @else {
+              <p class="prj-hint" i18n="@@decision.timelineEmpty">Nothing has happened yet.</p>
+            }
+          </section>
+        }
+        @default {
+          <section class="prj-section" aria-labelledby="readiness-title">
+            <h2 id="readiness-title" i18n="@@decision.readinessTitle">Readiness</h2>
+            <p>
+              <span
+                class="prj-chip dc-state"
+                [class.dc-state--good]="view.readiness.state === 'Ready'"
+                [class.dc-state--warn]="
+                  view.readiness.state !== 'Ready' && view.readiness.state !== 'Awarded'
+                "
+                >{{ evidenceLabel(view) }}</span
+              >
+            </p>
+            @if (view.currentStep; as step) {
+              <p class="dc-step">
+                <strong i18n="@@decision.stepTitle">Where the decision stands:</strong>
+                {{ stepLabel(step) }}
+              </p>
+              @if (step.state === 'Approved' && view.access.issue) {
+                <p class="prj-actions">
+                  <button
+                    class="prj-btn"
+                    type="button"
+                    (click)="selectTab('award')"
+                    i18n="@@decision.toAward"
+                  >
+                    Go to the award
+                  </button>
+                </p>
+              }
+            }
+            @if (view.readiness.gaps.length) {
+              <div class="prj-note tnd-attention-box" role="note">
+                <strong i18n="@@decision.gapsTitle">Before a recommendation can be computed</strong>
+                <ul role="list">
+                  @for (gap of view.readiness.gaps; track gap) {
+                    <li>{{ gapLabel(gap) }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (readsEvaluation) {
+              <div class="dc-links">
+                <a
+                  class="prj-btn prj-btn--ghost"
+                  [routerLink]="['/tenders', tenderId(), 'evaluation']"
+                >
+                  <ng-container i18n="@@negotiation.toEvaluation">Evaluation</ng-container>
+                </a>
+                <a
+                  class="prj-btn prj-btn--ghost"
+                  [routerLink]="['/tenders', tenderId(), 'negotiation']"
+                >
+                  <ng-container i18n="@@evaluation.negotiationLink"
+                    >Negotiation rounds</ng-container
+                  >
+                </a>
+              </div>
+            }
+          </section>
+
+          <section class="prj-section" aria-labelledby="summary-title">
+            <h2 id="summary-title" i18n="@@decision.summaryTitle">Where the decision stands</h2>
+            <dl class="dc-facts">
+              <div>
+                <dt i18n="@@decision.recommendationLabel">Recommendation</dt>
+                <dd>
+                  @if (view.recommendation; as recommendation) {
+                    <span
+                      class="dc-state"
+                      [class.dc-state--good]="fresh()"
+                      [class.dc-state--warn]="!fresh()"
+                      >{{
+                        liveStateLabel(recommendation.liveState, recommendation.staleReason)
+                      }}</span
+                    >
+                    <small class="prj-hint tnd-block" i18n="@@decision.recommendationNumber"
+                      >Recommendation {{ recommendation.number }} ·
+                      <bdi>{{ recommendation.policyName }}</bdi> version
+                      {{ recommendation.policyVersionNumber }}</small
+                    >
+                  } @else {
+                    <span class="prj-hint" i18n="@@decision.noRecommendation"
+                      >Not computed yet</span
+                    >
+                  }
+                </dd>
+              </div>
+              @if (topRanked().length) {
+                <div>
+                  <dt i18n="@@decision.rankOne">Recommendation rank 1</dt>
+                  <dd>
+                    @for (candidate of topRanked(); track candidate.openingBidId) {
+                      <span class="tnd-block"
+                        ><bdi dir="ltr" class="tnd-code">{{ candidate.subcontractorCode }}</bdi
+                        >{{ ' ' }}<bdi>{{ candidate.subcontractorName }}</bdi></span
+                      >
+                    }
+                    @if (!fresh() && view.recommendation; as stale) {
+                      <strong class="tnd-attention tnd-block" i18n="@@decision.rankStale"
+                        >Not current:
+                        {{ liveStateLabel(stale.liveState, stale.staleReason) }}</strong
+                      >
+                    }
+                    <small class="prj-hint tnd-block" i18n="@@decision.rankHint"
+                      >A policy result, not a decision or an award.</small
+                    >
+                  </dd>
+                </div>
+              }
+              @if (view.currentSubmission; as submission) {
+                <div>
+                  <dt i18n="@@decision.proposed">Proposed for award</dt>
+                  <dd>
+                    <bdi dir="ltr" class="tnd-code">{{ submission.subcontractorCode }}</bdi
+                    >{{ ' ' }}<bdi>{{ submission.subcontractorName }}</bdi>
+                    <small class="prj-hint tnd-block">
+                      {{ outcomeLabel(submission.outcome) }}
+                      @if (submission.isOverride) {
+                        · <span i18n="@@decision.overrideShort">overrides the recommendation</span>
+                      }
+                    </small>
+                  </dd>
+                </div>
+              }
+              @if (view.award; as award) {
+                <div>
+                  <dt i18n="@@decision.awardedTo">Awarded to</dt>
+                  <dd>
+                    <bdi dir="ltr" class="tnd-code">{{ award.subcontractorCode }}</bdi
+                    >{{ ' ' }}<bdi>{{ award.subcontractorName }}</bdi>
+                    <small class="prj-hint tnd-block"
+                      ><bdi dir="ltr">{{ money(award.awardValue) }} {{ award.currency }}</bdi> ·
+                      {{ award.awardedAtUtc | businessDate: 'instant' }}</small
+                    >
+                  </dd>
+                </div>
+              }
+            </dl>
+            <p class="prj-hint" i18n="@@decision.boundary">
+              The recommendation ranks eligible bids by the company's policy. People decide: a
+              decision is prepared, submitted, approved on its route and only then awarded.
+            </p>
+          </section>
+        }
+      }
+    </div>
+  }
+</section>

@@ -1,0 +1,12 @@
+node_modules
+dist
+.angular
+coverage
+.vscode
+.idea
+npm-debug.log
+*.log
+.env
+.env.*
+.DS_Store
+.playwright-cli

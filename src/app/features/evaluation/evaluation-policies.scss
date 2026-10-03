@@ -1,0 +1,123 @@
+@use 'evaluation-common';
+
+// ---- split views (technical evaluation, policies) -----------------------------
+
+.ev-split {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 64rem) {
+  .ev-split {
+    grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.ev-bidlist ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ev-bidlist__item {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-inline-start: 3px solid transparent;
+  border-radius: 3px;
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.ev-bidlist__item.is-active {
+  border-inline-start-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.ev-bidlist__item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.ev-detail {
+  min-inline-size: 0;
+}
+
+.ev-detail {
+  min-inline-size: 0;
+}
+
+.ev-total {
+  margin-block: 0.75rem;
+  font-weight: 600;
+}
+
+.ev-history {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.ev-form {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  min-inline-size: 0;
+}
+
+.ev-table td,
+.ev-table th {
+  white-space: normal;
+}
+
+// ---- policies -------------------------------------------------------------------
+
+.ev-policy-form h2 {
+  margin-block-start: 0;
+}
+
+.ev-criterion {
+  display: grid;
+  gap: 0.5rem 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  min-inline-size: 0;
+  margin: 0 0 1rem;
+  padding: 0 0 1rem;
+  border: 0;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.ev-criterion__legend {
+  grid-column: 1 / -1;
+  padding: 0;
+  font-weight: 600;
+}
+
+@media (min-width: 48rem) {
+  .ev-criterion {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(6rem, 0.6fr);
+  }
+
+  .ev-criterion__guidance,
+  .ev-criterion__actions {
+    grid-column: 1 / -1;
+  }
+}
+
+.ev-criterion .prj-field {
+  margin: 0;
+}
+
+.ev-criterion__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

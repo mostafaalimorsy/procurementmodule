@@ -1,0 +1,322 @@
+@let item = award();
+@let base = item.baseline;
+<section class="prj-section" aria-labelledby="award-title">
+  <h2 id="award-title" class="dc-heading">
+    <span i18n="@@award.title">Award</span>
+    @if (base.fingerprintVerified) {
+      <span class="prj-chip dc-state dc-state--good" i18n="@@award.verified"
+        >Baseline fingerprint verified</span
+      >
+    } @else {
+      <span class="prj-chip dc-state dc-state--warn" i18n="@@award.notVerified"
+        >Baseline fingerprint does not match — contact support</span
+      >
+    }
+  </h2>
+  <p i18n="@@award.summary">
+    Awarded to <bdi dir="ltr" class="tnd-code">{{ item.subcontractorCode }}</bdi> —
+    <bdi>{{ item.subcontractorName }}</bdi> on {{ item.awardedAtUtc | businessDate: 'instant' }} by
+    <bdi>{{ item.awardedByName }}</bdi> (decision version {{ item.submissionNumber }}).
+  </p>
+
+  @if (showCloseout()) {
+    <p>
+      <a
+        class="prj-btn prj-btn--ghost"
+        [routerLink]="['/closeouts', item.id]"
+        i18n="@@award.closeout"
+        >Performance closeout</a
+      >
+    </p>
+  }
+  <h3 i18n="@@award.baselineTitle">Award baseline</h3>
+  <dl class="dc-facts">
+    <div>
+      <dt i18n="@@decision.awardValue">Award value</dt>
+      <dd>
+        <bdi dir="ltr" class="dc-strong">{{ money(base.awardValue) }} {{ base.currency }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@evaluation.rowLeveledTotal">Leveled total</dt>
+      <dd>
+        <bdi dir="ltr">{{ money(base.leveledTotal) }} {{ base.currency }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@evaluation.rowSubmittedTotal">Submitted total</dt>
+      <dd>
+        <bdi dir="ltr">{{ money(base.submittedTotal) }} {{ base.currency }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@award.tender">Tender</dt>
+      <dd>
+        <bdi dir="ltr" class="tnd-code">{{ base.tenderReference }}</bdi
+        >{{ ' ' }}<bdi>{{ base.tenderTitle }}</bdi>
+        <small class="prj-hint tnd-block" i18n="@@award.tenderRevision"
+          >tender revision in force: {{ base.tenderRevisionInForce }}</small
+        >
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@award.project">Project and work package</dt>
+      <dd>
+        <bdi dir="ltr" class="tnd-code">{{ base.projectCode }}</bdi
+        >{{ ' ' }}<bdi>{{ base.projectName }}</bdi>
+        <span class="tnd-block"
+          ><bdi dir="ltr" class="tnd-code">{{ base.workPackageCode }}</bdi
+          >{{ ' ' }}<bdi>{{ base.workPackageTitle }}</bdi></span
+        >
+        @if (base.workPackageCategory) {
+          <small class="prj-hint tnd-block"
+            ><bdi>{{ base.workPackageCategory }}</bdi></small
+          >
+        }
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@award.bid">Bid awarded</dt>
+      <dd>
+        <bdi dir="ltr" class="tnd-code">{{ base.bidReference }}</bdi>
+        <small class="prj-hint tnd-block"
+          >{{ kindLabel(base.bidRevisionKind, base.round) }} ·
+          <span i18n="@@comparison.revisionNumber"
+            >revision {{ base.bidRevisionNumber }}</span
+          ></small
+        >
+        <small class="prj-hint tnd-block" i18n="@@award.answered"
+          >answered tender revision {{ base.answeredTenderRevision }}</small
+        >
+        @if (base.answeredTenderRevision < base.tenderRevisionInForce) {
+          <strong class="tnd-block tnd-attention" role="note" i18n="@@award.olderRevisionWarning"
+            >This bid answered tender revision {{ base.answeredTenderRevision }}; revision
+            {{ base.tenderRevisionInForce }} was in force when it was awarded.</strong
+          >
+        }
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@comparisonField.scopeCompliance">Scope compliance</dt>
+      <dd>{{ value('scopeCompliance', base.scopeCompliance) }}</dd>
+    </div>
+    <div>
+      <dt i18n="@@comparisonField.durationDays">Duration (days)</dt>
+      <dd>{{ base.durationDays ?? '—' }}</dd>
+    </div>
+    <div>
+      <dt i18n="@@comparisonField.validityDays">Validity (days)</dt>
+      <dd>{{ base.validityDays ?? '—' }}</dd>
+    </div>
+    <div>
+      <dt i18n="@@comparisonField.warrantyMonths">Warranty (months)</dt>
+      <dd>{{ base.warrantyMonths ?? '—' }}</dd>
+    </div>
+    <div>
+      <dt i18n="@@award.decision">Decision</dt>
+      <dd>
+        <span i18n="@@award.decisionValue"
+          >version {{ base.submissionNumber }} · recommendation
+          {{ base.recommendationNumber }}</span
+        >
+        @if (base.criteria; as criteria) {
+          <app-criteria-flag
+            [declaration]="criteria.declaration"
+            [declaredPolicyName]="criteria.declaredPolicyName"
+            [declaredPolicyVersionNumber]="criteria.declaredPolicyVersionNumber"
+            [deviationReason]="criteria.deviationReason"
+            [evaluationDeviated]="criteria.evaluationCriteriaDeviated"
+          />
+        }
+        @if (base.recommendedRank !== null) {
+          <small class="prj-hint tnd-block" i18n="@@decision.otherRank"
+            >Recommendation rank {{ base.recommendedRank }}</small
+          >
+        }
+        @if (base.isOverride) {
+          <small class="tnd-attention tnd-block" i18n="@@decision.overrideShort"
+            >overrides the recommendation</small
+          >
+        }
+        <small class="prj-hint tnd-block" i18n="@@decision.routeRule"
+          >Rule <bdi>{{ base.approvalRuleName }}</bdi></small
+        >
+        @if (base.routeWithoutIndependentApproval) {
+          <!-- Red-team G016 (CF-034 AC5): the route let the decision through without an independent approver. -->
+          <span class="prj-chip tnd-attention" i18n="@@approval.withoutIndependent"
+            >Approved without independent approval</span
+          >
+        }
+      </dd>
+    </div>
+    @if (base.validUntilUtc) {
+      <!-- Red-team G050 (CF-039 AC1): the awarded bid's valid-until, in the tender's time zone, and its basis. -->
+      <div data-testid="baseline-validity">
+        <dt i18n="@@controls.validity">Bid validity</dt>
+        <dd>
+          <span i18n="@@controls.validUntil"
+            ><bdi dir="ltr">{{ base.validityDays }}</bdi> days, until
+            {{ base.validUntilUtc | zonedInstant: timeZoneId() }}</span
+          >
+          @if (base.validityBasis; as b) {
+            <p class="prj-hint" i18n="@@controls.basisHint">
+              Validity runs {{ basisLabel(b) }}, as your company's governance settings define it.
+            </p>
+          }
+          @if (base.validityExtendedUntil) {
+            <p class="tnd-attention" i18n="@@baseline.validityExtended">
+              The bidder extended validity until
+              {{ base.validityExtendedUntil | businessDate }} ({{
+                channelLabel(base.validityExtensionChannel ?? 'Other')
+              }}
+              <bdi>{{ base.validityExtensionReference ?? '—' }}</bdi
+              >).
+            </p>
+          }
+        </dd>
+      </div>
+    }
+  </dl>
+
+  <app-shortlist-basis [basis]="base.shortlistBasis" />
+  @if (base.limitedCompetition) {
+    <!-- Red-team G048 (CF-038 AC2): the competition justification approvers saw, kept beside the baseline. -->
+    <div class="prj-note tnd-attention-box" role="note" data-testid="baseline-limited">
+      <strong i18n="@@approval.limitedTitle">Limited competition</strong>
+      <p>{{ justificationLabel(base.competitionCategory ?? null) }}</p>
+      @if (base.competitionReason) {
+        <p class="ev-prose">
+          <bdi>{{ base.competitionReason }}</bdi>
+        </p>
+      }
+    </div>
+  }
+  @if (base.overBudget) {
+    <div class="prj-note tnd-attention-box" role="note" data-testid="baseline-over-budget">
+      <strong i18n="@@approval.overBudgetTitle">Above the package estimate</strong>
+      @if (base.overBudgetReason) {
+        <p class="ev-prose">
+          <bdi>{{ base.overBudgetReason }}</bdi>
+        </p>
+      }
+    </div>
+  }
+
+  @if (base.valueReason) {
+    <h4 i18n="@@approval.valueReasonTitle">Why the value differs from the leveled total</h4>
+    <p class="ev-prose">
+      <bdi>{{ base.valueReason }}</bdi>
+    </p>
+  }
+  @if (base.paymentTerms) {
+    <h4 i18n="@@comparisonField.paymentTerms">Payment terms</h4>
+    <p class="ev-prose">
+      <bdi>{{ base.paymentTerms }}</bdi>
+    </p>
+  }
+  @if (base.mobilizationCommitment) {
+    <h4 i18n="@@award.mobilization">Mobilization commitment</h4>
+    <p class="ev-prose">
+      <bdi>{{ base.mobilizationCommitment }}</bdi>
+    </p>
+  }
+  @if (base.technicalApproach) {
+    <h4 i18n="@@comparisonField.technicalApproach">Technical approach</h4>
+    <p class="ev-prose">
+      <bdi>{{ base.technicalApproach }}</bdi>
+    </p>
+  }
+
+  <h4 i18n="@@comparison.linesTitle">Priced lines</h4>
+  @if (base.lines.length) {
+    <div class="prj-table-wrap">
+      <table class="prj-table ev-table">
+        <caption class="prj-visually-hidden" i18n="@@comparison.linesTitle">
+          Priced lines
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@comparison.colLine">Line</th>
+            <th scope="col" class="dc-num">
+              <span i18n="@@award.amountIn"
+                >Amount (<bdi dir="ltr">{{ base.currency }}</bdi
+                >)</span
+              >
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of base.lines; track line.position) {
+            <tr>
+              <th scope="row">
+                <bdi>{{ line.description }}</bdi>
+              </th>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ money(line.amount) }} {{ base.currency }}</bdi>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="prj-hint" i18n="@@award.noLines">No priced breakdown was submitted.</p>
+  }
+
+  <div class="dc-texts">
+    <div>
+      <h4 i18n="@@comparisonField.exclusions">Exclusions</h4>
+      <ng-container *ngTemplateOutlet="list; context: { items: base.exclusions }" />
+    </div>
+    <div>
+      <h4 i18n="@@comparisonField.commercialDeviations">Commercial deviations</h4>
+      <ng-container *ngTemplateOutlet="list; context: { items: base.commercialDeviations }" />
+    </div>
+    <div>
+      <h4 i18n="@@comparisonField.technicalDeviations">Technical deviations</h4>
+      <ng-container *ngTemplateOutlet="list; context: { items: base.technicalDeviations }" />
+    </div>
+  </div>
+
+  <h4 i18n="@@approval.outcomesTitle">Every bid's outcome in this decision</h4>
+  <ul class="dc-list" role="list">
+    @for (entry of item.dispositions; track entry.openingBidId) {
+      <li>
+        <bdi dir="ltr" class="tnd-code">{{ entry.subcontractorCode }}</bdi
+        >{{ ' ' }}<bdi>{{ entry.subcontractorName }}</bdi> —
+        {{ dispositionLabel(entry.disposition, entry.reserveRank) }}
+      </li>
+    }
+  </ul>
+
+  <app-verification-details>
+    <dl class="dc-facts dc-hashes">
+      <div>
+        <dt i18n="@@award.baselineHash">Baseline fingerprint (SHA-256)</dt>
+        <dd>
+          <code dir="ltr" class="dc-mono">{{ base.baselineSha256 }}</code>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@award.bidHash">Bid content fingerprint (SHA-256)</dt>
+        <dd>
+          <code dir="ltr" class="dc-mono">{{ base.bidContentSha256 }}</code>
+        </dd>
+      </div>
+    </dl>
+  </app-verification-details>
+</section>
+
+<ng-template #list let-items="items">
+  @if (items.length) {
+    <ul class="dc-list" role="list">
+      @for (text of items; track $index) {
+        <li>
+          <bdi>{{ text }}</bdi>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="prj-hint" i18n="@@bidWorkspace.listEmpty">None listed.</p>
+  }
+</ng-template>

@@ -1,0 +1,257 @@
+@use 'evaluation-common';
+
+// ---- commercial leveling -------------------------------------------------------
+
+// Red-team B7: the package estimate block above the comparison (estimate readers only).
+.ev-estimate {
+  margin-block: 0.75rem;
+}
+
+.ev-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  align-items: end;
+  margin-block-end: 1rem;
+}
+
+.ev-toolbar__field {
+  margin: 0;
+}
+
+.ev-toolbar__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0;
+}
+
+.ev-toolbar__currency {
+  margin: 0;
+}
+
+// The matrix scrolls inside its own region: bidder columns move, the item column and header stay.
+.ev-grid-wrap {
+  position: relative;
+  max-block-size: 75vh;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.ev-grid-wrap:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.ev-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.88rem;
+  min-inline-size: 100%;
+}
+
+.ev-grid th,
+.ev-grid td {
+  min-inline-size: 12rem;
+  max-inline-size: 18rem;
+  padding: 0.6rem 0.75rem;
+  border-block-end: 1px solid var(--color-border);
+  border-inline-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: start;
+  vertical-align: top;
+}
+
+.ev-grid thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: var(--color-background);
+}
+
+// The first column (the item) is frozen; logical properties keep it on the start side in Arabic.
+.ev-grid tbody th,
+.ev-grid__corner {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  min-inline-size: 11rem;
+  background: var(--color-background);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.ev-grid__corner {
+  z-index: 3;
+}
+
+.ev-grid__name {
+  font-weight: 400;
+}
+
+.ev-grid__strong td {
+  font-weight: 600;
+}
+
+.ev-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ev-text {
+  overflow-wrap: anywhere;
+}
+
+.ev-variance {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.ev-variance--outlier {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.ev-stated {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.ev-lines {
+  margin-block-start: 1.5rem;
+}
+
+.ev-thresholds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.ev-thresholds .prj-field {
+  margin: 0;
+  inline-size: 11rem;
+}
+
+// A phone reviews bid by bid; the full matrix is for a larger screen.
+.ev-cards {
+  display: none;
+}
+
+.ev-cards ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ev-card {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.ev-card p {
+  margin-block: 0 0.5rem;
+}
+
+.ev-card__facts {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  margin: 0 0 0.75rem;
+}
+
+.ev-card__facts dt {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.ev-card__facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 47.99rem) {
+  .ev-matrix-section {
+    display: none;
+  }
+
+  .ev-cards {
+    display: block;
+  }
+}
+
+// ---- drawer and forms ---------------------------------------------------------
+
+.ev-drawer > div {
+  inline-size: min(46rem, 100%);
+}
+
+.ev-drawer__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.ev-drawer__head h2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ev-drawer h3 {
+  margin-block: 1.25rem 0.5rem;
+}
+
+.ev-form {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  min-inline-size: 0;
+}
+
+.ev-radio {
+  display: grid;
+  gap: 0.25rem;
+  margin-block-end: 0.75rem;
+}
+
+.ev-note--withdrawn {
+  opacity: 0.75;
+}
+
+.ev-table td,
+.ev-table th {
+  white-space: normal;
+}
+
+.ev-response {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.ev-response dt {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.ev-response dd {
+  margin: 0.15rem 0 0;
+}
+
+.ev-files {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}

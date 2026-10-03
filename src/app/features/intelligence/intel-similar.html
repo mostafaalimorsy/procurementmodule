@@ -1,0 +1,73 @@
+<section class="intel-block" aria-labelledby="intel-similar">
+  <h3 id="intel-similar" i18n="@@intel.similarTitle">Similar projects</h3>
+  <p class="prj-hint" i18n="@@intel.similarFor">
+    For the next work package
+    <bdi dir="ltr" class="tnd-code">{{ similar().projectCode }}</bdi> ·
+    <bdi dir="ltr" class="tnd-code">{{ similar().workPackageCode }}</bdi> ·
+    <bdi>{{ similar().workPackageTitle }}</bdi> ({{ categoryLabel(similar().category) }}).
+  </p>
+  @if (similar().categoryMissing) {
+    <p i18n="@@intel.similarNoCategory">
+      This work package has no category, so no project can be judged similar. Add its category to
+      see similar-project evidence.
+    </p>
+  } @else if (similar().matches === 0) {
+    <p i18n="@@intel.similarNone">No completed project of this firm in the same category yet.</p>
+  } @else {
+    <p i18n="@@intel.similarRule">
+      Matched on structured facts only: the same category is required; the same project and a
+      comparable value in the same currency are shown when they also apply. Matches:
+      <bdi dir="ltr">{{ similar().matches }}</bdi>
+    </p>
+    @if (similar().items.length === 0) {
+      <p class="prj-hint" i18n="@@intel.similarWithheld">
+        The projects themselves are visible to roles that read performance closeouts.
+      </p>
+    }
+    <ul class="intel-list" role="list">
+      @for (item of similar().items; track item.outcome.awardId) {
+        <li>
+          <a [routerLink]="['/closeouts', item.outcome.awardId]"
+            ><bdi dir="ltr" class="tnd-code">{{ item.outcome.tenderReference }}</bdi></a
+          >
+          <bdi dir="ltr" class="tnd-code">{{ item.outcome.projectCode }}</bdi>
+          <bdi>{{ item.outcome.workPackageTitle }}</bdi>
+          <span class="intel-reasons">
+            <span class="prj-visually-hidden" i18n="@@intel.whyMatched">Why it matched:</span>
+            @for (reason of item.reasons; track reason) {
+              <span class="prj-chip">{{ reasonLabel(reason) }}</span>
+            }
+          </span>
+          <span>{{ scheduleLabel(item.outcome.scheduleOutcome) }}</span>
+          @if (item.outcome.scheduleVariancePercent) {
+            <bdi dir="ltr">{{ percent(item.outcome.scheduleVariancePercent) }}</bdi>
+          }
+          @if (access().commercial && item.outcome.costVariancePercent) {
+            <span i18n="@@intel.costShort"
+              >cost <bdi dir="ltr">{{ percent(item.outcome.costVariancePercent) }}</bdi></span
+            >
+          }
+          <app-variance-cause
+            [cause]="item.outcome.variationCause"
+            [share]="item.outcome.variationSharePercent"
+            [residual]="item.outcome.residualCostVariancePercent"
+          />
+          <span i18n="@@intel.ratingsShort"
+            >quality <bdi dir="ltr">{{ item.outcome.qualityRating }}</bdi> · HSE
+            <bdi dir="ltr">{{ item.outcome.hseRating }}</bdi></span
+          >
+          <span i18n="@@intel.patternsShort"
+            >variations <bdi dir="ltr">{{ item.outcome.variationCount }}</bdi> · claims
+            <bdi dir="ltr">{{ item.outcome.claimCount }}</bdi> · disputes
+            <bdi dir="ltr">{{ item.outcome.disputeCount }}</bdi></span
+          >
+          <span class="prj-chip">{{ rehireLabel(item.outcome.wouldWorkAgain) }}</span>
+          <span class="prj-hint" i18n="@@intel.similarDates"
+            >awarded <bdi>{{ item.outcome.awardedAtUtc | businessDate: 'instant' }}</bdi> · closed
+            <bdi>{{ item.outcome.closedAtUtc | businessDate: 'instant' }}</bdi></span
+          >
+        </li>
+      }
+    </ul>
+  }
+</section>

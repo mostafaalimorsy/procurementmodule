@@ -1,0 +1,294 @@
+<section class="prj-page">
+  @if (item(); as item) {
+    <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+      <a routerLink="/projects" i18n="@@nav.projects">Projects</a><span aria-hidden="true">/</span>
+      <a [routerLink]="['/projects', item.projectId]"
+        ><bdi dir="ltr">{{ item.projectCode }}</bdi></a
+      >
+      <span aria-hidden="true">/</span
+      ><span
+        ><bdi dir="ltr">{{ item.code }}</bdi></span
+      >
+    </nav>
+  }
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@packages.loading">Loading work package…</p>
+  } @else if (item(); as item) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ item.code }}</bdi> ·
+          @if (item.category) {
+            <bdi>{{ item.category }}</bdi>
+          } @else {
+            <ng-container i18n="@@packages.uncategorised">Uncategorised</ng-container>
+          }
+        </p>
+        <h1>
+          <bdi>{{ item.title }}</bdi>
+        </h1>
+        <p>
+          <span class="prj-chip prj-chip--{{ item.status }}">{{ statusLabel(item.status) }}</span>
+          <span class="prj-hint" i18n="@@packages.inProject">
+            · in
+            <a [routerLink]="['/projects', item.projectId]"
+              ><bdi>{{ item.projectName }}</bdi></a
+            >
+            ({{ statusLabel(item.projectStatus) }})
+          </span>
+        </p>
+      </div>
+      <div class="prj-actions">
+        <!-- Closed scope, or scope under a closed project, is a record rather than a draft. -->
+        @if (
+          can(permissions.packagesEdit) &&
+          item.status !== 'Completed' &&
+          item.status !== 'Cancelled' &&
+          item.projectStatus !== 'Completed' &&
+          item.projectStatus !== 'Cancelled'
+        ) {
+          <a
+            class="prj-btn prj-btn--ghost"
+            [routerLink]="['/work-packages', item.id, 'edit']"
+            i18n="@@common.edit"
+            >Edit</a
+          >
+        }
+        @if (can(permissions.packagesCreate) && !cloning()) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="startClone()"
+            i18n="@@packages.clone"
+          >
+            New work package from this
+          </button>
+        }
+        @if (can(permissions.packagesChangeStatus)) {
+          @for (next of item.allowedNextStatuses; track next) {
+            @if (offered(next)) {
+              <button [class]="actionClass(next)" type="button" (click)="ask(next)">
+                {{ actionLabel(next, item.status) }}
+              </button>
+            }
+          }
+        }
+      </div>
+    </div>
+
+    @if (cloning()) {
+      <form class="prj-form" (ngSubmit)="submitClone()" aria-labelledby="clone-title">
+        <h2 id="clone-title" i18n="@@packages.cloneTitle">New work package from this one</h2>
+        <p class="prj-hint" i18n="@@packages.cloneHint">
+          The new package starts as a Draft in the same project with this scope and trade. Its
+          estimate and dates are left for you to set; sourcing and tenders are not copied.
+        </p>
+        <div class="prj-field">
+          <label for="clone-code" i18n="@@packages.cloneCode">Code of the new package</label>
+          <input id="clone-code" name="code" maxlength="32" required [(ngModel)]="cloneCode" />
+        </div>
+        <div class="prj-field">
+          <label for="clone-name" i18n="@@packages.cloneName">Title</label>
+          <input id="clone-name" name="title" maxlength="200" [(ngModel)]="cloneTitle" />
+        </div>
+        <div class="prj-form-actions">
+          <button
+            class="prj-btn"
+            type="submit"
+            [disabled]="busy() || !cloneCode.trim()"
+            i18n="@@packages.cloneCreate"
+          >
+            Create work package
+          </button>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="cloning.set(false)"
+            i18n="@@common.cancel"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    }
+
+    @if (
+      (item.projectStatus === 'Completed' || item.projectStatus === 'Cancelled') &&
+      item.status === 'Draft'
+    ) {
+      <p class="prj-note" i18n="@@packages.closedParentDraft">
+        The parent project is {{ statusLabel(item.projectStatus) }}. This unstarted Draft scope
+        remains recorded, cannot be activated, and may only be cancelled.
+      </p>
+    }
+
+    <div class="prj-layout">
+      <div>
+        <dl class="prj-summary">
+          @if (item.estimateVisible) {
+            <div>
+              <dt i18n="@@project.estimated">Estimated value</dt>
+              <dd>
+                <bdi dir="ltr">{{ item.estimatedValue | businessCurrency: item.currency }}</bdi>
+              </dd>
+            </div>
+          }
+          <div>
+            <dt i18n="@@project.trade">Trade</dt>
+            <dd>
+              <bdi>{{ item.category || '—' }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@packages.plannedStart">Planned start</dt>
+            <dd>{{ item.plannedStartDate | businessDate }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@packages.plannedEnd">Planned end</dt>
+            <dd>{{ item.plannedEndDate | businessDate }}</dd>
+          </div>
+        </dl>
+        @if (item.estimateVisible && item.estimateRevisions.length) {
+          <section class="prj-section" aria-labelledby="estimate-history-title">
+            <h2 id="estimate-history-title" i18n="@@packages.estimateHistory">Estimate history</h2>
+            <div class="prj-table-wrap">
+              <table class="prj-table">
+                <caption class="prj-visually-hidden" i18n="@@packages.estimateHistoryCaption">
+                  Every value the estimate has held, newest first
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" class="prj-numeric" i18n="@@packages.estimateValue">Value</th>
+                    <th scope="col" i18n="@@packages.estimateWhen">Recorded</th>
+                    <th scope="col" i18n="@@packages.estimateReason">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (revision of item.estimateRevisions; track revision.number) {
+                    <tr>
+                      <td class="prj-numeric">
+                        @if (revision.value !== null) {
+                          <bdi dir="ltr">{{
+                            revision.value | businessCurrency: revision.currency
+                          }}</bdi>
+                        } @else {
+                          <ng-container i18n="@@packages.estimateCleared">Removed</ng-container>
+                        }
+                      </td>
+                      <td>
+                        @if (revision.carried) {
+                          <ng-container i18n="@@packages.estimateCarried"
+                            >Before estimate history was kept</ng-container
+                          >
+                        } @else {
+                          <ng-container i18n="@@packages.estimateRecorded"
+                            >{{ revision.recordedAtUtc | businessDate: 'instant' }} by
+                            <bdi>{{ revision.recordedByName }}</bdi></ng-container
+                          >
+                        }
+                        @if (revision.afterPublication) {
+                          <span class="prj-hint" i18n="@@packages.estimateAfterPublication">
+                            · after a tender was published</span
+                          >
+                        }
+                      </td>
+                      <td>
+                        <bdi>{{ revision.reason || '—' }}</bdi>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+        @if (item.scopeSummary) {
+          <h2 style="margin-block: 1.75rem 0.4rem; font-size: 1.1rem">
+            <ng-container i18n="@@packages.scopeSummary">Scope summary</ng-container>
+          </h2>
+          <p>
+            <bdi>{{ item.scopeSummary }}</bdi>
+          </p>
+        }
+        @if (item.description) {
+          <h2 style="margin-block: 1.5rem 0.4rem; font-size: 1.1rem">
+            <ng-container i18n="@@packages.notes">Notes</ng-container>
+          </h2>
+          <p>
+            <bdi>{{ item.description }}</bdi>
+          </p>
+        }
+        <app-work-package-sourcing [workPackageId]="item.id" [packageStatus]="item.status" />
+        <app-work-package-tender [workPackageId]="item.id" />
+      </div>
+      <aside class="prj-card" aria-labelledby="record-title">
+        <p class="prj-eyebrow" id="record-title" i18n="@@packages.record">Record</p>
+        <dl>
+          <dt i18n="@@packages.created">Created</dt>
+          <dd>{{ item.createdAtUtc | businessDate: 'instant' }}</dd>
+          <dt i18n="@@project.updated">Last updated</dt>
+          <dd>{{ item.updatedAtUtc | businessDate: 'instant' }}</dd>
+        </dl>
+      </aside>
+    </div>
+
+    @if (pendingStatus(); as next) {
+      <app-confirm-dialog
+        [heading]="actionLabel(next, item.status)"
+        [confirmLabel]="actionLabel(next, item.status)"
+        [cancelLabel]="keepLabel"
+        [danger]="next === 'Cancelled'"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="dismiss()"
+      >
+        <p>
+          <bdi dir="ltr">{{ item.code }}</bdi> · <bdi>{{ item.title }}</bdi>
+        </p>
+        <p>
+          @switch (next) {
+            @case ('Active') {
+              <ng-container i18n="@@packageIntent.active"
+                >This scope becomes live work in <bdi>{{ item.projectName }}</bdi
+                >.</ng-container
+              >
+            }
+            @case ('OnHold') {
+              <ng-container i18n="@@packageIntent.onHold"
+                >Work pauses. You can resume it later.</ng-container
+              >
+            }
+            @case ('Completed') {
+              <ng-container i18n="@@packageIntent.completed"
+                >This scope is delivered and cannot be reopened.</ng-container
+              >
+            }
+            @case ('Cancelled') {
+              <ng-container i18n="@@packageIntent.cancelled"
+                >This scope is abandoned and cannot be reopened.</ng-container
+              >
+            }
+            @default {
+              <ng-container i18n="@@packageIntent.default"
+                >Change the status of this work package.</ng-container
+              >
+            }
+          }
+        </p>
+      </app-confirm-dialog>
+    }
+  }
+</section>

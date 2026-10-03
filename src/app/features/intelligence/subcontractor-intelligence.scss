@@ -1,0 +1,36 @@
+@use 'intelligence-common';
+
+.intel-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.intel-head h2 {
+  margin: 0;
+}
+
+.intel-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.intel-overview dt {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.intel-overview dd {
+  margin: 0.2rem 0 0;
+}
+
+.intel-figure {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}

@@ -1,0 +1,273 @@
+@if (error()) {
+  <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+}
+@if (notice()) {
+  <p [id]="noticeId()" class="prj-note" role="status" tabindex="-1">{{ notice() }}</p>
+}
+@let current = view();
+@if (part() === 'addenda') {
+  @if (current.addenda.length) {
+    <section class="bid-card" aria-labelledby="bid-addenda-title">
+      <h2 id="bid-addenda-title" i18n="@@bidUpdates.addendaTitle">Tender updated</h2>
+      @let count = current.addenda.length;
+      <p>
+        <span i18n="@@bidUpdates.addendaCount">{count, plural,
+          =1 {The buyer has issued 1 addendum.}
+          other {The buyer has issued {{ count }} addenda.}
+        }</span
+        >&ngsp;<span i18n="@@bidUpdates.addendaIntro"
+          >The tender is now at revision {{ current.currentRevision }}. Review the changes before
+          you submit.</span
+        >
+      </p>
+      @if (outstanding().length && current.canAcknowledge) {
+        <p class="prj-note bid-attention" role="note" i18n="@@bidUpdates.acknowledgeFirst">
+          Acknowledge each addendum marked "Acknowledgement required" before you submit your bid.
+        </p>
+      }
+      <ol class="bid-addenda" role="list">
+        @for (addendum of current.addenda; track addendum.id) {
+          <li class="bid-addendum" [attr.aria-labelledby]="'bid-addendum-' + addendum.id">
+            <h3 [id]="'bid-addendum-' + addendum.id">
+              <ng-container i18n="@@addendum.numbered">Addendum {{ addendum.number }}</ng-container>
+              · <bdi>{{ addendum.title }}</bdi>
+            </h3>
+            <p class="prj-hint" i18n="@@bidUpdates.addendumIssued">
+              Issued {{ addendum.issuedAtUtc | businessDate: 'instant' }} · revision
+              {{ addendum.tenderRevision }}
+            </p>
+            <p class="bid-prewrap">
+              <bdi>{{ addendum.summary }}</bdi>
+            </p>
+            @if (addendum.newDeadline) {
+              <p i18n="@@bidUpdates.deadlineMoved">
+                Deadline moved from <bdi>{{ local(addendum.previousDeadline) }}</bdi> to
+                <strong
+                  ><bdi>{{ local(addendum.newDeadline) }}</bdi></strong
+                >
+              </p>
+            }
+            @if (addendum.addedDocuments.length) {
+              <h4 i18n="@@bidUpdates.newDocuments">New or revised documents</h4>
+              <ul class="bid-docs" role="list">
+                @for (document of addendum.addedDocuments; track document.id) {
+                  <li>
+                    @if (document.current) {
+                      <button
+                        class="prj-btn prj-btn--ghost"
+                        type="button"
+                        (click)="download.emit(document)"
+                      >
+                        <ng-container i18n="@@bidder.download">Download</ng-container>&ngsp;<bdi>{{
+                          document.fileName
+                        }}</bdi>
+                      </button>
+                    } @else {
+                      <bdi>{{ document.fileName }}</bdi
+                      >&ngsp;<span class="prj-hint" i18n="@@bidUpdates.superseded"
+                        >(superseded by a later addendum)</span
+                      >
+                    }
+                    <span class="prj-hint"
+                      ><bdi>{{ size(document.sizeBytes) }}</bdi></span
+                    >
+                  </li>
+                }
+              </ul>
+            }
+            @if (addendum.withdrawnDocuments.length) {
+              <h4 i18n="@@bidUpdates.withdrawnDocuments">No longer part of the tender</h4>
+              <ul role="list">
+                @for (document of addendum.withdrawnDocuments; track document.id) {
+                  <li>
+                    <bdi>{{ document.fileName }}</bdi>
+                  </li>
+                }
+              </ul>
+            }
+            <div class="bid-ack">
+              @if (addendum.acknowledgedAtUtc) {
+                <p class="bid-submitted" i18n="@@bidUpdates.acknowledgedOn">
+                  Acknowledged {{ addendum.acknowledgedAtUtc | businessDate: 'instant' }}
+                </p>
+              } @else if (addendum.acknowledgementRequired && current.canAcknowledge) {
+                <p>
+                  <strong i18n="@@addendum.acknowledgementRequired"
+                    >Acknowledgement required</strong
+                  >
+                </p>
+              } @else if (addendum.acknowledgementRequired) {
+                <p class="prj-hint" i18n="@@bidUpdates.firmsAcknowledge">
+                  Each invited firm acknowledges this addendum through its own link.
+                </p>
+              }
+              @if (!addendum.acknowledgedAtUtc && current.canAcknowledge) {
+                <button
+                  class="prj-btn"
+                  [class.prj-btn--ghost]="!addendum.acknowledgementRequired"
+                  type="button"
+                  [disabled]="acknowledging() !== null"
+                  (click)="acknowledge(addendum)"
+                >
+                  @if (acknowledging() === addendum.id) {
+                    <ng-container i18n="@@common.working">Working…</ng-container>
+                  } @else {
+                    <ng-container i18n="@@bidUpdates.acknowledge">Acknowledge receipt</ng-container>
+                    <span class="prj-visually-hidden"
+                      >&ngsp;<ng-container i18n="@@addendum.numbered"
+                        >Addendum {{ addendum.number }}</ng-container
+                      ></span
+                    >
+                  }
+                </button>
+                <p class="prj-hint" i18n="@@bidUpdates.acknowledgeHint">
+                  Acknowledging confirms that your company received and reviewed this addendum. It
+                  is not acceptance of any commercial term.
+                </p>
+              }
+            </div>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+} @else {
+  <section class="bid-card" aria-labelledby="bid-clarifications-title">
+    <h2 id="bid-clarifications-title" i18n="@@clar.title">Clarifications</h2>
+    <h3 id="bid-published-title" i18n="@@bidUpdates.publishedTitle">Published clarifications</h3>
+    <p class="prj-hint" i18n="@@bidUpdates.publishedHint">
+      Answers the buyer published to every invited bidder. The firm that asked is never named.
+    </p>
+    @if (current.published.length) {
+      <ol class="bid-clarifications" role="list" aria-labelledby="bid-published-title">
+        @for (item of current.published; track item.id) {
+          <li>
+            <p class="bid-clar-head">
+              <bdi dir="ltr" class="bid-code">{{ item.reference }}</bdi> ·
+              {{ item.publishedAtUtc | businessDate: 'instant' }}
+              @if (item.mine) {
+                · <span class="prj-hint" i18n="@@bidUpdates.yourQuestion">your question</span>
+              }
+            </p>
+            <p class="bid-prewrap">
+              <strong i18n="@@bidUpdates.questionLabel">Question:</strong>&ngsp;<bdi>{{
+                item.question
+              }}</bdi>
+            </p>
+            <p class="bid-prewrap">
+              <strong i18n="@@bidUpdates.answerLabel">Answer:</strong>&ngsp;<bdi>{{
+                item.answer
+              }}</bdi>
+            </p>
+          </li>
+        }
+      </ol>
+    } @else {
+      <p class="prj-hint" i18n="@@bidUpdates.noPublished">
+        No clarifications have been published yet.
+      </p>
+    }
+
+    @if (invitation().linkAccess === 'Firm' && !invitation().buyerPreview) {
+      <h3 id="bid-mine-title" i18n="@@bidUpdates.mineTitle">Your questions</h3>
+      @if (current.myQuestions.length) {
+        <ol class="bid-clarifications" role="list" aria-labelledby="bid-mine-title">
+          @for (item of current.myQuestions; track item.id) {
+            <li>
+              <p class="bid-clar-head">
+                <bdi dir="ltr" class="bid-code">{{ item.reference }}</bdi> ·
+                {{ item.askedAtUtc | businessDate: 'instant' }} ·
+                <strong>{{
+                  item.visibility ? visibilityLabel(item.visibility) : statusLabel(item.status)
+                }}</strong>
+              </p>
+              <p class="bid-prewrap">
+                <strong i18n="@@bidUpdates.questionLabel">Question:</strong>&ngsp;<bdi>{{
+                  item.question
+                }}</bdi>
+              </p>
+              @if (reworded(item)) {
+                <p class="bid-prewrap prj-hint">
+                  <ng-container i18n="@@bidUpdates.publishedAs"
+                    >Published to all bidders as:</ng-container
+                  >&ngsp;<bdi>{{ item.publishedQuestion }}</bdi>
+                </p>
+              }
+              @if (item.answer) {
+                <p class="bid-prewrap">
+                  <strong i18n="@@bidUpdates.answerLabel">Answer:</strong>&ngsp;<bdi>{{
+                    item.answer
+                  }}</bdi>
+                </p>
+              } @else {
+                <p class="prj-hint" i18n="@@bidUpdates.awaiting">The buyer has not answered yet.</p>
+              }
+            </li>
+          }
+        </ol>
+      } @else {
+        <p class="prj-hint" i18n="@@bidUpdates.noQuestions">You have not asked any questions.</p>
+      }
+
+      @if (current.canAsk) {
+        <form
+          class="prj-form bid-ask-form"
+          novalidate
+          (ngSubmit)="ask()"
+          aria-labelledby="bid-ask-title"
+        >
+          <h3 id="bid-ask-title" i18n="@@bidUpdates.askTitle">Ask the buyer a question</h3>
+          <div class="prj-field">
+            <label for="bid-question" i18n="@@bidUpdates.questionField">Your question</label>
+            <textarea
+              id="bid-question"
+              name="question"
+              rows="4"
+              [attr.maxlength]="current.questionMaxLength"
+              [attr.aria-invalid]="questionMissing() || !!askError()"
+              [attr.aria-describedby]="
+                askError()
+                  ? 'bid-question-error'
+                  : questionMissing()
+                    ? 'bid-question-missing'
+                    : 'bid-question-hint'
+              "
+              [(ngModel)]="question"
+              (input)="questionMissing.set(false); askError.set('')"
+            ></textarea>
+            <small id="bid-question-hint" class="prj-hint" i18n="@@bidUpdates.askHint"
+              >Only the buyer reads your question. If the buyer publishes the answer to every
+              bidder, your company is not named.</small
+            >
+            @if (questionMissing()) {
+              <p
+                id="bid-question-missing"
+                class="prj-error-text"
+                role="alert"
+                i18n="@@bidUpdates.questionMissing"
+              >
+                Write your question first.
+              </p>
+            }
+            @if (askError()) {
+              <p id="bid-question-error" class="prj-error-text" role="alert" tabindex="-1">
+                {{ askError() }}
+              </p>
+            }
+          </div>
+          <div class="prj-actions">
+            <button class="prj-btn" type="submit" [disabled]="asking()">
+              @if (asking()) {
+                <ng-container i18n="@@common.working">Working…</ng-container>
+              } @else {
+                <ng-container i18n="@@bidUpdates.send">Send question</ng-container>
+              }
+            </button>
+          </div>
+        </form>
+      } @else if (current.questionsClosedReason) {
+        <p class="prj-note" role="note">{{ closedLabel(current.questionsClosedReason) }}</p>
+      }
+    }
+  </section>
+}

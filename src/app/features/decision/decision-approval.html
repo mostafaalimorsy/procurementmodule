@@ -1,0 +1,592 @@
+@let view = workspace();
+@if (submission(); as current) {
+  <section class="prj-section" aria-labelledby="submission-title">
+    <h2 id="submission-title" class="dc-heading">
+      <span i18n="@@approval.submissionTitle">Decision version {{ current.number }}</span>
+      <span
+        class="prj-chip dc-state"
+        [class.dc-state--good]="current.outcome === 'Approved' || current.outcome === 'Awarded'"
+        >{{ outcomeLabel(current.outcome) }}</span
+      >
+    </h2>
+    <p class="prj-hint" i18n="@@approval.submittedBy">
+      Submitted {{ current.submittedAtUtc | businessDate: 'instant' }} by
+      <bdi>{{ current.submittedByName }}</bdi
+      >.
+    </p>
+
+    <dl class="dc-facts">
+      <div>
+        <dt i18n="@@decision.proposed">Proposed for award</dt>
+        <dd>
+          <bdi dir="ltr" class="tnd-code">{{ current.subcontractorCode }}</bdi
+          >{{ ' ' }}<bdi>{{ current.subcontractorName }}</bdi>
+          <small class="prj-hint tnd-block" i18n="@@approval.revisionUsed"
+            >revision {{ current.bidRevisionNumber }} · round {{ current.round }}</small
+          >
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@approval.recommendationVsProposed">Recommendation</dt>
+        <dd>
+          <span i18n="@@approval.recommendationNumber"
+            >Recommendation {{ current.recommendationNumber }}</span
+          >
+          @if (current.criteria; as criteria) {
+            <app-criteria-flag
+              [declaration]="criteria.declaration"
+              [declaredPolicyName]="criteria.declaredPolicyName"
+              [declaredPolicyVersionNumber]="criteria.declaredPolicyVersionNumber"
+              [deviationReason]="criteria.deviationReason"
+              [evaluationDeviated]="criteria.evaluationCriteriaDeviated"
+            />
+          }
+          <small class="prj-hint tnd-block">
+            @if (current.recommendedRank !== null) {
+              <span i18n="@@approval.proposedRank"
+                >The proposed firm has recommendation rank {{ current.recommendedRank }}.</span
+              >
+            }
+          </small>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@decision.awardValue">Award value</dt>
+        <dd>
+          <bdi dir="ltr" class="dc-strong"
+            >{{ money(current.awardValue) }} {{ current.currency }}</bdi
+          >
+          <small class="prj-hint tnd-block" data-testid="approval-totals" i18n="@@approval.totals"
+            >leveled
+            <bdi dir="ltr">{{ money(current.leveledTotal) + ' ' + current.currency }}</bdi> ·
+            submitted
+            <bdi dir="ltr">{{ money(current.submittedTotal) + ' ' + current.currency }}</bdi></small
+          >
+        </dd>
+      </div>
+    </dl>
+
+    @if (current.isOverride) {
+      <div class="prj-note tnd-attention-box" role="note">
+        <strong i18n="@@approval.overrideTitle">Overrides the recommendation</strong>
+        <p class="ev-prose">
+          <bdi>{{ current.overrideReason }}</bdi>
+        </p>
+      </div>
+    }
+    @if (current.valueReason) {
+      <div class="prj-note" role="note">
+        <strong i18n="@@approval.valueReasonTitle"
+          >Why the value differs from the leveled total</strong
+        >
+        <p class="ev-prose">
+          <bdi>{{ current.valueReason }}</bdi>
+        </p>
+      </div>
+    }
+    @if (current.limitedCompetition) {
+      <div class="prj-note tnd-attention-box" role="note">
+        <strong i18n="@@approval.limitedTitle">Limited competition</strong>
+        <p>{{ justificationLabel(current.competitionCategory) }}</p>
+        <p class="ev-prose">
+          <bdi>{{ current.competitionReason }}</bdi>
+        </p>
+      </div>
+    }
+    @if (current.overBudget) {
+      <div class="prj-note tnd-attention-box" role="note">
+        <strong i18n="@@approval.overBudgetTitle">Above the package estimate</strong>
+        <p class="ev-prose">
+          <bdi>{{ current.overBudgetReason }}</bdi>
+        </p>
+      </div>
+    }
+    <!-- Red-team G073 (CF-057 AC5): the approver sees that the shortlist skipped four-eyes prequalification. -->
+    <app-shortlist-basis [basis]="view.shortlistBasis" />
+    @if (current.revisionAcknowledgementReason) {
+      <div class="prj-note tnd-attention-box" role="note">
+        <strong i18n="@@approval.revisionTitle"
+          >The proposed bid answered an earlier tender revision</strong
+        >
+        <p class="ev-prose">
+          <bdi>{{ current.revisionAcknowledgementReason }}</bdi>
+        </p>
+      </div>
+    }
+    @if (current.rationale) {
+      <h3 i18n="@@decision.rationale">Rationale</h3>
+      <p class="ev-prose">
+        <bdi>{{ current.rationale }}</bdi>
+      </p>
+    }
+
+    <h3 i18n="@@approval.outcomesTitle">Every bid's outcome in this decision</h3>
+    <div class="prj-table-wrap">
+      <table class="prj-table ev-table">
+        <caption class="prj-visually-hidden" i18n="@@approval.outcomesTitle">
+          Every bid's outcome in this decision
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@evaluation.colFirm">Firm</th>
+            <th scope="col" i18n="@@approval.colOutcome">Outcome</th>
+            <th scope="col" i18n="@@approval.colRank">Recommendation rank</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of current.dispositions; track item.openingBidId) {
+            <tr>
+              <th scope="row">
+                <bdi dir="ltr" class="tnd-code">{{ item.subcontractorCode }}</bdi
+                >{{ ' ' }}<bdi>{{ item.subcontractorName }}</bdi>
+              </th>
+              <td>
+                {{ dispositionLabel(item.disposition, item.reserveRank) }}
+                @if (item.reason) {
+                  <small class="prj-hint tnd-block"
+                    ><bdi>{{ item.reason }}</bdi></small
+                  >
+                }
+              </td>
+              <td>
+                @if (item.recommendedRank !== null) {
+                  {{ item.recommendedRank }}
+                } @else {
+                  <span class="prj-hint" i18n="@@approval.notEligible">Not eligible</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <h3 i18n="@@decision.routeTitle">Approval route</h3>
+    <p>
+      <!-- CF-099 AC3: the server says which route is the default; a rule's name is never read as a flag. -->
+      @if (current.route.isDefault) {
+        <span i18n="@@decision.routeDefault"
+          >No approval rule matches, so the default route applies: one approval by an
+          Approver/Director.</span
+        >
+      } @else {
+        <span i18n="@@decision.routeRule"
+          >Rule <bdi>{{ current.route.ruleName }}</bdi></span
+        >
+      }
+      @if (current.route.allowSelfApproval) {
+        ·
+        <span class="tnd-attention" i18n="@@approval.selfAllowedShort">self-approval allowed</span>
+      }
+      @if (current.route.requiredApprovals === 0 || current.route.allowSelfApproval) {
+        ·
+        <span class="prj-chip tnd-attention" i18n="@@approval.withoutIndependent"
+          >Approved without independent approval</span
+        >
+      }
+      @if (readsRules) {
+        <!-- CF-136 AC6: the rule that routed this decision, highlighted in the approval routes. -->
+        ·
+        <a
+          routerLink="/approval-matrix/read"
+          [queryParams]="{ rule: current.route.isDefault ? 'default' : current.route.ruleName }"
+          i18n="@@decision.routeSeeRule"
+          >See this rule in the approval routes</a
+        >
+      }
+    </p>
+    @if (current.route.requiredApprovals === 0) {
+      <p class="prj-hint" i18n="@@decision.routeNone">
+        This route needs no approval: the decision is approved when it is submitted.
+      </p>
+    } @else {
+      <ol class="dc-steps" role="list">
+        @for (step of current.route.steps; track step.step) {
+          <li>
+            <span i18n="@@decision.routeStep"
+              >Step {{ step.step }}: {{ roleLabel(step.role) }}</span
+            >
+            @if (step.approval; as action) {
+              <span class="dc-state dc-state--good tnd-block" i18n="@@approval.stepApproved"
+                >Approved by <bdi>{{ action.actorName }}</bdi> ·
+                {{ action.actedAtUtc | businessDate: 'instant' }}</span
+              >
+              @if (action.comment) {
+                <small class="prj-hint tnd-block"
+                  ><bdi>{{ action.comment }}</bdi></small
+                >
+              }
+            } @else {
+              <span class="dc-state dc-state--muted tnd-block" i18n="@@approval.stepWaiting"
+                >Waiting</span
+              >
+            }
+          </li>
+        }
+      </ol>
+    }
+
+    @if (view.access.approve && pending() && view.approvalBlocker) {
+      <p class="prj-note tnd-attention-box" role="note">{{ blockerLabel(view.approvalBlocker) }}</p>
+    }
+    <div class="prj-actions">
+      @if (canApprove()) {
+        <button class="prj-btn" type="button" (click)="start('Approve')" i18n="@@approval.approve">
+          Approve
+        </button>
+      }
+      @if (canSendBack()) {
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          (click)="start('Return')"
+          i18n="@@approval.return"
+        >
+          Return for changes
+        </button>
+        <button
+          class="prj-btn prj-btn--ghost prj-btn--danger"
+          type="button"
+          (click)="start('Reject')"
+          i18n="@@approval.reject"
+        >
+          Reject the proposal
+        </button>
+      }
+      @if (canAward()) {
+        <button class="prj-btn" type="button" (click)="start('award')" i18n="@@award.issue">
+          Issue the award
+        </button>
+      }
+      @if (canWithdraw()) {
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          (click)="start('withdraw')"
+          i18n="@@approval.withdraw"
+        >
+          Withdraw the submission
+        </button>
+      }
+    </div>
+    @if (approved() && !fresh()) {
+      <p class="prj-note prj-note--error" role="note" i18n="@@award.staleNote">
+        The recommendation behind this approved decision is no longer current, so the award cannot
+        be issued. Its submitter withdraws the submission so the decision can be prepared again on a
+        current recommendation.
+      </p>
+    } @else if (view.status === 'Approved' && !view.access.issue) {
+      <p class="prj-hint" i18n="@@award.waiting">
+        The decision is approved. Procurement leadership issues the award.
+      </p>
+    }
+
+    @if (current.actions.length) {
+      <h3 i18n="@@approval.actionsTitle">Approval record</h3>
+      <ul class="dc-list" role="list">
+        @for (action of current.actions; track action.id) {
+          <li>
+            <strong>{{ actionLabel(action.kind) }}</strong> · <bdi>{{ action.actorName }}</bdi> ·
+            {{ action.actedAtUtc | businessDate: 'instant' }}
+            @if (action.comment) {
+              <span class="tnd-block ev-prose"
+                ><bdi>{{ action.comment }}</bdi></span
+              >
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+} @else {
+  <p class="prj-hint" i18n="@@approval.none">No decision has been submitted for approval yet.</p>
+}
+
+@if (earlier().length) {
+  <section class="prj-section" aria-labelledby="earlier-title">
+    <h2 id="earlier-title" i18n="@@approval.earlierTitle">Earlier versions</h2>
+    <ul class="dc-list" role="list">
+      @for (item of earlier(); track item.id) {
+        <li>
+          <span i18n="@@approval.earlierLine"
+            >Version {{ item.number }} · <bdi dir="ltr">{{ item.subcontractorCode }}</bdi> ·
+            {{ item.submittedAtUtc | businessDate: 'instant' }}</span
+          >
+          · {{ outcomeLabel(item.outcome) }}
+          @for (action of item.actions; track action.id) {
+            @if (action.comment) {
+              <small class="prj-hint tnd-block"
+                >{{ actionLabel(action.kind) }} · <bdi>{{ action.actorName }}</bdi
+                >: <bdi>{{ action.comment }}</bdi></small
+              >
+            }
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+@switch (dialog()) {
+  @case ('Approve') {
+    <app-confirm-dialog
+      heading="Approve this decision?"
+      i18n-heading="@@approval.approveHeading"
+      confirmLabel="Approve"
+      i18n-confirmLabel="@@approval.approve"
+      [busy]="busy()"
+      (confirmed)="confirm()"
+      (cancelled)="close()"
+    >
+      <p i18n="@@approval.approveBody">
+        Your approval of step {{ (submission() ? approvedSteps(submission()!) : 0) + 1 }} is
+        recorded with your name and roles. Approving does not award: the award is a separate act
+        once every step is approved.
+      </p>
+      <div class="prj-field">
+        <label for="approval-comment" i18n="@@approval.commentOptional">Comment (optional)</label>
+        <textarea
+          id="approval-comment"
+          rows="3"
+          [attr.maxlength]="commentMax"
+          [(ngModel)]="comment"
+          (input)="dialogError.set(''); commentInvalid.set(false)"
+        ></textarea>
+      </div>
+      @if (dialogError()) {
+        <p id="approval-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+      }
+    </app-confirm-dialog>
+  }
+  @case ('Return') {
+    <app-confirm-dialog
+      heading="Return the decision for changes?"
+      i18n-heading="@@approval.returnHeading"
+      confirmLabel="Return for changes"
+      i18n-confirmLabel="@@approval.return"
+      [busy]="busy()"
+      (confirmed)="confirm()"
+      (cancelled)="close()"
+    >
+      <p i18n="@@approval.returnBody">
+        The decision goes back to its preparer as a draft. Say what should change; your comment is
+        kept on this version.
+      </p>
+      <div class="prj-field">
+        <label for="return-comment" i18n="@@approval.commentRequiredLabel"
+          >Comment (required)</label
+        >
+        <textarea
+          id="return-comment"
+          rows="3"
+          aria-required="true"
+          [attr.aria-invalid]="commentInvalid() ? 'true' : null"
+          [attr.aria-describedby]="commentInvalid() ? 'approval-dialog-error' : null"
+          [attr.maxlength]="commentMax"
+          [(ngModel)]="comment"
+          (input)="dialogError.set(''); commentInvalid.set(false)"
+        ></textarea>
+      </div>
+      @if (dialogError()) {
+        <p id="approval-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+      }
+    </app-confirm-dialog>
+  }
+  @case ('Reject') {
+    <app-confirm-dialog
+      heading="Reject the proposal?"
+      i18n-heading="@@approval.rejectHeading"
+      confirmLabel="Reject the proposal"
+      i18n-confirmLabel="@@approval.reject"
+      [danger]="true"
+      [busy]="busy()"
+      (confirmed)="confirm()"
+      (cancelled)="close()"
+    >
+      <p i18n="@@approval.rejectBody">
+        You reject this proposal as a whole; no bid is rejected by it. The decision goes back to a
+        draft to be prepared again. Your comment is kept on this version.
+      </p>
+      <div class="prj-field">
+        <label for="reject-comment" i18n="@@approval.commentRequiredLabel"
+          >Comment (required)</label
+        >
+        <textarea
+          id="reject-comment"
+          rows="3"
+          aria-required="true"
+          [attr.aria-invalid]="commentInvalid() ? 'true' : null"
+          [attr.aria-describedby]="commentInvalid() ? 'approval-dialog-error' : null"
+          [attr.maxlength]="commentMax"
+          [(ngModel)]="comment"
+          (input)="dialogError.set(''); commentInvalid.set(false)"
+        ></textarea>
+      </div>
+      @if (dialogError()) {
+        <p id="approval-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+      }
+    </app-confirm-dialog>
+  }
+  @case ('withdraw') {
+    <app-confirm-dialog
+      heading="Withdraw the submission?"
+      i18n-heading="@@approval.withdrawHeading"
+      confirmLabel="Withdraw"
+      i18n-confirmLabel="@@approval.withdrawConfirm"
+      [busy]="busy()"
+      (confirmed)="confirm()"
+      (cancelled)="close()"
+    >
+      <p i18n="@@approval.withdrawBody">
+        The decision goes back to a draft; approvals already given no longer count. The reason is
+        recorded with your name.
+      </p>
+      <div class="prj-field">
+        <label for="withdraw-comment"
+          ><span i18n="@@tenderField.reason">Reason</span>&ngsp;<span
+            class="prj-hint"
+            i18n="@@bidWorkspace.requiredMark"
+            >(required)</span
+          ></label
+        >
+        <textarea
+          id="withdraw-comment"
+          rows="3"
+          aria-required="true"
+          [attr.aria-invalid]="commentInvalid() ? 'true' : null"
+          [attr.aria-describedby]="commentInvalid() ? 'approval-dialog-error' : null"
+          [attr.maxlength]="reasonMax"
+          [(ngModel)]="comment"
+          (input)="dialogError.set(''); commentInvalid.set(false)"
+        ></textarea>
+      </div>
+      @if (dialogError()) {
+        <p id="approval-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+      }
+    </app-confirm-dialog>
+  }
+  @case ('award') {
+    <app-confirm-dialog
+      heading="Issue the award?"
+      i18n-heading="@@award.heading"
+      confirmLabel="Issue the award"
+      i18n-confirmLabel="@@award.issue"
+      [busy]="busy()"
+      (confirmed)="confirm()"
+      (cancelled)="close()"
+    >
+      <p i18n="@@award.body">
+        The award goes to <bdi dir="ltr">{{ submission()?.subcontractorCode }}</bdi> —
+        <bdi>{{ submission()?.subcontractorName }}</bdi> for
+        <bdi dir="ltr">{{ money(submission()?.awardValue) }} {{ submission()?.currency }}</bdi
+        >. The award baseline — the bid revision, value, lines, exclusions and deviations — is
+        frozen and can never change. The tender becomes read-only.
+      </p>
+      @if (lapsed()) {
+        <div class="prj-note tnd-attention-box" role="note">
+          <p i18n="@@award.lapsedNote">
+            This bid's validity lapsed on
+            {{ proposedValidity()?.validUntilUtc | zonedInstant: view.timeZoneId }}. Record the
+            bidder's written extension; it is kept with the award, outside its frozen baseline.
+          </p>
+          <div class="prj-field">
+            <label for="award-extended-until" i18n="@@award.extendedUntil">Extended until</label>
+            <input
+              id="award-extended-until"
+              name="extendedUntil"
+              type="date"
+              dir="ltr"
+              aria-required="true"
+              [(ngModel)]="extension.until"
+              (ngModelChange)="dialogError.set('')"
+            />
+          </div>
+          <div class="prj-field">
+            <label for="award-extension-channel" i18n="@@award.extensionChannel"
+              >Confirmed by</label
+            >
+            <select
+              id="award-extension-channel"
+              name="extensionChannel"
+              aria-required="true"
+              [(ngModel)]="extension.channel"
+              (ngModelChange)="dialogError.set('')"
+            >
+              <option value="" disabled i18n="@@award.chooseChannel">Choose how</option>
+              @for (channel of channels; track channel) {
+                <option [value]="channel">{{ channelLabel(channel) }}</option>
+              }
+            </select>
+          </div>
+          <div class="prj-field">
+            <label for="award-extension-reference" i18n="@@award.extensionReference"
+              >Reference (optional)</label
+            >
+            <input
+              id="award-extension-reference"
+              name="extensionReference"
+              [attr.maxlength]="referenceMax"
+              [(ngModel)]="extension.reference"
+            />
+          </div>
+        </div>
+      }
+      <fieldset class="prj-field award-notices">
+        <legend i18n="@@award.noticeTiming">When the other firms are told</legend>
+        <label class="tnd-choice">
+          <input type="radio" name="noticeTiming" value="" [(ngModel)]="noticeTiming" />
+          <span i18n="@@award.noticeTiming.company">As the company setting says</span>
+        </label>
+        <label class="tnd-choice">
+          <input type="radio" name="noticeTiming" value="OnAcceptance" [(ngModel)]="noticeTiming" />
+          <span i18n="@@award.noticeTiming.onAcceptance"
+            >When the awarded firm accepts (held until then)</span
+          >
+        </label>
+        <label class="tnd-choice">
+          <input type="radio" name="noticeTiming" value="AtAward" [(ngModel)]="noticeTiming" />
+          <span i18n="@@award.noticeTiming.atAward">Now, with the award</span>
+        </label>
+        <p class="prj-hint" i18n="@@award.noticeTiming.hint">
+          Reserve bids are not told "not selected" while they may still be called on.
+        </p>
+      </fieldset>
+      @if (reserves().length) {
+        <fieldset class="prj-field award-notices">
+          <legend i18n="@@award.notifyReserves">
+            Tell these reserves they are held in reserve
+          </legend>
+          @for (reserve of reserves(); track reserve.openingBidId) {
+            <label class="tnd-choice">
+              <input
+                type="checkbox"
+                [checked]="notifyReserves().has(reserve.openingBidId)"
+                (change)="toggleReserve(reserve.openingBidId, $any($event.target).checked)"
+              />
+              <span
+                ><bdi dir="ltr">{{ reserve.subcontractorCode }}</bdi> —
+                <bdi>{{ reserve.subcontractorName }}</bdi></span
+              >
+            </label>
+          }
+          <p class="prj-hint" i18n="@@award.notifyReserves.hint">
+            The notice gives no rank, amount or competitor. Unticked reserves hear nothing until you
+            release them.
+          </p>
+        </fieldset>
+      }
+      <label class="tnd-choice tnd-close-confirm">
+        <input
+          type="checkbox"
+          name="awardConfirmed"
+          [(ngModel)]="awardConfirmed"
+          (change)="dialogError.set('')"
+        />
+        <span i18n="@@award.confirmBox">I confirm the award as approved.</span>
+      </label>
+      @if (dialogError()) {
+        <p id="approval-dialog-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+      }
+    </app-confirm-dialog>
+  }
+}

@@ -1,0 +1,813 @@
+@if (tender().status === 'Cancelled') {
+  <div class="prj-note" role="note">
+    <strong i18n="@@control.cancelledTitle">This tender is cancelled.</strong>
+    <p i18n="@@control.cancelledBy">
+      Cancelled by <bdi>{{ tender().cancelledByName }}</bdi> on
+      {{ tender().cancelledAtUtc | businessDate: 'instant' }}. Reason:
+      <bdi>{{ tender().cancellationReason }}</bdi>
+    </p>
+    <p class="prj-hint" i18n="@@control.cancelledHint">
+      Invitation links now show bidders that the tender is cancelled. Nothing further is sent, and
+      the history below is kept.
+    </p>
+  </div>
+}
+
+@if (tender().closure; as closure) {
+  @if (tender().status === 'Published') {
+    <div class="prj-note tnd-attention-box" role="note">
+      @if (closure.kind === 'Early') {
+        <strong i18n="@@control.closedEarlyTitle">This tender was closed early.</strong>
+        <p i18n="@@control.closedEarlyBy">
+          Closed by <bdi>{{ closure.closedByName }}</bdi> on <bdi>{{ closedAtShown() }}</bdi
+          >, before its scheduled deadline of <bdi>{{ scheduledShown() }}</bdi
+          >. Reason: <bdi>{{ closure.reason }}</bdi>
+        </p>
+      } @else {
+        <strong i18n="@@control.closedDeadlineTitle">This tender closed at its deadline.</strong>
+        <p i18n="@@control.closedDeadlineBody">
+          Responses stopped at <bdi>{{ closedAtShown() }}</bdi
+          >. Nobody had to close it by hand.
+        </p>
+      }
+      <p class="prj-hint" i18n="@@control.closedHint">
+        No firm can submit or change a bid any more. Submitted bids stay sealed until they are
+        opened for evaluation. Closing a tender does not accept, recommend or award any bidder.
+      </p>
+    </div>
+  }
+}
+
+@if (evaluationAvailable() && tender().status !== 'Draft') {
+  <section class="prj-section" aria-labelledby="evaluation-entry-title">
+    <h2 id="evaluation-entry-title" i18n="@@control.evaluationTitle">Bid opening and evaluation</h2>
+    <p class="prj-hint">
+      @if (tender().closure?.bidsOpenedAtUtc) {
+        <ng-container i18n="@@control.evaluationOpened"
+          >The bids were opened on
+          {{ tender().closure?.bidsOpenedAtUtc | businessDate: 'instant' }}. Evaluators work in the
+          evaluation workspace.</ng-container
+        >
+      } @else if (tender().closure) {
+        <ng-container i18n="@@control.evaluationReady"
+          >The tender is closed. Authorized buyers can open the submitted bids for
+          evaluation.</ng-container
+        >
+      } @else {
+        <ng-container i18n="@@control.evaluationSealed"
+          >Submitted bids stay sealed while the tender is open.</ng-container
+        >
+      }
+    </p>
+    <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tender().id, 'evaluation']">
+      <ng-container i18n="@@control.evaluationOpenLink"
+        >Go to bid opening and evaluation</ng-container
+      >
+    </a>
+  </section>
+}
+
+@if (evaluationNotInPlan()) {
+  <!-- CF-105: where the journey would continue, the plan boundary is named instead of the section vanishing. -->
+  <section class="prj-section">
+    <app-not-in-plan feature="evaluation" />
+  </section>
+} @else if (awardNotInPlan()) {
+  <section class="prj-section">
+    <app-not-in-plan feature="award" />
+  </section>
+}
+
+@if (awardAvailable()) {
+  <section class="prj-section" aria-labelledby="award-entry-title">
+    <h2 id="award-entry-title" i18n="@@control.awardTitle">Negotiation, decision and award</h2>
+    @if (tender().awardedAtUtc) {
+      <p class="prj-note" role="note" i18n="@@control.awarded">
+        <strong>Awarded</strong> on {{ tender().awardedAtUtc | businessDate: 'instant' }}. The
+        tender and its evaluation are read-only; the award baseline is in the decision workspace.
+      </p>
+    } @else {
+      <p class="prj-hint" i18n="@@control.awardHint">
+        Negotiation rounds ask selected firms for revised or best and final offers. The decision
+        workspace holds the recommendation, the approvals and the award.
+      </p>
+    }
+    <div class="prj-actions">
+      @if (negotiationAvailable()) {
+        <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tender().id, 'negotiation']">
+          <ng-container i18n="@@control.negotiationLink">Negotiation rounds</ng-container>
+        </a>
+      }
+      @if (decisionAvailable()) {
+        <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tender().id, 'decision']">
+          <ng-container i18n="@@control.decisionLink">Recommendation and decision</ng-container>
+        </a>
+      }
+      <!-- CF-009: forward to the award baseline and the closeout, for readers of each. -->
+      @if (tender().awardId && decisionAvailable()) {
+        <a
+          class="prj-btn prj-btn--ghost"
+          [routerLink]="['/tenders', tender().id, 'decision']"
+          [queryParams]="{ tab: 'award' }"
+          i18n="@@control.awardBaselineLink"
+          >Award baseline</a
+        >
+      }
+      @if (tender().awardId && closeoutAvailable()) {
+        <a
+          class="prj-btn prj-btn--ghost"
+          [routerLink]="['/closeouts', tender().awardId]"
+          i18n="@@control.closeoutLink"
+          >Closeout</a
+        >
+      }
+    </div>
+    @if (closeoutNotInPlan()) {
+      <app-not-in-plan feature="performance" />
+    }
+  </section>
+}
+
+@if (attention().length) {
+  <div class="prj-note tnd-attention-box" role="status">
+    <strong i18n="@@control.attentionTitle">Needs attention</strong>
+    <ul role="list">
+      @for (item of attention(); track item) {
+        <li>{{ item }}</li>
+      }
+    </ul>
+    @if (pollStopped() && tender().counts.queued > 0) {
+      <button
+        class="prj-btn prj-btn--ghost"
+        type="button"
+        (click)="checkAgain()"
+        i18n="@@control.checkAgain"
+      >
+        Check again
+      </button>
+    }
+  </div>
+}
+@if (error()) {
+  <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+}
+
+<dl class="prj-summary tnd-summary">
+  <div>
+    <dt i18n="@@tenderField.deadline">Submission deadline</dt>
+    <dd>
+      <bdi>{{ deadlineShown() }}</bdi>
+      <small class="prj-hint tnd-block">{{
+        tender().submissionDeadline?.utc | businessDate: 'instant'
+      }}</small>
+    </dd>
+  </div>
+  <div>
+    <dt i18n="@@control.published">Published</dt>
+    <dd>
+      {{ tender().publishedAtUtc | businessDate: 'instant' }}
+      <small class="prj-hint tnd-block" i18n="@@control.publishedBy"
+        >by <bdi>{{ tender().publishedByName }}</bdi> · revision {{ tender().currentRevision }} ·
+        shortlist round {{ tender().sourcingApprovalRound }}</small
+      >
+    </dd>
+  </div>
+  @if (tender().questionsDeadline) {
+    <div>
+      <dt i18n="@@tenderField.questionsDeadline">Questions deadline</dt>
+      <dd>
+        <bdi>{{ questionsShown() }}</bdi>
+      </dd>
+    </div>
+  }
+</dl>
+
+<section class="prj-section" aria-labelledby="counts-title">
+  <h2 id="counts-title" class="prj-visually-hidden" i18n="@@control.countsTitle">
+    Invitation summary
+  </h2>
+  <dl class="prj-summary tnd-counts">
+    <div>
+      <dt i18n="@@control.countInvited">Invited</dt>
+      <dd>
+        <bdi dir="ltr">{{ tender().counts.total }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@control.countSent">Accepted by mail server</dt>
+      <dd>
+        <bdi dir="ltr">{{ tender().counts.sent }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@control.countFailed">Email failed</dt>
+      <dd [class.tnd-attention]="tender().counts.failed > 0">
+        <bdi dir="ltr">{{ tender().counts.failed }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@control.countOpened">Opened the link</dt>
+      <dd>
+        <bdi dir="ltr">{{ tender().counts.opened }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <!-- CF-085: a firm that has submitted is counted under "Bid submitted", so this counter says it is the firms not yet there. -->
+      <dt i18n="@@control.countIntendsNotSubmitted">Intends to bid, not yet submitted</dt>
+      <dd>
+        <bdi dir="ltr">{{ tender().counts.intendsToBid }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@invitationStatus.declined">Declined</dt>
+      <dd>
+        <bdi dir="ltr">{{ tender().counts.declined }}</bdi>
+      </dd>
+    </div>
+    <div>
+      <dt i18n="@@control.countNoResponse">No response yet</dt>
+      <dd>
+        <bdi dir="ltr">{{ tender().counts.noResponse }}</bdi>
+      </dd>
+    </div>
+  </dl>
+  <p class="prj-hint" i18n="@@control.deliveryHonesty">
+    "Accepted by mail server" means the mail server took the email; it does not prove the email
+    reached an inbox. "Opened the link" is recorded only when the bidder opens its secure link.
+  </p>
+</section>
+
+@if (tender().status !== 'Draft') {
+  <app-tender-addenda
+    [tender]="tender()"
+    (changed)="changed.emit($event)"
+    (announce)="announce.emit($event)"
+    (reloadRequested)="reloadRequested.emit($event)"
+  />
+  <app-tender-clarifications [tender]="tender()" (announce)="announce.emit($event)" />
+  <app-outside-bids [tender]="tender()" (announce)="announce.emit($event)" />
+}
+
+<section class="prj-section" aria-labelledby="bids-title">
+  <div class="prj-section-head">
+    <h2 id="bids-title" i18n="@@control.bidsTitle">Bids received</h2>
+    <button
+      class="prj-btn prj-btn--ghost"
+      type="button"
+      (click)="loadBids(tender().id)"
+      i18n="@@control.bidsRefresh"
+    >
+      Refresh
+    </button>
+  </div>
+  @if (bidsError()) {
+    <p class="prj-note prj-note--error" role="alert">{{ bidsError() }}</p>
+  }
+  @if (bids(); as received) {
+    <dl class="prj-summary tnd-counts">
+      <div>
+        <dt i18n="@@control.countInvited">Invited</dt>
+        <dd>
+          <bdi dir="ltr">{{ received.invited }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@control.bidsInProgress">Bid in progress</dt>
+        <dd>
+          <bdi dir="ltr">{{ received.inProgress }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@control.bidsSubmitted">Bid submitted</dt>
+        <dd>
+          <bdi dir="ltr">{{ received.submitted }}</bdi>
+        </dd>
+      </div>
+      @if (received.draftsOfDeclinedFirms) {
+        <!-- Red-team B-085-1 (CF-085): drafts left by a firm that then declined or was revoked — not in progress, but not hidden. -->
+        <div>
+          <dt i18n="@@control.bidsDraftDeclinedOrRevoked">Started, then declined or revoked</dt>
+          <dd>
+            <bdi dir="ltr">{{ received.draftsOfDeclinedFirms }}</bdi>
+          </dd>
+        </div>
+      }
+    </dl>
+    @if (received.contentSealed) {
+      <p class="prj-hint" i18n="@@control.bidsSealed">
+        Bids stay sealed here: you see who submitted and when, with a receipt reference and a
+        fingerprint of the exact submission — not the prices or the content. Opening bids is part of
+        evaluation.
+      </p>
+    }
+    @if (received.receipts.length) {
+      <div class="prj-table-wrap">
+        <table class="prj-table">
+          <caption class="prj-visually-hidden" i18n="@@control.bidsTitle">
+            Bids received
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@control.colSubcontractor">Subcontractor</th>
+              <th scope="col" i18n="@@control.colBidStatus">Bid</th>
+              <th scope="col" i18n="@@bidWorkspace.reference">Bid reference</th>
+              <th scope="col" i18n="@@control.colSubmitted">Submitted</th>
+              <th scope="col" i18n="@@control.colAnswered">Answered revision</th>
+              <th scope="col" class="prj-numeric" i18n="@@bidWorkspace.files">Files</th>
+              <th scope="col" i18n="@@control.colReceipt">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (receipt of received.receipts; track receipt.invitationId) {
+              <tr>
+                <td>
+                  <bdi dir="ltr" class="tnd-code">{{ receipt.subcontractorCode }}</bdi
+                  >&ngsp;<bdi>{{ receipt.subcontractorName }}</bdi>
+                </td>
+                <td>
+                  @switch (receipt.bidStatus) {
+                    @case ('Submitted') {
+                      <strong i18n="@@control.bidSubmittedState">Submitted</strong>
+                      @if (receipt.outsidePortal) {
+                        <span class="prj-chip tnd-block" i18n="@@control.outsidePortal"
+                          >Recorded outside the portal</span
+                        >
+                      }
+                    }
+                    @case ('Draft') {
+                      @switch (receipt.invitationStatus) {
+                        @case ('Declined') {
+                          <span i18n="@@control.bidDraftDeclinedState">Started, then declined</span>
+                        }
+                        @case ('Revoked') {
+                          <span i18n="@@control.bidDraftRevokedState"
+                            >Started, invitation revoked</span
+                          >
+                        }
+                        @default {
+                          <span i18n="@@control.bidDraftState">In progress</span>
+                        }
+                      }
+                    }
+                    @default {
+                      <span class="prj-hint">{{ statusLabel(receipt.invitationStatus) }}</span>
+                    }
+                  }
+                </td>
+                <td>
+                  @if (receipt.bidReference) {
+                    <bdi dir="ltr" class="tnd-code">{{ receipt.bidReference }}</bdi>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>{{ receipt.submittedAtUtc | businessDate: 'instant' }}</td>
+                <td>
+                  @if (receipt.answeredTenderRevision) {
+                    <bdi dir="ltr">{{ receipt.answeredTenderRevision }}</bdi>
+                    @if (receipt.tenderRevisedSince) {
+                      <small class="tnd-attention tnd-block" i18n="@@control.revisedSince"
+                        >Tender revised since (now revision {{ received.currentRevision }})</small
+                      >
+                    }
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="prj-numeric">
+                  <bdi dir="ltr">{{ receipt.submittedAttachmentCount ?? '—' }}</bdi>
+                </td>
+                <td>
+                  @if (receipt.contentSha256) {
+                    <!-- CF-018: the whole fingerprint, one click away, so it can be read out and compared with the firm's receipt. -->
+                    <app-verification-details>
+                      <code dir="ltr" class="tnd-fingerprint">{{ receipt.contentSha256 }}</code>
+                    </app-verification-details>
+                    @switch (receipt.receiptEmailStatus) {
+                      @case ('Sent') {
+                        <small class="prj-hint tnd-block" i18n="@@control.receiptSent"
+                          >Receipt emailed to the firm</small
+                        >
+                      }
+                      @case ('Failed') {
+                        <small class="tnd-attention tnd-block" i18n="@@control.receiptFailed"
+                          >Receipt email failed</small
+                        >
+                      }
+                      @case ('Queued') {
+                        <small class="prj-hint tnd-block" i18n="@@control.receiptQueued"
+                          >Receipt email queued</small
+                        >
+                      }
+                    }
+                  } @else {
+                    —
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  } @else if (!bidsError() && tender().status !== 'Draft') {
+    <p class="prj-note" role="status" i18n="@@control.bidsLoading">Loading bid receipts…</p>
+  }
+</section>
+
+<section class="prj-section" aria-labelledby="invitations-title">
+  <div class="prj-section-head">
+    <h2 id="invitations-title" i18n="@@control.invitationsTitle">Invitations</h2>
+  </div>
+  <div class="prj-table-wrap" role="region" aria-labelledby="invitations-title" tabindex="0">
+    <table class="prj-table tnd-table">
+      <thead>
+        <tr>
+          <th scope="col" i18n="@@tenderBuilder.colFirm">Subcontractor</th>
+          <th scope="col" i18n="@@tenderBuilder.colRecipient">Recipient</th>
+          <th scope="col" i18n="@@control.colEmail">Email</th>
+          <th scope="col" i18n="@@control.colOpened">Opened</th>
+          <th scope="col" i18n="@@control.colResponse">Response</th>
+          <th scope="col">
+            <span class="prj-visually-hidden" i18n="@@common.actions">Actions</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (invitation of tender().invitations; track invitation.id) {
+          <tr [class.tnd-row-warning]="invitation.deliveryStatus === 'Failed'">
+            <td>
+              <bdi dir="ltr" class="tnd-code">{{ invitation.subcontractorCode }}</bdi
+              >&ngsp;<bdi>{{ invitation.subcontractorName }}</bdi>
+              @if (invitation.currentStanding && invitation.currentStanding !== 'Active') {
+                <span class="prj-chip prj-chip--{{ invitation.currentStanding }} tnd-block">{{
+                  standingLabel(invitation.currentStanding)
+                }}</span>
+              }
+            </td>
+            <td>
+              <bdi>{{ invitation.recipientName }}</bdi>
+              <bdi dir="ltr" class="prj-hint tnd-block">{{ invitation.recipientEmail }}</bdi>
+            </td>
+            <td>
+              <span class="tnd-delivery tnd-delivery--{{ invitation.deliveryStatus }}">{{
+                emailState(invitation)
+              }}</span>
+              @if (invitation.lastSentAtUtc) {
+                <small class="prj-hint tnd-block">{{
+                  invitation.lastSentAtUtc | businessDate: 'instant'
+                }}</small>
+              }
+              @if (invitation.deliveryStatus === 'Failed') {
+                <small class="tnd-attention tnd-block">{{
+                  failureLabel(invitation.lastFailureCategory)
+                }}</small>
+              }
+              @if (invitation.reminderCount > 0) {
+                <small class="prj-hint tnd-block" i18n="@@control.reminders"
+                  >Reminders: {{ invitation.reminderCount }}</small
+                >
+              }
+            </td>
+            <td>
+              @if (invitation.firstOpenedAtUtc) {
+                {{ invitation.firstOpenedAtUtc | businessDate: 'instant' }}
+              } @else {
+                <span class="prj-hint" i18n="@@control.notOpened">Not opened</span>
+              }
+            </td>
+            <td>
+              <span class="prj-chip tnd-response tnd-response--{{ invitation.status }}">{{
+                responseState(invitation)
+              }}</span>
+              @if (invitation.declineReason) {
+                <small class="prj-hint tnd-block">{{
+                  declineLabel(invitation.declineReason)
+                }}</small>
+              }
+            </td>
+            <td>
+              <button class="prj-btn prj-btn--ghost" type="button" (click)="select(invitation)">
+                <ng-container i18n="@@control.details">Details</ng-container>
+                <span class="prj-visually-hidden"
+                  >&ngsp;<bdi>{{ invitation.subcontractorName }}</bdi></span
+                >
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (open() && canManage() && invitable().length) {
+    <form
+      class="prj-filters tnd-invite"
+      (ngSubmit)="inviteAnother()"
+      aria-labelledby="invite-title"
+    >
+      <h3 id="invite-title" class="prj-span-all" i18n="@@control.inviteTitle">
+        Invite another approved subcontractor
+      </h3>
+      <div class="prj-field">
+        <label for="invite-member" i18n="@@tenderBuilder.colFirm">Subcontractor</label>
+        <select
+          id="invite-member"
+          name="inviteMember"
+          [ngModel]="inviteMember"
+          (ngModelChange)="pickMember($event)"
+        >
+          <option value="" i18n="@@control.chooseFirm">Choose…</option>
+          @for (member of invitable(); track member.subcontractorId) {
+            <option [value]="member.subcontractorId">
+              {{ member.code }} — {{ member.legalName }}
+            </option>
+          }
+        </select>
+      </div>
+      <div class="prj-field">
+        <label for="invite-contact" i18n="@@tenderBuilder.colRecipient">Recipient</label>
+        <select
+          id="invite-contact"
+          name="inviteContact"
+          [(ngModel)]="inviteContact"
+          [disabled]="!inviteMember"
+        >
+          @for (contact of inviteContacts(); track contact.contactId) {
+            <option [value]="contact.contactId">{{ contact.name }} — {{ contact.email }}</option>
+          }
+        </select>
+      </div>
+      <button class="prj-btn" type="submit" [disabled]="busy() || !inviteMember || !inviteContact">
+        <ng-container i18n="@@control.inviteSubmit">Invite and send</ng-container>
+      </button>
+    </form>
+  }
+</section>
+
+@if (tender().reminders.length) {
+  <section class="prj-section" aria-labelledby="reminders-title">
+    <h2 id="reminders-title" i18n="@@tenderBuilder.remindersLegend">Automatic reminders</h2>
+    <ul class="tnd-plan" role="list">
+      @for (reminder of tender().reminders; track reminder.daysBefore) {
+        @let day = reminder.daysBefore;
+        <li>
+          <span i18n="@@tenderBuilder.daysBefore">{day, plural,
+            =1 {1 day before}
+            other {{{ day }} days before}
+          }</span
+          >: {{ reminder.dueAtUtc | businessDate: 'instant' }} ·
+          <strong>{{ reminderLabel(reminder.status) }}</strong>
+          @if (reminder.status === 'Processed') {
+            <span class="prj-hint" i18n="@@control.reminderQueuedCount"
+              >({{ reminder.queuedCount }})</span
+            >
+          } @else if (reminder.status === 'Skipped' && reminder.skipReason) {
+            <span class="prj-hint">({{ skipLabel(reminder.skipReason) }})</span>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+<section class="prj-section" aria-labelledby="published-title">
+  <h2 id="published-title" i18n="@@control.publishedContent">What bidders received</h2>
+  <details>
+    <summary i18n="@@control.showPublishedContent">Show the published content</summary>
+    <dl class="tnd-review">
+      <div>
+        <dt i18n="@@tenderBuilder.typeLegend">Tender type</dt>
+        <dd>{{ typeLabel(tender().type) }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@tenderField.currency">Bid currency</dt>
+        <dd>
+          <bdi dir="ltr">{{ tender().currency }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@tenderField.contactName">Procurement contact</dt>
+        <dd>
+          <bdi>{{ tender().contactName }}</bdi> ·
+          <bdi dir="ltr">{{ tender().contactEmail }}</bdi>
+        </dd>
+      </div>
+    </dl>
+    <h3 i18n="@@tenderField.scope">Scope and instructions</h3>
+    <p class="tnd-prewrap">
+      <bdi>{{ tender().scopeInstructions }}</bdi>
+    </p>
+    @if (tender().requiredDocuments.length) {
+      <h3 i18n="@@tenderField.requiredDocuments">Required documents</h3>
+      <ul role="list">
+        @for (item of tender().requiredDocuments; track item) {
+          <li>
+            <bdi>{{ item }}</bdi>
+          </li>
+        }
+      </ul>
+    }
+    @if (tender().documents.length) {
+      <h3 i18n="@@tenderBuilder.stepDocuments">Documents</h3>
+      <ul class="tnd-docs" role="list">
+        @for (document of tender().documents; track document.id) {
+          <li>
+            <a [href]="documentUrl(document.id)" [attr.download]="document.fileName"
+              ><bdi>{{ document.fileName }}</bdi></a
+            >
+            <span class="prj-hint"
+              ><bdi>{{ size(document.sizeBytes) }}</bdi></span
+            >
+          </li>
+        }
+      </ul>
+    }
+  </details>
+</section>
+
+@if (closeEarlyNeedsBid()) {
+  <p class="prj-hint" i18n="@@control.closeEarlyNeedsBid">
+    The tender can be closed early once at least one bid has been submitted.
+  </p>
+}
+@if (canCancel() || canCloseEarly()) {
+  <div class="prj-form-actions">
+    @if (canCloseEarly()) {
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="startCloseEarly()">
+        <ng-container i18n="@@control.closeEarly">Close tender early</ng-container>
+      </button>
+    }
+    @if (canCloseWithoutAward()) {
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="startCloseWithoutAward()">
+        <ng-container i18n="@@control.closeWithoutAward">Close without award</ng-container>
+      </button>
+    }
+    @if (canCancel()) {
+      <button class="prj-btn prj-btn--ghost prj-btn--danger" type="button" (click)="startCancel()">
+        <ng-container i18n="@@control.cancelTender">Cancel tender</ng-container>
+      </button>
+    }
+  </div>
+}
+
+@if (selected(); as invitation) {
+  <app-invitation-dialog
+    [tender]="tender()"
+    [invitation]="invitation"
+    (changed)="updated($event)"
+    (reloadRequested)="selectedId.set(null); reloadRequested.emit($event)"
+    (closed)="selectedId.set(null)"
+  />
+}
+
+@if (cancelling()) {
+  <app-confirm-dialog
+    heading="Cancel this tender?"
+    i18n-heading="@@control.cancelHeading"
+    confirmLabel="Cancel tender"
+    i18n-confirmLabel="@@control.cancelTender"
+    [danger]="true"
+    [busy]="busy()"
+    (confirmed)="confirmCancel()"
+    (cancelled)="cancelling.set(false)"
+  >
+    <p i18n="@@control.cancelBody">
+      Bidders' links will show that the tender is cancelled, scheduled reminders stop and emails
+      still waiting are withdrawn. The invitations and their history are kept.
+    </p>
+    <div class="prj-field">
+      <label for="tender-cancel-reason" i18n="@@tenderField.reason">Reason</label>
+      <textarea
+        id="tender-cancel-reason"
+        rows="3"
+        [attr.maxlength]="reasonMax"
+        [attr.aria-invalid]="!!dialogError()"
+        [attr.aria-describedby]="dialogError() ? 'tender-cancel-error' : null"
+        [(ngModel)]="cancelReason"
+        (input)="dialogError.set('')"
+      ></textarea>
+    </div>
+    @if (dialogError()) {
+      <p id="tender-cancel-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (closingWithoutAward()) {
+  <app-confirm-dialog
+    heading="Close this tender without an award?"
+    i18n-heading="@@control.closeWithoutAwardHeading"
+    confirmLabel="Close without award"
+    i18n-confirmLabel="@@control.closeWithoutAward"
+    [busy]="busy()"
+    (confirmed)="confirmCloseWithoutAward()"
+    (cancelled)="closingWithoutAward.set(false)"
+  >
+    <p i18n="@@control.closeWithoutAwardBody">
+      Your plan ends at evaluation, so this tender is not awarded in the product. Closing it records
+      why, keeps the bids and the evaluation exactly as they are and frees its tender slot. It is
+      not a cancellation, and no bidder is emailed.
+    </p>
+    <div class="prj-field">
+      <label for="tender-close-reason" i18n="@@tenderField.reason">Reason</label>
+      <textarea
+        id="tender-close-reason"
+        rows="3"
+        [attr.maxlength]="reasonMax"
+        [attr.aria-invalid]="!!dialogError()"
+        [(ngModel)]="noAwardReason"
+        (input)="dialogError.set('')"
+      ></textarea>
+    </div>
+    @if (dialogError()) {
+      <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (closingEarly(); as counts) {
+  <app-confirm-dialog
+    heading="Close this tender early?"
+    i18n-heading="@@control.closeEarlyHeading"
+    confirmLabel="Close tender early"
+    i18n-confirmLabel="@@control.closeEarly"
+    [danger]="true"
+    [busy]="busy()"
+    (confirmed)="confirmCloseEarly()"
+    (cancelled)="closingEarly.set(null)"
+  >
+    <p i18n="@@control.closeEarlyBody">
+      Closing stops responses now, before the deadline. It is not a cancellation: the tender
+      proceeds with the bids already submitted, which are kept exactly as submitted. It does not
+      accept, recommend or award any bidder. Every invited firm is told the tender is closed.
+    </p>
+    <dl class="prj-summary">
+      <div>
+        <dt i18n="@@control.closeEarlyDeadline">Current deadline</dt>
+        <dd>
+          <bdi>{{ deadlineShown() }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@control.closeEarlyInvited">Invited firms</dt>
+        <dd>{{ counts.invited }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@control.closeEarlySubmitted">Submitted</dt>
+        <dd>{{ counts.submitted }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@control.closeEarlyNotSubmitted">Not submitted</dt>
+        <dd>{{ counts.notSubmitted }}</dd>
+      </div>
+    </dl>
+    @if (counts.notSubmitted > 0) {
+      <p class="prj-note tnd-attention-box tnd-close-warning" role="note">
+        <strong
+          ><span i18n="@@control.closeEarlyWarning">{counts.notSubmitted, plural,
+            =1 {
+              1 invited firm has not submitted. Closing this tender will prevent it from submitting.
+            }
+            other {
+              {{ counts.notSubmitted }} invited firms have not submitted. Closing this tender will
+              prevent them from submitting.
+            }
+          }</span></strong
+        >
+      </p>
+    }
+    <div class="prj-field">
+      <label for="tender-close-reason" i18n="@@control.closeEarlyReason"
+        >Reason for closing early</label
+      >
+      <textarea
+        id="tender-close-reason"
+        rows="3"
+        [attr.maxlength]="reasonMax"
+        aria-required="true"
+        [attr.aria-invalid]="closeError() === 'reason'"
+        [attr.aria-describedby]="closeError() === 'reason' ? 'tender-close-error' : null"
+        [(ngModel)]="closeReason"
+        (input)="clearCloseError()"
+      ></textarea>
+    </div>
+    <label class="tnd-choice">
+      <input
+        type="checkbox"
+        [(ngModel)]="closeAcknowledged"
+        aria-required="true"
+        [attr.aria-invalid]="closeError() === 'confirm'"
+        [attr.aria-describedby]="closeError() === 'confirm' ? 'tender-close-error' : null"
+        (change)="clearCloseError()"
+      />
+      <span i18n="@@control.closeEarlyAcknowledge"
+        >I understand that no firm can submit or change a bid after this, and that it cannot be
+        undone.</span
+      >
+    </label>
+    @if (dialogError()) {
+      <p id="tender-close-error" class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}

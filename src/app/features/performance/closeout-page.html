@@ -1,0 +1,1526 @@
+<section class="prj-page pf-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/closeouts" i18n="@@nav.closeouts">Closeouts</a><span aria-hidden="true">/</span>
+    @if (workspace(); as view) {
+      <bdi dir="ltr">{{ view.baseline.tenderReference }}</bdi>
+    } @else {
+      <span i18n="@@closeout.crumb">Closeout</span>
+    }
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  <div role="status" aria-live="polite">
+    @if (notice()) {
+      <p id="closeout-notice" class="prj-note" tabindex="-1">{{ notice() }}</p>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@closeout.loading">Loading the closeout…</p>
+  } @else if (workspace(); as view) {
+    @let base = view.baseline;
+    @let metrics = view.metrics;
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ base.tenderReference }}</bdi> ·
+          <ng-container i18n="@@closeout.eyebrow">Performance closeout</ng-container>
+        </p>
+        <h1>
+          <bdi>{{ base.subcontractorName }}</bdi>
+        </h1>
+        <p class="tnd-meta">
+          <bdi dir="ltr" class="tnd-code">{{ base.subcontractorCode }}</bdi>
+          <span
+            class="prj-chip dc-state"
+            [class.dc-state--good]="view.lifecycle === 'Closed'"
+            [class.dc-state--warn]="view.lifecycle === 'Reopened'"
+            [class.dc-state--muted]="view.lifecycle === 'Pending'"
+            >{{ lifecycleLabel(view.lifecycle) }}</span
+          >
+          <span class="prj-chip">{{ categoryLabel(base.category) }}</span>
+        </p>
+        <p class="prj-hint">
+          <bdi dir="ltr" class="tnd-code">{{ base.projectCode }}</bdi
+          >{{ ' ' }}<bdi>{{ base.projectName }}</bdi> ·
+          <bdi dir="ltr" class="tnd-code">{{ base.workPackageCode }}</bdi
+          >{{ ' ' }}<bdi>{{ base.workPackageTitle }}</bdi>
+        </p>
+      </div>
+      <p class="pf-progress" aria-live="polite">
+        @if (view.completeness.complete) {
+          <span class="dc-state dc-state--good" i18n="@@closeout.completeShort"
+            >All required evidence recorded</span
+          >
+        } @else {
+          <span i18n="@@closeout.progress"
+            >Recorded
+            <bdi dir="ltr">{{ view.completeness.recorded }} / {{ view.completeness.required }}</bdi>
+            required items</span
+          >
+        }
+        <progress
+          [value]="view.completeness.recorded"
+          [max]="view.completeness.required"
+          aria-hidden="true"
+        ></progress>
+      </p>
+    </div>
+
+    @if (!base.baselineVerified) {
+      <p class="prj-note prj-note--error" role="alert" i18n="@@closeout.baselineNotVerified">
+        The award baseline no longer matches its fingerprint. Do not rely on this comparison and
+        contact support.
+      </p>
+    }
+
+    <div
+      class="dc-tabs pf-steps"
+      role="tablist"
+      aria-label="Closeout steps"
+      i18n-aria-label="@@closeout.steps"
+    >
+      @for (entry of steps; track entry; let index = $index) {
+        <button
+          type="button"
+          role="tab"
+          [id]="'closeout-step-' + entry"
+          [attr.aria-selected]="step() === entry"
+          [attr.aria-controls]="step() === entry ? 'closeout-panel-' + entry : null"
+          [attr.tabindex]="step() === entry ? 0 : -1"
+          [class.is-active]="step() === entry"
+          (click)="selectStep(entry)"
+          (keydown)="stepKey($event, index)"
+        >
+          <span class="pf-step-number" aria-hidden="true"
+            ><bdi dir="ltr">{{ index + 1 }}</bdi></span
+          >
+          {{ stepLabel(entry) }}
+          @if (missingIn(entry) > 0 && !closed()) {
+            <span class="pf-missing-count">
+              <span class="prj-visually-hidden" i18n="@@closeout.stepMissing">items missing:</span>
+              <bdi dir="ltr">{{ missingIn(entry) }}</bdi>
+            </span>
+          }
+        </button>
+      }
+    </div>
+
+    <div
+      [id]="'closeout-panel-' + step()"
+      role="tabpanel"
+      tabindex="-1"
+      class="pf-panel"
+      [attr.aria-labelledby]="'closeout-step-' + step()"
+    >
+      @if (sectionOf(step()); as section) {
+        @if (!canEdit(section)) {
+          <p class="prj-hint pf-owner">
+            @if (closed()) {
+              <span data-testid="closed-notice">{{ closedNotice() }}</span>
+            } @else if (section === 'commercial') {
+              <ng-container i18n="@@closeout.ownerCommercial"
+                >Recorded by the commercial team (Commercial/QS). You can read it.</ng-container
+              >
+            } @else {
+              <ng-container i18n="@@closeout.ownerExecution"
+                >Recorded by the project manager. You can read it.</ng-container
+              >
+            }
+          </p>
+        }
+        @if (sectionError(); as problem) {
+          @if (problem.section === section) {
+            <p id="section-error" class="prj-note prj-note--error" role="alert" tabindex="-1">
+              {{ problem.message }}
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="load()"
+                i18n="@@common.reload"
+              >
+                Reload
+              </button>
+            </p>
+          }
+        }
+      }
+
+      @switch (step()) {
+        @case ('outcome') {
+          <section class="prj-section" aria-labelledby="promise-title">
+            <h2 id="promise-title" i18n="@@closeout.promiseTitle">Awarded, actual and variance</h2>
+            <p class="prj-hint" i18n="@@closeout.promiseIntro">
+              The awarded side is the immutable award baseline and cannot be changed here. The
+              actual side is what the closeout records.
+            </p>
+            <div class="pf-compare" role="list">
+              <div class="pf-row" role="listitem">
+                <h3 i18n="@@closeout.rowCost">Cost</h3>
+                @if (!view.commercialVisible) {
+                  <p class="prj-hint" i18n="@@closeout.costRestricted">
+                    The award value, final cost and cost variance are shown to commercial roles and
+                    to the Project Manager assigned to this project.
+                  </p>
+                } @else {
+                  <dl>
+                    <div>
+                      <dt i18n="@@closeout.awardValue">Award value</dt>
+                      <dd>
+                        <bdi dir="ltr">{{ money(base.awardValue) }} {{ base.currency }}</bdi>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt i18n="@@closeout.actualFinalCost">Actual final cost</dt>
+                      <dd>
+                        @if (metrics.actualFinalCost) {
+                          <bdi dir="ltr"
+                            >{{ money(metrics.actualFinalCost) }} {{ base.currency }}</bdi
+                          >
+                        } @else {
+                          <span class="prj-hint" i18n="@@performance.notRecorded"
+                            >Not recorded</span
+                          >
+                        }
+                      </dd>
+                    </div>
+                    <div>
+                      <dt i18n="@@closeout.variance">Variance</dt>
+                      <dd>
+                        <span
+                          class="pf-variance"
+                          [class.pf-variance--over]="
+                            direction(metrics.costVariancePercent) === 'over'
+                          "
+                          [class.pf-variance--under]="
+                            direction(metrics.costVariancePercent) === 'under'
+                          "
+                        >
+                          <bdi dir="ltr" class="pf-strong">{{
+                            percent(metrics.costVariancePercent)
+                          }}</bdi>
+                          @if (metrics.costVarianceAmount) {
+                            <bdi dir="ltr"
+                              >({{ signedMoney(metrics.costVarianceAmount) }}
+                              {{ base.currency }})</bdi
+                            >
+                          }
+                        </span>
+                        <small class="tnd-block">{{
+                          costDirection(metrics.costVariancePercent)
+                        }}</small>
+                      </dd>
+                    </div>
+                  </dl>
+                }
+              </div>
+              <div class="pf-row" role="listitem">
+                <h3 i18n="@@closeout.rowDuration">Duration</h3>
+                <dl>
+                  <div>
+                    <dt i18n="@@closeout.awardedDuration">Awarded duration</dt>
+                    <dd>
+                      @if (base.plannedDurationDays) {
+                        <span i18n="@@closeout.days">{base.plannedDurationDays, plural,
+                          =1 {1 day}
+                          other {{{base.plannedDurationDays}} days}
+                        }</span>
+                      } @else {
+                        <span class="prj-hint" i18n="@@closeout.noDurationBaseline"
+                          >No duration was frozen at award</span
+                        >
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.actualDuration">Actual duration</dt>
+                    <dd>
+                      @if (metrics.actualDurationDays) {
+                        <span i18n="@@closeout.days">{metrics.actualDurationDays, plural,
+                          =1 {1 day}
+                          other {{{metrics.actualDurationDays}} days}
+                        }</span>
+                      } @else {
+                        <span class="prj-hint" i18n="@@performance.notRecorded">Not recorded</span>
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.variance">Variance</dt>
+                    <dd>
+                      <span
+                        class="pf-variance"
+                        [class.pf-variance--over]="
+                          direction(metrics.scheduleVariancePercent) === 'over'
+                        "
+                        [class.pf-variance--under]="
+                          direction(metrics.scheduleVariancePercent) === 'under'
+                        "
+                      >
+                        <bdi dir="ltr" class="pf-strong">{{
+                          percent(metrics.scheduleVariancePercent)
+                        }}</bdi>
+                        @if (metrics.durationVarianceDays !== null) {
+                          <span
+                            i18n="@@closeout.varianceDays"
+                            >{absDays(metrics.durationVarianceDays), plural,
+                              =1 {({{ days(metrics.durationVarianceDays) }} day)}
+                              other {({{ days(metrics.durationVarianceDays) }} days)}
+                            }</span
+                          >
+                        }
+                      </span>
+                      <small class="tnd-block">{{
+                        durationDirection(metrics.scheduleVariancePercent)
+                      }}</small>
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div class="pf-row" role="listitem">
+                <h3 i18n="@@closeout.rowCompletion">Completion</h3>
+                <dl>
+                  <div>
+                    <dt i18n="@@closeout.promisedCompletion">Promised</dt>
+                    <dd>
+                      @if (metrics.impliedCompletionDate) {
+                        <bdi>{{ metrics.impliedCompletionDate | businessDate }}</bdi>
+                        <small class="prj-hint tnd-block" i18n="@@closeout.impliedHint"
+                          >the actual start plus the awarded duration</small
+                        >
+                      } @else {
+                        <span class="prj-hint" i18n="@@closeout.noPromisedDate"
+                          >Needs the actual start and an awarded duration</span
+                        >
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.actualCompletion">Actual completion</dt>
+                    <dd>
+                      @if (metrics.actualCompletionDate) {
+                        <bdi>{{ metrics.actualCompletionDate | businessDate }}</bdi>
+                      } @else {
+                        <span class="prj-hint" i18n="@@performance.notRecorded">Not recorded</span>
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.outcome">Outcome</dt>
+                    <dd>{{ scheduleLabel(metrics.scheduleOutcome) }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div class="pf-row" role="listitem">
+                <h3 i18n="@@closeout.rowMobilization">Mobilization</h3>
+                <dl>
+                  <div>
+                    <dt i18n="@@closeout.promisedCompletion">Promised</dt>
+                    <dd>
+                      @if (base.mobilizationCommitment) {
+                        <bdi>{{ base.mobilizationCommitment }}</bdi>
+                      } @else {
+                        <span class="prj-hint" i18n="@@closeout.noMobilizationBaseline"
+                          >Not captured at award — nothing to compare with</span
+                        >
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.actual">Actual</dt>
+                    <dd>{{ mobilizationLabel(view.execution.mobilization) }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div class="pf-row" role="listitem">
+                <h3 i18n="@@closeout.rowTechnical">Technical promise</h3>
+                <dl>
+                  <div>
+                    <dt i18n="@@closeout.technicalAtAward">Technical score at award</dt>
+                    <dd>
+                      @if (base.technicalMeanAtAward !== null) {
+                        <bdi dir="ltr">{{ base.technicalMeanAtAward }} / 100</bdi>
+                      } @else {
+                        <span class="prj-hint" i18n="@@closeout.noTechnical">Not recorded</span>
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.qualityActual">Quality (internal scale)</dt>
+                    <dd>{{ ratingLabel(view.execution.qualityRating) }}</dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.hseActual">HSE (internal scale)</dt>
+                    <dd>{{ ratingLabel(view.execution.hseRating) }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div class="pf-row" role="listitem">
+                <h3 i18n="@@closeout.rowScope">Scope and exclusions</h3>
+                <dl>
+                  <div>
+                    <dt i18n="@@closeout.exclusionsAtAward">Exclusions and deviations at award</dt>
+                    <dd>
+                      <span i18n="@@closeout.exclusionCounts"
+                        >Exclusions: <bdi dir="ltr">{{ base.exclusions.length }}</bdi> · deviations:
+                        <bdi dir="ltr">{{
+                          base.commercialDeviationCount + base.technicalDeviationCount
+                        }}</bdi></span
+                      >
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@closeout.issuesActual">Variations, claims and disputes</dt>
+                    <dd>
+                      @if (view.commercial.variationCount !== null) {
+                        <span i18n="@@closeout.issueCounts"
+                          >Variations: <bdi dir="ltr">{{ view.commercial.variationCount }}</bdi> ·
+                          claims: <bdi dir="ltr">{{ view.commercial.claimCount ?? '—' }}</bdi> ·
+                          disputes:
+                          <bdi dir="ltr">{{ view.commercial.disputeCount ?? '—' }}</bdi></span
+                        >
+                      } @else {
+                        <span class="prj-hint" i18n="@@performance.notRecorded">Not recorded</span>
+                      }
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+            <p class="prj-hint">
+              <span i18n="@@closeout.awardedOn"
+                >Awarded on <bdi>{{ base.awardedAtUtc | businessDate: 'instant' }}</bdi></span
+              >
+              ·
+              @if (readsDecision) {
+                <a
+                  [routerLink]="['/tenders', base.tenderId, 'decision']"
+                  [queryParams]="{ tab: 'award' }"
+                  ><ng-container i18n="@@closeout.viewBaseline"
+                    >View the award baseline</ng-container
+                  ></a
+                >
+              }
+            </p>
+          </section>
+        }
+
+        @case ('schedule') {
+          @if (canEdit('execution')) {
+            <form
+              class="prj-section prj-form"
+              (ngSubmit)="saveExecution()"
+              aria-labelledby="schedule-title"
+            >
+              <h2 id="schedule-title" i18n="@@closeout.scheduleTitle">
+                Actual schedule and mobilization
+              </h2>
+              <fieldset class="pf-fieldset" [disabled]="saving() !== null">
+                <!-- CF-048 (ADR-124): a closeout says how the subcontract ended; only a completed one compares with the award. -->
+                <div class="prj-grid">
+                  <div class="prj-field">
+                    <label for="field-outcome_type" i18n="@@closeout.outcomeType"
+                      >How did the subcontract end?</label
+                    >
+                    <select
+                      id="field-outcome_type"
+                      name="outcomeType"
+                      [(ngModel)]="execution.outcomeType"
+                      aria-describedby="outcome-effect"
+                    >
+                      <option value="" i18n="@@closeout.outcomeChoose">Choose…</option>
+                      @for (option of outcomeTypes; track option) {
+                        <option [value]="option">{{ outcomeLabel(option) }}</option>
+                      }
+                    </select>
+                    @if (execution.outcomeType) {
+                      <small id="outcome-effect" class="prj-hint">{{
+                        outcomeEffect(execution.outcomeType)
+                      }}</small>
+                    }
+                  </div>
+                  @if (execution.outcomeType && execution.outcomeType !== 'Completed') {
+                    <div class="prj-field">
+                      <label for="field-percent_complete" i18n="@@closeout.percentComplete"
+                        >Share of the work completed by the subcontractor, % (optional)</label
+                      >
+                      <input
+                        id="field-percent_complete"
+                        name="percentComplete"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        dir="ltr"
+                        [(ngModel)]="execution.percentComplete"
+                      />
+                    </div>
+                  }
+                </div>
+                <div class="prj-grid">
+                  <div class="prj-field">
+                    <label for="field-actual_start_date" i18n="@@closeout.actualStart"
+                      >Actual start date</label
+                    >
+                    <input
+                      id="field-actual_start_date"
+                      name="actualStartDate"
+                      type="date"
+                      [(ngModel)]="execution.actualStartDate"
+                    />
+                  </div>
+                  <div class="prj-field">
+                    @if (execution.outcomeType && execution.outcomeType !== 'Completed') {
+                      <label for="field-actual_completion_date" i18n="@@closeout.effectiveEnd"
+                        >Effective end date</label
+                      >
+                    } @else {
+                      <label for="field-actual_completion_date" i18n="@@closeout.actualCompletion"
+                        >Actual completion</label
+                      >
+                    }
+                    <input
+                      id="field-actual_completion_date"
+                      name="actualCompletionDate"
+                      type="date"
+                      [(ngModel)]="execution.actualCompletionDate"
+                    />
+                  </div>
+                </div>
+                <p class="prj-hint">
+                  @if (base.plannedDurationDays) {
+                    <span i18n="@@closeout.awardedDurationLabel">Awarded duration:</span>{{ ' '
+                    }}<span i18n="@@closeout.days">{base.plannedDurationDays, plural,
+                      =1 {1 day}
+                      other {{{base.plannedDurationDays}} days}
+                    }</span
+                    >.{{ ' '
+                    }}<span i18n="@@closeout.bothDatesCounted"
+                      >Actual duration counts both dates.</span
+                    >
+                  } @else {
+                    <span i18n="@@closeout.noDurationHint"
+                      >The award froze no duration, so no schedule variance is calculated.</span
+                    >
+                  }
+                </p>
+                <div class="prj-field">
+                  <label for="field-schedule_explanation" i18n="@@closeout.scheduleExplanation"
+                    >Why did the work take longer than awarded? (required when it did)</label
+                  >
+                  <textarea
+                    id="field-schedule_explanation"
+                    name="scheduleExplanation"
+                    rows="3"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="execution.scheduleExplanation"
+                  ></textarea>
+                </div>
+                @if (beforeAward() || execution.earlyWorksDeclared) {
+                  <!-- CF-082 (ADR-124): works before the award are declared, with what they were. -->
+                  <div class="prj-field pf-early-works">
+                    <p class="prj-hint" i18n="@@closeout.earlyWorksHint">
+                      These dates are before the award (<bdi>{{
+                        base.awardedAtUtc | businessDate: 'instant'
+                      }}</bdi
+                      >). Declare the early works (for example under a letter of intent) to finalize
+                      the closeout.
+                    </p>
+                    <label class="tnd-choice">
+                      <input
+                        id="field-early_works_declaration"
+                        type="checkbox"
+                        name="earlyWorksDeclared"
+                        [(ngModel)]="execution.earlyWorksDeclared"
+                      />
+                      <span i18n="@@closeout.earlyWorksDeclare"
+                        >Works started or finished before the award: early works are declared</span
+                      >
+                    </label>
+                    @if (execution.earlyWorksDeclared) {
+                      <label for="early-works-note" i18n="@@closeout.earlyWorksNote"
+                        >What were the early works, and on what basis? (required)</label
+                      >
+                      <textarea
+                        id="early-works-note"
+                        name="earlyWorksNote"
+                        rows="2"
+                        [maxlength]="noteMax"
+                        [(ngModel)]="execution.earlyWorksNote"
+                      ></textarea>
+                    }
+                  </div>
+                }
+                <fieldset class="prj-fieldset">
+                  <legend i18n="@@closeout.mobilization">Mobilization</legend>
+                  <p class="prj-hint">
+                    @if (base.mobilizationCommitment) {
+                      <span i18n="@@closeout.mobilizationPromised"
+                        >Promised at award: <bdi>{{ base.mobilizationCommitment }}</bdi></span
+                      >
+                    } @else {
+                      <span i18n="@@closeout.mobilizationNoBaseline"
+                        >No mobilization commitment was captured at award, so this is recorded as an
+                        outcome only — no variance is calculated.</span
+                      >
+                    }
+                  </p>
+                  @for (option of mobilizations; track option) {
+                    <label class="tnd-choice">
+                      <input
+                        type="radio"
+                        name="mobilization"
+                        [attr.name]="'mobilization'"
+                        [value]="option"
+                        [(ngModel)]="execution.mobilization"
+                      />
+                      {{ mobilizationLabel(option) }}
+                    </label>
+                  }
+                </fieldset>
+                <div class="prj-field">
+                  <label for="mobilization-note" i18n="@@closeout.mobilizationNote"
+                    >Mobilization note (optional)</label
+                  >
+                  <textarea
+                    id="mobilization-note"
+                    name="mobilizationNote"
+                    rows="2"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="execution.mobilizationNote"
+                  ></textarea>
+                </div>
+              </fieldset>
+              @if (canEdit('execution')) {
+                <div class="prj-form-actions">
+                  <button class="prj-btn" type="submit" [disabled]="saving() !== null">
+                    @if (saving() === 'execution') {
+                      <ng-container i18n="@@common.working">Working…</ng-container>
+                    } @else {
+                      <ng-container i18n="@@closeout.saveExecution"
+                        >Save execution outcome</ng-container
+                      >
+                    }
+                  </button>
+                </div>
+              }
+            </form>
+          } @else {
+            <app-closeout-readonly [view]="view" step="schedule" />
+          }
+        }
+
+        @case ('commercial') {
+          @if (!view.commercialVisible) {
+            <p class="prj-note" role="note" i18n="@@closeout.commercialRestricted">
+              This project's commercial outcome — amounts and commercial notes — is shown to
+              commercial roles and to its assigned Project Manager. Counts of variations, claims and
+              disputes stay visible.
+            </p>
+          }
+          @if (canEdit('commercial')) {
+            <form
+              class="prj-section prj-form"
+              (ngSubmit)="saveCommercial()"
+              aria-labelledby="commercial-title"
+            >
+              <h2 id="commercial-title" i18n="@@closeout.commercialTitle">
+                Actual commercial outcome
+              </h2>
+              <fieldset class="pf-fieldset" [disabled]="saving() !== null">
+                <div class="prj-field">
+                  <label for="money-actualFinalCost">
+                    <span i18n="@@closeout.actualFinalCostCurrency"
+                      >Actual final cost (<bdi dir="ltr">{{ base.currency }}</bdi
+                      >)</span
+                    >
+                  </label>
+                  <input
+                    id="money-actualFinalCost"
+                    name="actualFinalCost"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    dir="ltr"
+                    [(ngModel)]="commercial.actualFinalCost"
+                    [attr.aria-invalid]="moneyErrors()['actualFinalCost'] ? 'true' : null"
+                    [attr.aria-describedby]="
+                      moneyErrors()['actualFinalCost']
+                        ? 'money-actualFinalCost-error'
+                        : 'final-cost-hint'
+                    "
+                  />
+                  <small id="final-cost-hint" class="prj-hint" i18n="@@closeout.finalCostHint"
+                    >Same currency as the award (no conversion). Award value:
+                    <bdi dir="ltr">{{ money(base.awardValue) }} {{ base.currency }}</bdi></small
+                  >
+                  @if (moneyErrors()['actualFinalCost']; as problem) {
+                    <span id="money-actualFinalCost-error" class="prj-error-text" role="alert">{{
+                      problem
+                    }}</span>
+                  }
+                </div>
+                <div class="prj-field">
+                  <label for="field-cost_explanation" i18n="@@closeout.costExplanation"
+                    >Why does the final cost exceed the award value? (required when it does)</label
+                  >
+                  <textarea
+                    id="field-cost_explanation"
+                    name="costExplanation"
+                    rows="3"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="commercial.costExplanation"
+                  ></textarea>
+                </div>
+                @if (
+                  view.execution.outcomeType === 'CompletedByOthers' ||
+                  commercial.costToCompleteByOthers
+                ) {
+                  <!-- CF-048: what completing the work cost beyond this firm (kept with the version only for that outcome). -->
+                  <div class="prj-field">
+                    <label for="money-costToCompleteByOthers">
+                      <span i18n="@@closeout.costToComplete"
+                        >Cost to complete by others (<bdi dir="ltr">{{ base.currency }}</bdi
+                        >, optional)</span
+                      >
+                    </label>
+                    <input
+                      id="money-costToCompleteByOthers"
+                      name="costToCompleteByOthers"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      dir="ltr"
+                      [(ngModel)]="commercial.costToCompleteByOthers"
+                      [attr.aria-invalid]="moneyErrors()['costToCompleteByOthers'] ? 'true' : null"
+                    />
+                    @if (moneyErrors()['costToCompleteByOthers']; as problem) {
+                      <span class="prj-error-text" role="alert">{{ problem }}</span>
+                    }
+                  </div>
+                }
+                <div class="prj-field">
+                  <label for="commercial-feedback" i18n="@@closeout.commercialFeedback"
+                    >Commercial feedback (internal, optional)</label
+                  >
+                  <textarea
+                    id="commercial-feedback"
+                    name="commercialFeedback"
+                    rows="3"
+                    [maxlength]="feedbackMax"
+                    [(ngModel)]="commercial.commercialFeedback"
+                  ></textarea>
+                </div>
+                <div class="prj-field">
+                  <label for="commercial-evidence" i18n="@@closeout.commercialEvidence"
+                    >Evidence reference, e.g. final account number (optional)</label
+                  >
+                  <input
+                    id="commercial-evidence"
+                    name="commercialEvidence"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="commercial.evidenceNote"
+                  />
+                </div>
+              </fieldset>
+              @if (canEdit('commercial')) {
+                <div class="prj-form-actions">
+                  <button class="prj-btn" type="submit" [disabled]="saving() !== null">
+                    @if (saving() === 'commercial') {
+                      <ng-container i18n="@@common.working">Working…</ng-container>
+                    } @else {
+                      <ng-container i18n="@@closeout.saveCommercial"
+                        >Save commercial outcome</ng-container
+                      >
+                    }
+                  </button>
+                </div>
+              }
+            </form>
+          } @else {
+            <app-closeout-readonly [view]="view" step="commercial" />
+          }
+        }
+
+        @case ('quality') {
+          @if (canEdit('execution')) {
+            <form
+              class="prj-section prj-form"
+              (ngSubmit)="saveExecution()"
+              aria-labelledby="quality-title"
+            >
+              <h2 id="quality-title" i18n="@@closeout.qualityTitle">Quality and HSE</h2>
+              <p class="prj-hint" i18n="@@closeout.ratingScale">
+                The company’s own internal 1–5 scale, private to your company. It is not a
+                certification or a third-party rating.
+              </p>
+              <fieldset class="pf-fieldset" [disabled]="saving() !== null">
+                <fieldset class="prj-fieldset pf-rating">
+                  <legend id="field-quality_rating" tabindex="-1" i18n="@@closeout.qualityRating">
+                    Quality rating
+                  </legend>
+                  @for (rating of ratings; track rating) {
+                    <label class="tnd-choice">
+                      <input
+                        type="radio"
+                        name="qualityRating"
+                        [attr.name]="'qualityRating'"
+                        [value]="rating"
+                        [(ngModel)]="execution.qualityRating"
+                      />
+                      <bdi>{{ ratingLabel(rating) }}</bdi>
+                    </label>
+                  }
+                </fieldset>
+                <div class="prj-field">
+                  <label for="field-quality_comment" i18n="@@closeout.qualityComment"
+                    >Quality comment (required for a rating of 1 or 2)</label
+                  >
+                  <textarea
+                    id="field-quality_comment"
+                    name="qualityComment"
+                    rows="2"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="execution.qualityComment"
+                  ></textarea>
+                </div>
+                <fieldset class="prj-fieldset pf-rating">
+                  <legend id="field-hse_rating" tabindex="-1" i18n="@@closeout.hseRating">
+                    HSE / safety rating
+                  </legend>
+                  @for (rating of ratings; track rating) {
+                    <label class="tnd-choice">
+                      <input
+                        type="radio"
+                        name="hseRating"
+                        [attr.name]="'hseRating'"
+                        [value]="rating"
+                        [(ngModel)]="execution.hseRating"
+                      />
+                      <bdi>{{ ratingLabel(rating) }}</bdi>
+                    </label>
+                  }
+                </fieldset>
+                <div class="prj-field">
+                  <label for="field-hse_comment" i18n="@@closeout.hseComment"
+                    >HSE comment (required for a rating of 1 or 2)</label
+                  >
+                  <textarea
+                    id="field-hse_comment"
+                    name="hseComment"
+                    rows="2"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="execution.hseComment"
+                  ></textarea>
+                </div>
+              </fieldset>
+              @if (canEdit('execution')) {
+                <div class="prj-form-actions">
+                  <button class="prj-btn" type="submit" [disabled]="saving() !== null">
+                    @if (saving() === 'execution') {
+                      <ng-container i18n="@@common.working">Working…</ng-container>
+                    } @else {
+                      <ng-container i18n="@@closeout.saveExecution"
+                        >Save execution outcome</ng-container
+                      >
+                    }
+                  </button>
+                </div>
+              }
+            </form>
+          } @else {
+            <app-closeout-readonly [view]="view" step="quality" />
+          }
+        }
+
+        @case ('issues') {
+          @if (canEdit('commercial')) {
+            <form
+              class="prj-section prj-form"
+              (ngSubmit)="saveCommercial()"
+              aria-labelledby="issues-title"
+            >
+              <h2 id="issues-title">
+                <span i18n="@@closeout.issuesTitle">Variations, claims and disputes</span>
+              </h2>
+              <p class="prj-hint" i18n="@@closeout.issuesIntro">
+                A short summary for future sourcing, not a contract register. Enter 0 where there
+                were none — each is recorded separately.
+              </p>
+              <fieldset class="pf-fieldset" [disabled]="saving() !== null">
+                <fieldset class="prj-fieldset">
+                  <legend i18n="@@closeout.variations">Variations</legend>
+                  <div class="prj-grid">
+                    <div class="prj-field">
+                      <label for="field-variations" i18n="@@closeout.count">Number</label>
+                      <input
+                        id="field-variations"
+                        name="variationCount"
+                        type="number"
+                        min="0"
+                        [max]="countMax"
+                        step="1"
+                        [(ngModel)]="commercial.variationCount"
+                        [attr.aria-invalid]="moneyErrors()['variationCount'] ? 'true' : null"
+                        [attr.aria-describedby]="
+                          moneyErrors()['variationCount'] ? 'variationCount-error' : null
+                        "
+                      />
+                      @if (moneyErrors()['variationCount']; as problem) {
+                        <span id="variationCount-error" class="prj-error-text" role="alert">{{
+                          problem
+                        }}</span>
+                      }
+                    </div>
+                    <div class="prj-field">
+                      <label for="money-variationValue">
+                        <span i18n="@@closeout.totalValue"
+                          >Total value (<bdi dir="ltr">{{ base.currency }}</bdi
+                          >, optional)</span
+                        >
+                      </label>
+                      <input
+                        id="money-variationValue"
+                        name="variationValue"
+                        inputmode="decimal"
+                        dir="ltr"
+                        [(ngModel)]="commercial.variationValue"
+                        [attr.aria-invalid]="moneyErrors()['variationValue'] ? 'true' : null"
+                        [attr.aria-describedby]="
+                          moneyErrors()['variationValue'] ? 'variationValue-error' : null
+                        "
+                      />
+                      @if (moneyErrors()['variationValue']; as problem) {
+                        <span id="variationValue-error" class="prj-error-text" role="alert">{{
+                          problem
+                        }}</span>
+                      }
+                    </div>
+                    <div class="prj-field">
+                      <label for="variation-cause" i18n="@@closeout.variationCause"
+                        >Main cause (optional)</label
+                      >
+                      <select
+                        id="variation-cause"
+                        name="variationCause"
+                        [(ngModel)]="commercial.variationCause"
+                      >
+                        <option value="" i18n="@@performance.causeNone">Not stated</option>
+                        @for (cause of causes; track cause) {
+                          <option [value]="cause">{{ causeLabel(cause) }}</option>
+                        }
+                      </select>
+                    </div>
+                  </div>
+                  <div class="prj-field">
+                    <label for="variation-note" i18n="@@closeout.note">Note (optional)</label>
+                    <textarea
+                      id="variation-note"
+                      name="variationNote"
+                      rows="2"
+                      [maxlength]="noteMax"
+                      [(ngModel)]="commercial.variationNote"
+                    ></textarea>
+                  </div>
+                </fieldset>
+                <fieldset class="prj-fieldset">
+                  <legend i18n="@@closeout.claims">Claims</legend>
+                  <div class="prj-grid">
+                    <div class="prj-field">
+                      <label for="field-claims" i18n="@@closeout.count">Number</label>
+                      <input
+                        id="field-claims"
+                        name="claimCount"
+                        type="number"
+                        min="0"
+                        [max]="countMax"
+                        step="1"
+                        [(ngModel)]="commercial.claimCount"
+                        [attr.aria-invalid]="moneyErrors()['claimCount'] ? 'true' : null"
+                        [attr.aria-describedby]="
+                          moneyErrors()['claimCount'] ? 'claimCount-error' : null
+                        "
+                      />
+                      @if (moneyErrors()['claimCount']; as problem) {
+                        <span id="claimCount-error" class="prj-error-text" role="alert">{{
+                          problem
+                        }}</span>
+                      }
+                    </div>
+                    <div class="prj-field">
+                      <label for="money-claimedValue">
+                        <span i18n="@@closeout.claimedValue"
+                          >Total claimed (<bdi dir="ltr">{{ base.currency }}</bdi
+                          >, optional)</span
+                        >
+                      </label>
+                      <input
+                        id="money-claimedValue"
+                        name="claimedValue"
+                        inputmode="decimal"
+                        dir="ltr"
+                        [(ngModel)]="commercial.claimedValue"
+                        [attr.aria-invalid]="moneyErrors()['claimedValue'] ? 'true' : null"
+                        [attr.aria-describedby]="
+                          moneyErrors()['claimedValue'] ? 'claimedValue-error' : null
+                        "
+                      />
+                      @if (moneyErrors()['claimedValue']; as problem) {
+                        <span id="claimedValue-error" class="prj-error-text" role="alert">{{
+                          problem
+                        }}</span>
+                      }
+                    </div>
+                    <div class="prj-field">
+                      <label for="field-unresolved_claims" i18n="@@closeout.unresolved"
+                        >Unresolved</label
+                      >
+                      <input
+                        id="field-unresolved_claims"
+                        name="unresolvedClaimCount"
+                        type="number"
+                        min="0"
+                        [max]="countMax"
+                        step="1"
+                        [(ngModel)]="commercial.unresolvedClaimCount"
+                        [attr.aria-invalid]="moneyErrors()['unresolvedClaimCount'] ? 'true' : null"
+                        [attr.aria-describedby]="
+                          moneyErrors()['unresolvedClaimCount']
+                            ? 'unresolvedClaimCount-error'
+                            : null
+                        "
+                      />
+                      @if (moneyErrors()['unresolvedClaimCount']; as problem) {
+                        <span id="unresolvedClaimCount-error" class="prj-error-text" role="alert">{{
+                          problem
+                        }}</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="prj-field">
+                    <label for="claim-note" i18n="@@closeout.note">Note (optional)</label>
+                    <textarea
+                      id="claim-note"
+                      name="claimNote"
+                      rows="2"
+                      [maxlength]="noteMax"
+                      [(ngModel)]="commercial.claimNote"
+                    ></textarea>
+                  </div>
+                </fieldset>
+                <fieldset class="prj-fieldset">
+                  <legend i18n="@@closeout.disputes">Disputes</legend>
+                  <div class="prj-grid">
+                    <div class="prj-field">
+                      <label for="field-disputes" i18n="@@closeout.count">Number</label>
+                      <input
+                        id="field-disputes"
+                        name="disputeCount"
+                        type="number"
+                        min="0"
+                        [max]="countMax"
+                        step="1"
+                        [(ngModel)]="commercial.disputeCount"
+                        [attr.aria-invalid]="moneyErrors()['disputeCount'] ? 'true' : null"
+                        [attr.aria-describedby]="
+                          moneyErrors()['disputeCount'] ? 'disputeCount-error' : null
+                        "
+                      />
+                      @if (moneyErrors()['disputeCount']; as problem) {
+                        <span id="disputeCount-error" class="prj-error-text" role="alert">{{
+                          problem
+                        }}</span>
+                      }
+                    </div>
+                    <div class="prj-field">
+                      <label for="field-unresolved_disputes" i18n="@@closeout.unresolved"
+                        >Unresolved</label
+                      >
+                      <input
+                        id="field-unresolved_disputes"
+                        name="unresolvedDisputeCount"
+                        type="number"
+                        min="0"
+                        [max]="countMax"
+                        step="1"
+                        [(ngModel)]="commercial.unresolvedDisputeCount"
+                        [attr.aria-invalid]="
+                          moneyErrors()['unresolvedDisputeCount'] ? 'true' : null
+                        "
+                        [attr.aria-describedby]="
+                          moneyErrors()['unresolvedDisputeCount']
+                            ? 'unresolvedDisputeCount-error'
+                            : null
+                        "
+                      />
+                      @if (moneyErrors()['unresolvedDisputeCount']; as problem) {
+                        <span
+                          id="unresolvedDisputeCount-error"
+                          class="prj-error-text"
+                          role="alert"
+                          >{{ problem }}</span
+                        >
+                      }
+                    </div>
+                  </div>
+                  <div class="prj-field">
+                    <label for="dispute-note" i18n="@@closeout.note">Note (optional)</label>
+                    <textarea
+                      id="dispute-note"
+                      name="disputeNote"
+                      rows="2"
+                      [maxlength]="noteMax"
+                      [(ngModel)]="commercial.disputeNote"
+                    ></textarea>
+                  </div>
+                </fieldset>
+              </fieldset>
+              @if (canEdit('commercial')) {
+                <div class="prj-form-actions">
+                  <button class="prj-btn" type="submit" [disabled]="saving() !== null">
+                    @if (saving() === 'commercial') {
+                      <ng-container i18n="@@common.working">Working…</ng-container>
+                    } @else {
+                      <ng-container i18n="@@closeout.saveCommercial"
+                        >Save commercial outcome</ng-container
+                      >
+                    }
+                  </button>
+                </div>
+              }
+            </form>
+          } @else {
+            <app-closeout-readonly [view]="view" step="issues" />
+          }
+        }
+
+        @case ('feedback') {
+          @if (canEdit('execution')) {
+            <form
+              class="prj-section prj-form"
+              (ngSubmit)="saveExecution()"
+              aria-labelledby="feedback-title"
+            >
+              <h2 id="feedback-title" i18n="@@closeout.feedbackTitle">
+                Feedback and would-work-again
+              </h2>
+              <p class="prj-hint" i18n="@@closeout.feedbackIntro">
+                Internal to your company. Never shown to the subcontractor. Would-work-again is a
+                human judgement recorded as evidence — it never awards or blocks a firm by itself.
+              </p>
+              <fieldset class="pf-fieldset" [disabled]="saving() !== null">
+                <fieldset class="prj-fieldset">
+                  <legend id="field-would_work_again" tabindex="-1" i18n="@@closeout.rehire">
+                    Would you work with this subcontractor again?
+                  </legend>
+                  @for (choice of rehireChoices; track choice) {
+                    <label class="tnd-choice">
+                      <input
+                        type="radio"
+                        name="wouldWorkAgain"
+                        [attr.name]="'wouldWorkAgain'"
+                        [value]="choice"
+                        [(ngModel)]="execution.wouldWorkAgain"
+                      />
+                      {{ rehireLabel(choice) }}
+                    </label>
+                  }
+                </fieldset>
+                <div class="prj-field">
+                  <label for="field-would_work_again_rationale" i18n="@@closeout.rehireRationale"
+                    >Rationale (required for Conditional or No)</label
+                  >
+                  <textarea
+                    id="field-would_work_again_rationale"
+                    name="wouldWorkAgainRationale"
+                    rows="2"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="execution.wouldWorkAgainRationale"
+                  ></textarea>
+                </div>
+                <div class="prj-field">
+                  <label for="execution-feedback" i18n="@@closeout.executionFeedback"
+                    >Project manager feedback (optional)</label
+                  >
+                  <textarea
+                    id="execution-feedback"
+                    name="executionFeedback"
+                    rows="3"
+                    [maxlength]="feedbackMax"
+                    [(ngModel)]="execution.executionFeedback"
+                  ></textarea>
+                </div>
+                <div class="prj-field">
+                  <label for="execution-evidence" i18n="@@closeout.executionEvidence"
+                    >Evidence reference, e.g. completion certificate (optional)</label
+                  >
+                  <input
+                    id="execution-evidence"
+                    name="executionEvidence"
+                    [maxlength]="noteMax"
+                    [(ngModel)]="execution.evidenceNote"
+                  />
+                </div>
+              </fieldset>
+              @if (canEdit('execution')) {
+                <div class="prj-form-actions">
+                  <button class="prj-btn" type="submit" [disabled]="saving() !== null">
+                    @if (saving() === 'execution') {
+                      <ng-container i18n="@@common.working">Working…</ng-container>
+                    } @else {
+                      <ng-container i18n="@@closeout.saveExecution"
+                        >Save execution outcome</ng-container
+                      >
+                    }
+                  </button>
+                </div>
+              }
+            </form>
+          } @else {
+            <app-closeout-readonly [view]="view" step="feedback" />
+          }
+        }
+
+        @case ('review') {
+          <section class="prj-section" aria-labelledby="review-title">
+            <h2 id="review-title" i18n="@@closeout.reviewTitle">Review and close</h2>
+            @if (closed()) {
+              <p>
+                <span class="dc-state dc-state--good" i18n="@@closeout.closedOn"
+                  >Closed on <bdi>{{ view.closedAtUtc | businessDate: 'instant' }}</bdi> by
+                  <bdi>{{ view.closedByName }}</bdi> — version
+                  <bdi dir="ltr">{{ view.currentVersionNumber }}</bdi></span
+                >
+              </p>
+              <p class="prj-hint" i18n="@@closeout.closedHelp">
+                This outcome is part of the subcontractor’s performance history. It cannot be
+                edited; a correction reopens it with a reason and closes it again as a new version.
+              </p>
+              @if (!view.access.reopen) {
+                <!-- CF-101 AC2: who may reopen it, from the permission matrix. -->
+                <p class="prj-hint" data-testid="closed-notice">{{ closedNotice() }}</p>
+              }
+              @if (view.access.reopen) {
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  (click)="ask('reopen')"
+                  i18n="@@closeout.reopen"
+                >
+                  Reopen for correction
+                </button>
+              }
+            } @else {
+              @if (view.lifecycle === 'Reopened') {
+                <p class="prj-note tnd-attention-box" i18n="@@closeout.reopenedHelp">
+                  Reopened for correction: the previous version is kept on record but is not counted
+                  as history until this closeout is closed again.
+                </p>
+              }
+              @if (view.completeness.complete) {
+                <p class="dc-state dc-state--good" i18n="@@closeout.readyToClose">
+                  Every required item is recorded. Review the outcome, then close it out.
+                </p>
+              } @else {
+                <p i18n="@@closeout.stillMissing">
+                  Still missing before the closeout can be closed:
+                </p>
+                <ul class="pf-missing">
+                  @for (key of view.completeness.missing; track key) {
+                    <li>
+                      <button class="pf-link" type="button" (click)="goToMissing(key)">
+                        {{ missingLabel(key) }}
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+              <p class="prj-hint" data-testid="assigned-pm">
+                @if (view.assignedProjectManagerName) {
+                  <span i18n="@@closeout.assignedPm"
+                    >Assigned Project Manager:
+                    <bdi>{{ view.assignedProjectManagerName }}</bdi></span
+                  >
+                  @if (view.assignedToYou) {
+                    <span i18n="@@closeout.assignedPmYou"> (you)</span>
+                  }
+                } @else {
+                  <span i18n="@@closeout.noAssignedPm"
+                    >No Project Manager is assigned to this project.</span
+                  >
+                }
+              </p>
+              @if (view.access.finalize) {
+                <button
+                  class="prj-btn"
+                  type="button"
+                  [disabled]="!view.completeness.complete || !view.version"
+                  (click)="ask('finalize')"
+                  i18n="@@closeout.finalize"
+                >
+                  Close out this award
+                </button>
+              } @else {
+                <p class="prj-hint" i18n="@@closeout.finalizeOwner">
+                  The project manager closes the closeout once every item is recorded.
+                </p>
+              }
+            }
+            <p class="prj-hint pf-attribution">
+              @if (view.commercial.updatedByName) {
+                <span i18n="@@closeout.commercialBy"
+                  >Commercial outcome recorded by <bdi>{{ view.commercial.updatedByName }}</bdi> on
+                  <bdi>{{ view.commercial.updatedAtUtc | businessDate: 'instant' }}</bdi
+                  >.</span
+                >
+              }
+              @if (view.execution.updatedByName) {
+                <span i18n="@@closeout.executionBy"
+                  >Execution outcome recorded by <bdi>{{ view.execution.updatedByName }}</bdi> on
+                  <bdi>{{ view.execution.updatedAtUtc | businessDate: 'instant' }}</bdi
+                  >.</span
+                >
+              }
+            </p>
+          </section>
+        }
+
+        @case ('history') {
+          <section class="prj-section" aria-labelledby="versions-title">
+            <h2 id="versions-title" i18n="@@closeout.versionsTitle">Finalized versions</h2>
+            @if (view.versions.length === 0) {
+              <p class="prj-hint" i18n="@@closeout.noVersions">
+                Not finalized yet. A version is recorded each time the closeout is closed.
+              </p>
+            } @else {
+              <ol class="prj-cards pf-versions" reversed>
+                @for (version of view.versions; track version.number) {
+                  <li class="prj-card">
+                    <h3>
+                      <span i18n="@@closeout.versionNumber"
+                        >Version <bdi dir="ltr">{{ version.number }}</bdi></span
+                      >
+                      @if (version.authoritative) {
+                        <span
+                          class="prj-chip dc-state dc-state--good"
+                          i18n="@@closeout.authoritative"
+                          >Current history</span
+                        >
+                      } @else {
+                        <span class="prj-chip dc-state dc-state--muted" i18n="@@closeout.superseded"
+                          >Not counted</span
+                        >
+                      }
+                    </h3>
+                    <dl>
+                      <dt i18n="@@closeout.outcomeShort">Outcome</dt>
+                      <dd>
+                        {{ outcomeLabel(version.outcomeType) }}
+                        @if (
+                          version.percentComplete !== null && version.percentComplete !== undefined
+                        ) {
+                          (<bdi dir="ltr">{{ version.percentComplete }} %</bdi>)
+                        }
+                        @if (version.earlyWorksDeclared) {
+                          · <span i18n="@@closeout.earlyWorksDeclared">Early works declared</span>
+                        }
+                        @for (warning of version.timingWarnings ?? []; track warning) {
+                          · <span>{{ timingLabel(warning) }}</span>
+                        }
+                      </dd>
+                      <dt i18n="@@closeout.finalizedBy">Finalized</dt>
+                      <dd>
+                        <bdi>{{ version.finalizedAtUtc | businessDate: 'instant' }}</bdi> ·
+                        <bdi>{{ version.finalizedByName }}</bdi>
+                      </dd>
+                      <dt i18n="@@closeout.actualFinalCost">Actual final cost</dt>
+                      <dd>
+                        <bdi dir="ltr"
+                          >{{ money(version.actualFinalCost) }} {{ base.currency }}</bdi
+                        >
+                        (<bdi dir="ltr">{{ percent(version.costVariancePercent) }}</bdi
+                        >)
+                      </dd>
+                      <dt i18n="@@closeout.actualDuration">Actual duration</dt>
+                      <dd>
+                        <span i18n="@@closeout.days">{version.actualDurationDays, plural,
+                          =1 {1 day}
+                          other {{{version.actualDurationDays}} days}
+                        }</span>
+                        (<bdi dir="ltr">{{ percent(version.scheduleVariancePercent) }}</bdi
+                        >)
+                      </dd>
+                      <dt i18n="@@closeout.ratings">Quality / HSE</dt>
+                      <dd>
+                        <bdi dir="ltr">{{ version.qualityRating }} / {{ version.hseRating }}</bdi>
+                      </dd>
+                      <dt i18n="@@closeout.rehireShort">Would work again</dt>
+                      <dd>{{ rehireLabel(version.wouldWorkAgain) }}</dd>
+                      <dt i18n="@@closeout.fingerprint">Fingerprint</dt>
+                      <dd>
+                        @if (version.fingerprintVerified) {
+                          <span class="dc-state dc-state--good" i18n="@@closeout.fingerprintOk"
+                            >Verified</span
+                          >
+                        } @else {
+                          <span class="dc-state dc-state--warn" i18n="@@closeout.fingerprintBad"
+                            >Does not match — contact support</span
+                          >
+                        }
+                      </dd>
+                    </dl>
+                  </li>
+                }
+              </ol>
+            }
+            <h2 i18n="@@closeout.eventsTitle">Lifecycle</h2>
+            <ol class="dc-timeline">
+              @for (event of view.events; track $index) {
+                <li>
+                  <strong>{{ eventLabel(event.kind, event.versionNumber) }}</strong> —
+                  <bdi>{{ event.atUtc | businessDate: 'instant' }}</bdi> ·
+                  <bdi>{{ event.actorName }}</bdi>
+                  @if (event.reason) {
+                    <span class="tnd-block"
+                      ><span i18n="@@closeout.reasonLabel">Reason:</span>
+                      <bdi>{{ event.reason }}</bdi></span
+                    >
+                  }
+                </li>
+              } @empty {
+                <li class="prj-hint" i18n="@@closeout.noEvents">Nothing recorded yet.</li>
+              }
+            </ol>
+          </section>
+        }
+      }
+    </div>
+
+    @if (confirming() === 'finalize') {
+      <app-confirm-dialog
+        heading="Close out this award?"
+        i18n-heading="@@closeout.finalizeHeading"
+        confirmLabel="Close out"
+        i18n-confirmLabel="@@closeout.finalizeConfirm"
+        [busy]="acting()"
+        (confirmed)="confirm()"
+        (cancelled)="dismiss()"
+      >
+        <p i18n="@@closeout.finalizeBody">
+          The recorded outcome becomes version
+          <bdi dir="ltr">{{ view.currentVersionNumber + 1 }}</bdi> of
+          <bdi>{{ base.subcontractorName }}</bdi
+          >’s performance history for future sourcing and recommendations. It cannot be edited
+          afterwards; a correction needs a reopening with a reason.
+        </p>
+        <ul class="prj-hint">
+          <li i18n="@@closeout.summaryCost">
+            Final cost vs award value:
+            <bdi dir="ltr">{{ percent(metrics.costVariancePercent) }}</bdi>
+          </li>
+          <li i18n="@@closeout.summaryDuration">
+            Duration vs awarded: <bdi dir="ltr">{{ percent(metrics.scheduleVariancePercent) }}</bdi>
+          </li>
+          <li>{{ rehireLabel(view.execution.wouldWorkAgain) }}</li>
+        </ul>
+        @if (needsNotAssignedConfirmation(view)) {
+          <label class="tnd-choice tnd-close-confirm">
+            <input
+              id="not-assigned-confirmed"
+              type="checkbox"
+              name="notAssignedConfirmed"
+              [(ngModel)]="notAssignedConfirmed"
+              [attr.aria-invalid]="notAssignedMissing() || null"
+              [attr.aria-describedby]="notAssignedMissing() ? 'not-assigned-error' : null"
+            />
+            <span i18n="@@closeout.notAssignedConfirm"
+              >This project is assigned to <bdi>{{ view.assignedProjectManagerName }}</bdi
+              >. I am finalizing the closeout on their behalf.</span
+            >
+          </label>
+          @if (notAssignedMissing()) {
+            <p
+              id="not-assigned-error"
+              class="prj-error-text"
+              role="alert"
+              i18n="@@closeout.notAssignedRequired"
+            >
+              Confirm that you are finalizing on behalf of the assigned Project Manager.
+            </p>
+          }
+        }
+        @if (view.timingWarnings?.length) {
+          <!-- CF-082 (ADR-124): implausible timing is confirmed explicitly and kept with the version. -->
+          <ul class="prj-hint">
+            @for (warning of view.timingWarnings; track warning) {
+              <li>{{ timingLabel(warning) }}</li>
+            }
+          </ul>
+          <label class="tnd-choice tnd-close-confirm">
+            <input
+              id="timing-confirmed"
+              type="checkbox"
+              name="timingConfirmed"
+              [(ngModel)]="timingConfirmed"
+              [attr.aria-invalid]="timingMissing() || null"
+            />
+            <span i18n="@@closeout.timingConfirm"
+              >I confirm this timing is correct; it is recorded with the version.</span
+            >
+          </label>
+          @if (timingMissing()) {
+            <p class="prj-error-text" role="alert" i18n="@@closeout.timingRequired">
+              Confirm the timing before finalizing.
+            </p>
+          }
+        }
+      </app-confirm-dialog>
+    }
+    @if (confirming() === 'reopen') {
+      <app-confirm-dialog
+        heading="Reopen for correction?"
+        i18n-heading="@@closeout.reopenHeading"
+        confirmLabel="Reopen"
+        i18n-confirmLabel="@@closeout.reopenConfirm"
+        [danger]="true"
+        [busy]="acting()"
+        (confirmed)="confirm()"
+        (cancelled)="dismiss()"
+      >
+        <p i18n="@@closeout.reopenBody">
+          Version {{ view.currentVersionNumber }} stays on record but stops counting as performance
+          history until the closeout is closed again.
+        </p>
+        <div class="prj-field">
+          <label for="reopen-reason">
+            <ng-container i18n="@@closeout.reopenReason">Reason for the correction</ng-container>
+            <span aria-hidden="true">*</span>
+          </label>
+          <textarea
+            id="reopen-reason"
+            name="reason"
+            rows="3"
+            [maxlength]="reasonMax"
+            [(ngModel)]="reason"
+            [attr.aria-invalid]="reasonMissing() ? 'true' : null"
+            [attr.aria-describedby]="reasonMissing() ? 'reopen-reason-error' : null"
+          ></textarea>
+          @if (reasonMissing()) {
+            <span
+              id="reopen-reason-error"
+              class="prj-error-text"
+              role="alert"
+              i18n="@@closeout.reasonRequired"
+              >Explain the correction (at least 3 characters).</span
+            >
+          }
+        </div>
+      </app-confirm-dialog>
+    }
+  }
+</section>

@@ -1,0 +1,225 @@
+<section class="prj-page">
+  <header class="prj-page-head">
+    <div>
+      <p>
+        <a routerLink="/subcontractors" i18n="@@directory.backToDirectory">Back to the directory</a>
+      </p>
+      <h1 i18n="@@complianceTypes.title">Compliance documents</h1>
+      <p class="prj-hint" i18n="@@complianceTypes.intro">
+        The documents your company keeps on file for its subcontractors. Each is your company's own
+        rule: which trades need it, what it must state, and whether an expired or missing one stops
+        an award (otherwise it is a warning).
+      </p>
+    </div>
+  </header>
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  <section class="prj-section" aria-labelledby="types-title">
+    <h2 id="types-title" i18n="@@complianceTypes.listTitle">Your document types</h2>
+    @if (types().length) {
+      <div class="prj-table-wrap">
+        <table class="prj-table">
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@compliance.colDocument">Document</th>
+              <th scope="col" i18n="@@complianceTypes.colScope">Required for</th>
+              <th scope="col" i18n="@@complianceTypes.colAward">At award</th>
+              <th scope="col" i18n="@@complianceTypes.colState">In use</th>
+              <th scope="col">
+                <span class="prj-visually-hidden" i18n="@@common.actions">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (type of types(); track type.id) {
+              <tr>
+                <td>
+                  <bdi>{{ type.name }}</bdi>
+                </td>
+                <td>
+                  @if (type.appliesToAllTrades) {
+                    <span i18n="@@complianceTypes.allTrades">Every trade</span>
+                  } @else {
+                    @for (trade of type.trades; track trade.id) {
+                      <span class="prj-chip"
+                        ><bdi>{{ trade.name }}</bdi></span
+                      >&ngsp;
+                    }
+                  }
+                </td>
+                <td>
+                  @if (type.awardBlocking) {
+                    <span i18n="@@complianceTypes.blocks">Blocks the award</span>
+                  } @else {
+                    <span i18n="@@complianceTypes.warns">Warning only</span>
+                  }
+                </td>
+                <td>
+                  @if (type.isActive) {
+                    <span i18n="@@complianceTypes.active">Yes</span>
+                  } @else {
+                    <span i18n="@@complianceTypes.inactive">Switched off</span>
+                  }
+                </td>
+                <td>
+                  <button type="button" class="prj-btn prj-btn--ghost" (click)="edit(type)">
+                    <ng-container i18n="@@complianceTypes.edit">Edit</ng-container>
+                    <span class="prj-visually-hidden"
+                      ><bdi>{{ type.name }}</bdi></span
+                    >
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@compliance.noTypes">
+        Your company has not defined any compliance documents yet.
+      </p>
+    }
+  </section>
+
+  <form class="prj-form" (ngSubmit)="save()">
+    <fieldset class="prj-fieldset">
+      <legend>
+        @if (editing()) {
+          <span i18n="@@complianceTypes.editLegend">Edit document type</span>
+        } @else {
+          <span i18n="@@complianceTypes.addLegend">Add a document type</span>
+        }
+      </legend>
+      <div class="prj-grid">
+        <div class="prj-field">
+          <label for="type-name" i18n="@@complianceTypes.name">Name</label>
+          <input id="type-name" name="name" maxlength="100" required [(ngModel)]="form.name" />
+        </div>
+        <div class="prj-field prj-span-all">
+          <label for="type-description" i18n="@@complianceTypes.description">Description</label>
+          <textarea
+            id="type-description"
+            name="description"
+            rows="2"
+            maxlength="500"
+            [(ngModel)]="form.description"
+          ></textarea>
+        </div>
+      </div>
+      <label class="tnd-choice"
+        ><input type="checkbox" name="requiresNumber" [(ngModel)]="form.requiresNumber" />
+        <ng-container i18n="@@complianceTypes.requiresNumber"
+          >A number is required</ng-container
+        ></label
+      >
+      <label class="tnd-choice"
+        ><input type="checkbox" name="requiresIssuer" [(ngModel)]="form.requiresIssuer" />
+        <ng-container i18n="@@complianceTypes.requiresIssuer"
+          >The issuer is required</ng-container
+        ></label
+      >
+      <label class="tnd-choice"
+        ><input type="checkbox" name="requiresExpiry" [(ngModel)]="form.requiresExpiry" />
+        <ng-container i18n="@@complianceTypes.requiresExpiry"
+          >An expiry date is required</ng-container
+        ></label
+      >
+      <label class="tnd-choice"
+        ><input type="checkbox" name="awardBlocking" [(ngModel)]="form.awardBlocking" />
+        <ng-container i18n="@@complianceTypes.awardBlocking"
+          >An expired or missing document stops the award</ng-container
+        ></label
+      >
+      <label class="tnd-choice"
+        ><input type="checkbox" name="appliesToAllTrades" [(ngModel)]="form.appliesToAllTrades" />
+        <ng-container i18n="@@complianceTypes.appliesToAll"
+          >Required for every trade</ng-container
+        ></label
+      >
+      @if (!form.appliesToAllTrades) {
+        <fieldset class="prj-fieldset">
+          <legend i18n="@@complianceTypes.tradesLegend">Required for these trades</legend>
+          @for (trade of trades(); track trade.id) {
+            <label class="tnd-choice">
+              <input
+                type="checkbox"
+                [name]="'trade-' + trade.id"
+                [checked]="form.tradeIds.includes(trade.id)"
+                (change)="toggleTrade(trade.id, $any($event.target).checked)"
+              />
+              <bdi>{{ trade.name }}</bdi> · <bdi dir="ltr">{{ trade.code }}</bdi>
+            </label>
+          }
+        </fieldset>
+      }
+      @if (editing()) {
+        <label class="tnd-choice"
+          ><input type="checkbox" name="isActive" [(ngModel)]="form.isActive" />
+          <ng-container i18n="@@complianceTypes.isActive"
+            >In use (switch off to stop requiring it; records stay)</ng-container
+          ></label
+        >
+      }
+      <div class="prj-form-actions">
+        <button
+          type="submit"
+          class="prj-btn"
+          [disabled]="busy() || !form.name.trim()"
+          i18n="@@common.save"
+        >
+          Save
+        </button>
+        @if (editing()) {
+          <button
+            type="button"
+            class="prj-btn prj-btn--ghost"
+            (click)="cancel()"
+            i18n="@@common.cancel"
+          >
+            Cancel
+          </button>
+        }
+      </div>
+    </fieldset>
+  </form>
+
+  <section class="prj-section" aria-labelledby="presets-title">
+    <h2 id="presets-title" i18n="@@complianceTypes.presetsTitle">
+      Optional starting list (Saudi Arabia)
+    </h2>
+    <p class="prj-hint" i18n="@@complianceTypes.presetsHint">
+      Common documents for firms working in Saudi Arabia. Adding one creates an ordinary type your
+      company can rename, scope or make award-blocking; nothing depends on these names.
+    </p>
+    <ul class="tnd-docs" role="list">
+      @for (preset of presets(); track preset.key) {
+        <li>
+          <bdi>{{ preset.name }}</bdi>
+          <span class="prj-hint tnd-block"
+            ><bdi>{{ preset.description }}</bdi></span
+          >
+          @if (preset.added) {
+            <span class="prj-chip" i18n="@@complianceTypes.presetAddedChip">Added</span>
+          } @else {
+            <button
+              type="button"
+              class="prj-btn prj-btn--ghost"
+              [disabled]="busy()"
+              (click)="addPreset(preset)"
+            >
+              <ng-container i18n="@@complianceTypes.addPreset">Add</ng-container>
+              <span class="prj-visually-hidden"
+                ><bdi>{{ preset.name }}</bdi></span
+              >
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+</section>

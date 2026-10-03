@@ -1,0 +1,618 @@
+<section class="prj-section" aria-labelledby="addenda-title">
+  <div class="prj-section-head">
+    <h2 id="addenda-title" i18n="@@addendum.sectionTitle">Addenda and deadline</h2>
+  </div>
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (view(); as current) {
+    <dl class="prj-summary tnd-summary">
+      <div>
+        <dt i18n="@@addendum.currentRevision">Current tender revision</dt>
+        <dd>
+          <bdi dir="ltr">{{ current.currentRevision }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@tenderField.deadline">Submission deadline</dt>
+        <dd>
+          <bdi>{{ local(tender().submissionDeadline) }}</bdi>
+          @if (tender().deadlineState === 'Extended' && tender().originalSubmissionDeadline) {
+            <small class="prj-hint tnd-block" i18n="@@addendum.originalDeadline"
+              >First published: <bdi>{{ local(tender().originalSubmissionDeadline) }}</bdi></small
+            >
+          }
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@addendum.issuedCount">Addenda issued</dt>
+        <dd>
+          <bdi dir="ltr">{{ current.issued.length }}</bdi>
+        </dd>
+      </div>
+    </dl>
+
+    <div class="prj-actions">
+      @if (mayExtend() && current.canExtend) {
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          (click)="startExtend()"
+          i18n="@@extend.action"
+        >
+          Extend the deadline
+        </button>
+      }
+      @if (mayDraft() && current.canDraft) {
+        <button
+          class="prj-btn"
+          type="button"
+          [disabled]="busy()"
+          (click)="startDraft()"
+          i18n="@@addendum.start"
+        >
+          Prepare an addendum
+        </button>
+      }
+    </div>
+
+    @if (tender().deadlineExtensions?.length) {
+      <details class="tnd-history">
+        <summary i18n="@@extend.historyTitle">Deadline history</summary>
+        <ol class="tnd-plan" role="list">
+          @for (extension of tender().deadlineExtensions; track extension.extendedAtUtc) {
+            <li>
+              <span i18n="@@extend.historyItem"
+                ><bdi>{{ local(extension.previous) }}</bdi> →
+                <strong
+                  ><bdi>{{ local(extension.new) }}</bdi></strong
+                ></span
+              >
+              <small class="prj-hint tnd-block">
+                <bdi>{{ extension.reason }}</bdi> · <bdi>{{ extension.extendedByName }}</bdi> ·
+                {{ extension.extendedAtUtc | businessDate: 'instant' }}
+                @if (extension.reopenedAfterClose) {
+                  ·
+                  <ng-container i18n="@@extend.reopened"
+                    >reopened after the deadline had passed</ng-container
+                  >
+                }
+              </small>
+            </li>
+          }
+        </ol>
+      </details>
+    }
+
+    @if (draft(); as addendum) {
+      <form
+        class="prj-card tnd-addendum-draft"
+        novalidate
+        (ngSubmit)="save()"
+        aria-labelledby="addendum-draft-title"
+      >
+        <h3 id="addendum-draft-title" i18n="@@addendum.draftTitle">
+          Addendum in preparation (revision {{ current.currentRevision + 1 }} when issued)
+        </h3>
+        <p class="prj-hint" i18n="@@addendum.draftHint">
+          Bidders see nothing until you issue it. Once issued an addendum is never edited; a
+          correction is another addendum. Bids already submitted are kept exactly as they are.
+        </p>
+        <div class="prj-field">
+          <label for="addendum-title" i18n="@@tenderField.title">Title</label>
+          <input
+            id="addendum-title"
+            name="title"
+            [attr.maxlength]="titleMax"
+            [disabled]="!mayDraft()"
+            [(ngModel)]="title"
+            (input)="edited()"
+          />
+        </div>
+        <div class="prj-field">
+          <label for="addendum-summary" i18n="@@tenderField.addendumSummary"
+            >What changes and why</label
+          >
+          <textarea
+            id="addendum-summary"
+            name="summary"
+            rows="6"
+            [attr.maxlength]="summaryMax"
+            aria-describedby="addendum-summary-hint"
+            [disabled]="!mayDraft()"
+            [(ngModel)]="summary"
+            (input)="edited()"
+          ></textarea>
+          <small id="addendum-summary-hint" class="prj-hint" i18n="@@addendum.summaryHint"
+            >Bidders read this explanation exactly as written, with the documents below.</small
+          >
+        </div>
+        <label class="tnd-choice">
+          <input
+            type="checkbox"
+            name="acknowledgementRequired"
+            [disabled]="!mayDraft()"
+            [(ngModel)]="acknowledgementRequired"
+            (change)="edited()"
+          />
+          <span>
+            <strong i18n="@@addendum.acknowledgementRequired">Acknowledgement required</strong>
+            <small class="prj-hint tnd-block" i18n="@@addendum.acknowledgementHint"
+              >Each invited firm must confirm it received and reviewed this addendum before it can
+              submit a bid. It is not acceptance of any commercial term.</small
+            >
+          </span>
+        </label>
+        <div class="prj-grid">
+          <div class="prj-field">
+            <label for="addendum-deadline" i18n="@@tenderField.newDeadline"
+              >New submission deadline</label
+            >
+            <input
+              id="addendum-deadline"
+              name="newDeadline"
+              type="datetime-local"
+              aria-describedby="addendum-deadline-hint"
+              [disabled]="!mayDraft()"
+              [(ngModel)]="newDeadline"
+              (change)="edited()"
+            />
+            <small id="addendum-deadline-hint" class="prj-hint" i18n="@@addendum.deadlineHint"
+              >Optional. Only later than the current deadline, in
+              <bdi dir="ltr">{{ tender().timeZoneId }}</bdi
+              >. After the deadline an addendum must set one.</small
+            >
+          </div>
+          <div class="prj-field">
+            <label for="addendum-questions" i18n="@@tenderField.newQuestionsDeadline"
+              >New questions deadline</label
+            >
+            <input
+              id="addendum-questions"
+              name="newQuestionsDeadline"
+              type="datetime-local"
+              [disabled]="!mayDraft()"
+              [(ngModel)]="newQuestionsDeadline"
+              (change)="edited()"
+            />
+          </div>
+        </div>
+
+        <fieldset class="prj-fieldset" id="addendum-schedule">
+          <legend i18n="@@addendum.scheduleLegend">Price schedule</legend>
+          <label class="tnd-choice">
+            <input
+              type="checkbox"
+              name="replaceSchedule"
+              [checked]="replaceSchedule"
+              (change)="toggleSchedule($any($event.target).checked)"
+            />
+            <ng-container i18n="@@addendum.replaceSchedule"
+              >This addendum replaces the price schedule</ng-container
+            >
+          </label>
+          <p class="prj-hint" i18n="@@addendum.scheduleHint">
+            The new schedule is in force from the next revision. Bids already submitted keep the
+            items they priced; at leveling, items they never priced show as missing scope.
+          </p>
+          @if (replaceSchedule) {
+            <app-schedule-editor
+              idPrefix="addendum-schedule"
+              [tenderId]="tender().id"
+              [(items)]="schedule"
+              (itemsChange)="edited()"
+            />
+          }
+        </fieldset>
+
+        <fieldset class="prj-fieldset" id="addendum-documents" tabindex="-1">
+          <legend i18n="@@addendum.documentsLegend">Documents</legend>
+          <p class="prj-hint" i18n="@@addendum.documentsHint">
+            The current revision's documents stay unless you replace or withdraw them; earlier
+            revisions keep theirs.
+          </p>
+          <ul class="tnd-docs" role="list">
+            @for (document of current.currentDocuments; track document.id) {
+              <li>
+                <bdi>{{ document.fileName }}</bdi>
+                <span class="prj-hint"
+                  ><bdi>{{ size(document.sizeBytes) }}</bdi></span
+                >
+                @if (replaced().has(document.id)) {
+                  <span class="prj-chip" i18n="@@addendum.beingReplaced"
+                    >Replaced by this addendum</span
+                  >
+                } @else if (mayDraft()) {
+                  <label class="tnd-choice tnd-inline">
+                    <input
+                      type="checkbox"
+                      [name]="'withdraw-' + document.id"
+                      [checked]="withdrawn.has(document.id)"
+                      (change)="toggleWithdraw(document.id, $any($event.target).checked)"
+                    />
+                    <span i18n="@@addendum.withdraw">Withdraw</span>
+                    <span class="prj-visually-hidden"
+                      >&ngsp;<bdi>{{ document.fileName }}</bdi></span
+                    >
+                  </label>
+                }
+              </li>
+            }
+          </ul>
+          @if (addendum.documents.length) {
+            <h4 i18n="@@addendum.newDocuments">Documents this addendum brings</h4>
+            <ul class="tnd-docs" role="list">
+              @for (document of addendum.documents; track document.id) {
+                <li>
+                  <bdi>{{ document.fileName }}</bdi>
+                  <span class="prj-hint"
+                    ><bdi>{{ size(document.sizeBytes) }}</bdi></span
+                  >
+                  @if (document.replacesFileName) {
+                    <span class="prj-hint" i18n="@@addendum.replaces"
+                      >replaces <bdi>{{ document.replacesFileName }}</bdi></span
+                    >
+                  }
+                  @if (mayDraft()) {
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      [disabled]="busy() || uploading()"
+                      (click)="removeDocument(document.id)"
+                    >
+                      <ng-container i18n="@@tenderBuilder.remove">Remove</ng-container>
+                      <span class="prj-visually-hidden"
+                        >&ngsp;<bdi>{{ document.fileName }}</bdi></span
+                      >
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+          }
+          @if (mayDraft()) {
+            <div class="prj-grid">
+              <div class="prj-field">
+                <label for="addendum-replaces" i18n="@@addendum.replacesLabel">The next file</label>
+                <select id="addendum-replaces" name="replaces" [(ngModel)]="replaces">
+                  <option value="" i18n="@@addendum.addNew">is a new document</option>
+                  @for (document of current.currentDocuments; track document.id) {
+                    @if (!replaced().has(document.id)) {
+                      <option [value]="document.id">
+                        <ng-container i18n="@@addendum.replacesOption"
+                          >replaces {{ document.fileName }}</ng-container
+                        >
+                      </option>
+                    }
+                  }
+                </select>
+              </div>
+              <div class="prj-field">
+                <label for="addendum-file" i18n="@@addendum.chooseFile"
+                  >Add a document (at most 25 MB)</label
+                >
+                <input
+                  #file
+                  id="addendum-file"
+                  type="file"
+                  [attr.accept]="accept"
+                  [disabled]="uploading() || busy()"
+                  (change)="upload(file)"
+                />
+              </div>
+            </div>
+            @if (uploading()) {
+              <p class="prj-hint" role="status" i18n="@@addendum.uploading">Uploading…</p>
+            }
+          }
+        </fieldset>
+
+        <p class="prj-hint" role="status" aria-live="polite">{{ formStatus() }}</p>
+        @if (formError()) {
+          <p id="addendum-error" class="prj-note prj-note--error" role="alert" tabindex="-1">
+            {{ formError() }}
+          </p>
+        }
+        @if (addendum.missingForIssue.length && !dirty()) {
+          <p class="prj-hint" role="status" i18n="@@addendum.missing">
+            Still needed before issue: {{ missing(addendum) }}
+          </p>
+        }
+        @if (mayDraft()) {
+          <div class="prj-actions">
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="submit"
+              [disabled]="busy() || uploading() || !dirty()"
+              i18n="@@addendum.save"
+            >
+              Save draft
+            </button>
+            @if (mayIssue()) {
+              <button
+                class="prj-btn"
+                type="button"
+                [disabled]="busy() || uploading() || dirty() || addendum.missingForIssue.length > 0"
+                [attr.aria-describedby]="dirty() ? 'addendum-save-first' : null"
+                (click)="startIssue()"
+                i18n="@@addendum.issue"
+              >
+                Review and issue
+              </button>
+            }
+            <button
+              class="prj-btn prj-btn--ghost prj-btn--danger"
+              type="button"
+              [disabled]="busy()"
+              (click)="confirmingDiscard.set(true)"
+              i18n="@@addendum.discard"
+            >
+              Discard draft
+            </button>
+          </div>
+          @if (dirty() && mayIssue()) {
+            <p id="addendum-save-first" class="prj-hint" i18n="@@addendum.saveFirst">
+              Save your changes before issuing.
+            </p>
+          }
+          @if (!mayIssue()) {
+            <p class="prj-hint" i18n="@@addendum.issueByLeadership">
+              A Procurement Manager or Company Admin issues the addendum.
+            </p>
+          }
+        }
+      </form>
+    }
+
+    @for (addendum of current.issued; track addendum.id) {
+      <article class="prj-card tnd-addendum" [attr.aria-labelledby]="'addendum-' + addendum.id">
+        <h3 [id]="'addendum-' + addendum.id">
+          <ng-container i18n="@@addendum.numbered">Addendum {{ addendum.number }}</ng-container>
+          · <bdi>{{ addendum.title }}</bdi>
+        </h3>
+        <p class="prj-hint" i18n="@@addendum.issuedBy">
+          Issued by <bdi>{{ addendum.issuedByName }}</bdi> ·
+          {{ addendum.issuedAtUtc | businessDate: 'instant' }} · revision
+          {{ addendum.baseRevision }} → {{ addendum.resultingRevision }}
+        </p>
+        <p class="tnd-prewrap">
+          <bdi>{{ addendum.summary }}</bdi>
+        </p>
+        @if (addendum.newSubmissionDeadline) {
+          <p i18n="@@addendum.deadlineMoved">
+            Deadline moved from <bdi>{{ local(addendum.previousSubmissionDeadline) }}</bdi> to
+            <strong
+              ><bdi>{{ local(addendum.newSubmissionDeadline) }}</bdi></strong
+            >
+          </p>
+        }
+        @if (addendum.schedule?.length) {
+          <p i18n="@@addendum.scheduleReplaced">
+            Replaced the price schedule: {{ addendum.schedule?.length }} items.
+          </p>
+        }
+        @if (addendum.documents.length || addendum.withdrawn.length) {
+          <ul class="tnd-docs" role="list">
+            @for (document of addendum.documents; track document.id) {
+              <li>
+                <span class="prj-chip" i18n="@@addendum.added">Added</span>&ngsp;<bdi>{{
+                  document.fileName
+                }}</bdi>
+                @if (document.replacesFileName) {
+                  <span class="prj-hint" i18n="@@addendum.replaces"
+                    >replaces <bdi>{{ document.replacesFileName }}</bdi></span
+                  >
+                }
+              </li>
+            }
+            @for (document of addendum.withdrawn; track document.id) {
+              @if (!document.replacedById) {
+                <li>
+                  <span class="prj-chip prj-chip--Cancelled" i18n="@@addendum.withdrawnChip"
+                    >Withdrawn</span
+                  >&ngsp;<bdi>{{ document.fileName }}</bdi>
+                </li>
+              }
+            }
+          </ul>
+        }
+        <details class="tnd-history">
+          <summary>
+            @if (addendum.acknowledgementRequired) {
+              <ng-container i18n="@@addendum.ackCountRequired"
+                >Acknowledgements: {{ addendum.acknowledgedCount }} of
+                {{ addendum.acknowledgementExpected }} (required)</ng-container
+              >
+            } @else {
+              <ng-container i18n="@@addendum.ackCountOptional"
+                >Acknowledgements: {{ addendum.acknowledgedCount }} of
+                {{ addendum.acknowledgementExpected }} (not required)</ng-container
+              >
+            }
+          </summary>
+          <ul class="tnd-ack-list" role="list">
+            @for (row of addendum.acknowledgements; track row.invitationId) {
+              <li>
+                <bdi dir="ltr" class="tnd-code">{{ row.subcontractorCode }}</bdi
+                >&ngsp;<bdi>{{ row.subcontractorName }}</bdi>
+                —
+                @if (row.acknowledgedAtUtc) {
+                  <strong i18n="@@addendum.acknowledged">Acknowledged</strong>
+                  <span class="prj-hint">
+                    · {{ row.acknowledgedAtUtc | businessDate: 'instant' }} ·
+                    <bdi>{{ row.acknowledgedByName }}</bdi></span
+                  >
+                } @else if (!row.expected) {
+                  <span class="prj-hint">{{ statusLabel(row.invitationStatus) }}</span>
+                } @else {
+                  <span
+                    [class.tnd-attention]="addendum.acknowledgementRequired"
+                    i18n="@@addendum.outstanding"
+                    >Not acknowledged yet</span
+                  >
+                }
+              </li>
+            }
+          </ul>
+        </details>
+      </article>
+    }
+  } @else if (!error()) {
+    <p class="prj-note" role="status" i18n="@@addendum.loading">Loading addenda…</p>
+  }
+</section>
+
+@if (confirmingIssue() && draft(); as addendum) {
+  <app-confirm-dialog
+    heading="Issue this addendum?"
+    i18n-heading="@@addendum.issueHeading"
+    confirmLabel="Issue the addendum"
+    i18n-confirmLabel="@@addendum.issueConfirm"
+    [busy]="busy()"
+    (confirmed)="confirmIssue()"
+    (cancelled)="confirmingIssue.set(false)"
+  >
+    <p i18n="@@addendum.issueBody">
+      It becomes addendum {{ (view()?.issued?.length ?? 0) + 1 }} and tender revision
+      {{ (view()?.currentRevision ?? 0) + 1 }}. Every invited firm is emailed and sees it through
+      its own link. It can never be edited afterwards.
+    </p>
+    <ul class="tnd-plan" role="list">
+      <li>
+        <bdi>{{ addendum.title }}</bdi>
+      </li>
+      @if (addendum.acknowledgementRequired) {
+        <li i18n="@@addendum.issueAck">Each firm must acknowledge it before submitting a bid.</li>
+      }
+      @if (addendum.newSubmissionDeadline) {
+        <li i18n="@@addendum.issueDeadline">
+          New deadline: <bdi>{{ local(addendum.newSubmissionDeadline) }}</bdi>
+        </li>
+      }
+      @if (addendum.documents.length) {
+        <li i18n="@@addendum.issueDocuments">Documents added: {{ addendum.documents.length }}</li>
+      }
+      @if (addendum.withdrawn.length) {
+        <li i18n="@@addendum.issueWithdrawn">
+          Documents replaced or withdrawn: {{ addendum.withdrawn.length }}
+        </li>
+      }
+    </ul>
+    @if (issueError()) {
+      <p id="addendum-issue-error" class="prj-error-text" role="alert" tabindex="-1">
+        {{ issueError() }}
+      </p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (confirmingDiscard()) {
+  <app-confirm-dialog
+    heading="Discard this addendum draft?"
+    i18n-heading="@@addendum.discardHeading"
+    confirmLabel="Discard draft"
+    i18n-confirmLabel="@@addendum.discard"
+    [danger]="true"
+    [busy]="busy()"
+    (confirmed)="confirmDiscard()"
+    (cancelled)="confirmingDiscard.set(false)"
+  >
+    <p i18n="@@addendum.discardBody">
+      Nothing was sent to bidders. The draft is kept in the record and a new one can be prepared.
+    </p>
+  </app-confirm-dialog>
+}
+
+@if (extending()) {
+  <div class="prj-dialog" (click)="backdrop($event)">
+    <div
+      class="tnd-dialog"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      appAutofocus
+      appFocusTrap
+      aria-labelledby="extend-title"
+      (keydown.escape)="closeExtend()"
+    >
+      <h2 id="extend-title" i18n="@@extend.title">Extend the submission deadline</h2>
+      <p class="prj-hint" i18n="@@extend.current">
+        Current deadline: <bdi>{{ local(tender().submissionDeadline) }}</bdi>
+      </p>
+      <p class="prj-hint" i18n="@@extend.help">
+        The deadline only ever moves later. Every invited firm is emailed; their links and kept
+        drafts follow the new deadline, and a draft kept after the deadline becomes editable again.
+        Submitted bids stay as they are.
+      </p>
+      <form class="prj-form" novalidate (ngSubmit)="confirmExtend()">
+        <div class="prj-field">
+          <label for="extend-deadline" i18n="@@tenderField.newDeadline"
+            >New submission deadline</label
+          >
+          <input
+            id="extend-deadline"
+            name="extendDeadline"
+            type="datetime-local"
+            [attr.aria-invalid]="extendErrorField() === 'deadline'"
+            [attr.aria-describedby]="
+              extendErrorField() === 'deadline' ? 'extend-zone extend-error' : 'extend-zone'
+            "
+            [(ngModel)]="extendDeadline"
+            (input)="extendError.set(''); extendErrorField.set(null)"
+          />
+          <small id="extend-zone" class="prj-hint" i18n="@@extend.zone"
+            >In <bdi dir="ltr">{{ tender().timeZoneId }}</bdi
+            >, at least one hour from now.</small
+          >
+        </div>
+        <div class="prj-field">
+          <label for="extend-questions" i18n="@@extend.questionsLabel"
+            >New questions deadline (optional)</label
+          >
+          <input
+            id="extend-questions"
+            name="extendQuestions"
+            type="datetime-local"
+            [(ngModel)]="extendQuestions"
+          />
+        </div>
+        <div class="prj-field">
+          <label for="extend-reason" i18n="@@tenderField.reason">Reason</label>
+          <textarea
+            id="extend-reason"
+            name="extendReason"
+            rows="3"
+            [attr.maxlength]="reasonMax"
+            [attr.aria-invalid]="extendErrorField() === 'reason'"
+            [attr.aria-describedby]="extendErrorField() === 'reason' ? 'extend-error' : null"
+            [(ngModel)]="extendReason"
+            (input)="extendError.set(''); extendErrorField.set(null)"
+          ></textarea>
+        </div>
+        @if (extendError()) {
+          <p id="extend-error" class="prj-error-text" role="alert" tabindex="-1">
+            {{ extendError() }}
+          </p>
+        }
+        <div class="prj-actions">
+          <button class="prj-btn" type="submit" [disabled]="busy()">
+            @if (busy()) {
+              <ng-container i18n="@@common.working">Working…</ng-container>
+            } @else {
+              <ng-container i18n="@@extend.submit">Extend and notify bidders</ng-container>
+            }
+          </button>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            [disabled]="busy()"
+            (click)="closeExtend()"
+            i18n="@@common.cancel"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

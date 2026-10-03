@@ -1,0 +1,150 @@
+@use 'performance-common';
+
+// ---- the closeout: progress, steps, promise vs actual -------------------------------------
+
+.pf-progress {
+  display: grid;
+  gap: 0.35rem;
+  min-inline-size: min(100%, 16rem);
+  margin: 0;
+}
+
+.pf-progress progress {
+  inline-size: 100%;
+  accent-color: var(--color-accent);
+}
+
+.pf-steps button {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.pf-step-number {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  font-size: 0.75rem;
+}
+
+.pf-missing-count {
+  padding: 0 0.4rem;
+  border-radius: 1rem;
+  background: var(--color-warning);
+  color: var(--color-surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+// Awarded / actual / variance: three labelled columns per row on wide screens, stacked on phones.
+.pf-compare {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pf-row {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.pf-row h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.pf-row dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+}
+
+.pf-row dt {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.pf-row dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+// The form's fieldset carries no chrome of its own; disabled (during a save) it keeps the browser's disabled look.
+.pf-fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.pf-rating .tnd-choice {
+  min-block-size: var(--touch-target);
+}
+
+.pf-missing {
+  padding-inline-start: 1.1rem;
+}
+
+.pf-link {
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.pf-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.pf-attribution span {
+  display: block;
+}
+
+// The step list wraps instead of overflowing on a phone (the same tab pattern as the decision workspace).
+.dc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-block: 0 1.25rem;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.dc-tabs button {
+  min-block-size: var(--touch-target);
+  padding: 0.5rem 0.1rem;
+  border: 0;
+  border-block-end: var(--nav-indicator) solid transparent;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dc-tabs button.is-active {
+  border-block-end-color: var(--color-accent);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.dc-tabs button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.dc-timeline {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.dc-timeline li {
+  margin-block-end: 0.6rem;
+}

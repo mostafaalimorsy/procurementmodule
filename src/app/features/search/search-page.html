@@ -1,0 +1,140 @@
+<section class="prj-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@search.eyebrow">Search</p>
+      <h1 i18n="@@search.title">Search your company</h1>
+      <p i18n="@@search.intro">
+        Find subcontractors, projects, work packages, tenders and closeouts by name, code or
+        reference. You only see records your role may open.
+      </p>
+    </div>
+  </div>
+
+  <form class="prj-filters" role="search" (ngSubmit)="submit()">
+    <div class="prj-field prj-field--grow">
+      <label for="search-q" i18n="@@search.query">Name, code or reference</label>
+      <input id="search-q" name="q" type="search" maxlength="100" [(ngModel)]="q" />
+    </div>
+    <div class="prj-field">
+      <label for="search-type" i18n="@@search.type">Record type</label>
+      <select id="search-type" name="type" [(ngModel)]="type" (change)="changeType()">
+        <option value="" i18n="@@search.allTypes">All types</option>
+        @for (option of types; track option) {
+          <option [value]="option">{{ typeLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    @if (type) {
+      <div class="prj-field">
+        <label for="search-status" i18n="@@search.status">Status</label>
+        <select id="search-status" name="status" [(ngModel)]="status" (change)="submit()">
+          <option value="" i18n="@@sourcing.filterAll">All</option>
+          @for (option of statuses(); track option) {
+            <option [value]="option">{{ statusLabel(type, option) }}</option>
+          }
+        </select>
+      </div>
+    }
+    <button class="prj-btn" type="submit" i18n="@@common.search">Search</button>
+  </form>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" role="status" i18n="@@search.loading">Searching…</p>
+  } @else if (result(); as view) {
+    @if (view.groups.length === 0) {
+      <div class="prj-empty">
+        <h2 i18n="@@search.nothingVisibleTitle">Nothing you can search here</h2>
+        <p i18n="@@search.nothingVisibleBody">
+          Your role or your company's plan does not include these records.
+        </p>
+      </div>
+    } @else {
+      @for (group of view.groups; track group.type) {
+        <section class="srch-group" [attr.aria-labelledby]="'search-group-' + group.type">
+          <h2 [id]="'search-group-' + group.type">
+            {{ typeLabel(group.type) }}
+            <span class="prj-hint" i18n="@@search.groupTotal"
+              >(<bdi dir="ltr">{{ group.total }}</bdi
+              >)</span
+            >
+          </h2>
+          @if (group.items.length === 0) {
+            <p class="prj-hint">
+              @if (view.type && group.total > 0) {
+                <span i18n="@@search.pageBeyond">No results on this page.</span>
+              } @else {
+                <span i18n="@@search.noneInType">No match.</span>
+              }
+            </p>
+          } @else {
+            <ul class="srch-list" role="list">
+              @for (hit of group.items; track hit.id) {
+                <li>
+                  <a [routerLink]="link(hit)"
+                    ><bdi dir="ltr" class="srch-code">{{ hit.code }}</bdi>
+                    <bdi>{{ hit.title }}</bdi></a
+                  >
+                  @if (hit.subtitle) {
+                    <bdi class="prj-hint">{{ hit.subtitle }}</bdi>
+                  }
+                  @if (hit.status) {
+                    <span class="prj-chip">{{ statusLabel(hit.type, hit.status) }}</span>
+                  }
+                  @if (hit.category) {
+                    <span class="prj-hint">{{ categoryLabel(hit.category) }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+          @if (!view.type && group.total > group.items.length) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="showAll(group.type)"
+              i18n="@@search.showAll"
+            >
+              Show all <bdi dir="ltr">{{ group.total }}</bdi>
+            </button>
+          }
+          @if (view.type && totalPages(group.total, group.pageSize) > 1) {
+            <nav class="prj-pager" aria-label="Result pages" i18n-aria-label="@@search.pages">
+              <span i18n="@@common.pageOf"
+                >Page <bdi dir="ltr">{{ group.page }}</bdi> of
+                <bdi dir="ltr">{{ totalPages(group.total, group.pageSize) }}</bdi></span
+              >
+              <span class="prj-actions">
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="group.page <= 1"
+                  (click)="goToPage(group.page - 1)"
+                  i18n="@@common.previous"
+                >
+                  Previous
+                </button>
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="group.page >= totalPages(group.total, group.pageSize)"
+                  (click)="goToPage(group.page + 1)"
+                  i18n="@@common.next"
+                >
+                  Next
+                </button>
+              </span>
+            </nav>
+          }
+        </section>
+      }
+    }
+  } @else if (!error()) {
+    <p class="prj-hint" i18n="@@search.start">
+      Type at least two characters, or choose a record type to browse.
+    </p>
+  }
+</section>

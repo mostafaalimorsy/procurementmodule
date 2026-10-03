@@ -1,0 +1,382 @@
+<div class="rnd-page">
+  <header class="rnd-header">
+    <div class="rnd-identity">
+      @if (view(); as item) {
+        @if (logo()) {
+          <!-- Decorative: the company name is written right next to it. -->
+          <img class="rnd-logo" [src]="logo()" alt="" />
+        } @else {
+          <span class="rnd-initial" aria-hidden="true">{{ item.buyerName.charAt(0) }}</span>
+        }
+        <span class="rnd-identity__text">
+          <strong class="rnd-buyer-name"
+            ><bdi>{{ item.buyerName }}</bdi></strong
+          >
+          <span class="rnd-system" i18n="@@bidder.via">Tender portal · via {{ systemName }}</span>
+        </span>
+      } @else {
+        <span class="rnd-identity__text">
+          <strong i18n="@@round.header">Negotiation round</strong>
+          <span class="rnd-system">{{ systemName }}</span>
+        </span>
+      }
+    </div>
+    <app-language-selector />
+  </header>
+
+  <main id="main-content" class="rnd-main" tabindex="-1">
+    @if (loading()) {
+      <p class="prj-note" role="status" i18n="@@round.loading">Opening your round…</p>
+    } @else if (invalid()) {
+      <section class="rnd-card" aria-labelledby="round-invalid-title">
+        <h1 id="round-invalid-title" i18n="@@bidder.invalidTitle">This link cannot be used</h1>
+        <p role="alert">{{ invalid() }}</p>
+      </section>
+    } @else if (view(); as item) {
+      @if (mode() === 'respond' && bid() && invitation()) {
+        <app-bid-workspace
+          [token]="token"
+          [invitation]="invitation()!"
+          [initial]="bid()!"
+          [round]="item.roundNumber"
+          [scope]="item.scope"
+          (back)="backToOverview()"
+          (submitted)="workspaceSubmitted()"
+        />
+      } @else {
+        <section class="rnd-card rnd-hero" aria-labelledby="round-title">
+          <p class="rnd-buyer">
+            @if (item.type === 'Bafo') {
+              <span i18n="@@round.asksBafo"
+                ><bdi>{{ item.buyerName }}</bdi> asks for your best and final offer</span
+              >
+            } @else {
+              <span i18n="@@round.asksRevision"
+                ><bdi>{{ item.buyerName }}</bdi> asks for a revised offer</span
+              >
+            }
+          </p>
+          <h1 id="round-title" tabindex="-1">
+            <bdi>{{ item.tenderTitle }}</bdi>
+          </h1>
+          <p class="rnd-meta">
+            <bdi dir="ltr">{{ item.tenderReference }}</bdi> ·
+            <span i18n="@@negotiation.roundTitle">Round {{ item.roundNumber }}</span> ·
+            {{ typeLabel(item.type) }} · {{ scopeLabel(item.scope) }}
+          </p>
+          <dl class="rnd-dates">
+            <div>
+              <dt i18n="@@negotiation.deadline">Response deadline</dt>
+              <dd>
+                <strong
+                  ><bdi>{{ deadline() }}</bdi></strong
+                >
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@bidWorkspace.reference">Bid reference</dt>
+              <dd>
+                <bdi dir="ltr" class="rnd-code">{{ item.bidReference }}</bdi>
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        @switch (item.state) {
+          @case ('open') {
+            @if (!submitted()) {
+              <p class="prj-note rnd-banner rnd-banner--open" role="note" i18n="@@round.stateOpen">
+                This round is open. You may submit one revised response before the deadline, or
+                decline to revise; your earlier offer stays in force until then.
+              </p>
+            }
+          }
+          @case ('deadline_passed') {
+            <p class="prj-note rnd-banner" role="note" i18n="@@round.stateDeadline">
+              The response deadline has passed. This round no longer accepts responses; what you
+              submitted is kept exactly as submitted.
+            </p>
+          }
+          @case ('closed') {
+            <p class="prj-note rnd-banner" role="note" i18n="@@round.stateClosed">
+              The buyer closed this round. It no longer accepts responses; what you submitted is
+              kept exactly as submitted.
+            </p>
+          }
+          @case ('cancelled') {
+            <p
+              class="prj-note prj-note--error rnd-banner"
+              role="alert"
+              i18n="@@round.stateCancelled"
+            >
+              The buyer cancelled this round. No response is needed, and nothing submitted in it
+              will be considered. Your earlier offer stays as it was.
+            </p>
+          }
+          @case ('withdrawn') {
+            <p
+              class="prj-note prj-note--error rnd-banner"
+              role="alert"
+              i18n="@@round.stateWithdrawn"
+            >
+              The buyer removed your firm from this round. Your earlier offer stays as it was.
+            </p>
+          }
+        }
+
+        <div role="status" aria-live="polite">
+          @if (notice()) {
+            <p id="round-notice" class="prj-note" tabindex="-1">{{ notice() }}</p>
+          }
+        </div>
+        @if (error()) {
+          <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+        }
+
+        @if (item.receipt; as receipt) {
+          <section class="rnd-card rnd-receipt" aria-labelledby="round-receipt">
+            <h2 id="round-receipt" tabindex="-1" i18n="@@round.receiptTitle">
+              Revised response received
+            </h2>
+            <p i18n="@@round.receiptBody">
+              The system received your response to this round. It is not an approval or an award.
+            </p>
+            <dl class="rnd-facts">
+              <div>
+                <dt i18n="@@bidWorkspace.reference">Bid reference</dt>
+                <dd>
+                  <bdi dir="ltr" class="rnd-code">{{ receipt.reference }}</bdi>
+                </dd>
+              </div>
+              <div>
+                <dt i18n="@@round.revision">Revision</dt>
+                <dd>{{ receipt.revisionNumber }}</dd>
+              </div>
+              <div>
+                <dt i18n="@@bidWorkspace.submittedAt">Submitted</dt>
+                <dd>{{ receipt.submittedAtUtc | businessDate: 'instant' }}</dd>
+              </div>
+              <div>
+                <dt i18n="@@bidField.totalAmount">Total bid amount</dt>
+                <dd>
+                  <bdi dir="ltr">{{ amount(receipt.totalAmount) }} {{ receipt.currency }}</bdi>
+                </dd>
+              </div>
+              <div>
+                <dt i18n="@@bidWorkspace.files">Files</dt>
+                <dd>{{ receipt.attachmentCount }}</dd>
+              </div>
+            </dl>
+            <app-verification-details>
+              <p>
+                <span i18n="@@bidWorkspace.fingerprint">Submission fingerprint (SHA-256)</span>:
+                <code dir="ltr" class="rnd-fingerprint">{{ receipt.contentSha256 }}</code>
+              </p>
+            </app-verification-details>
+          </section>
+        }
+
+        <section class="rnd-card" aria-labelledby="round-instructions-title">
+          <h2 id="round-instructions-title" i18n="@@round.instructionsTitle">
+            The buyer's instructions
+          </h2>
+          <p class="rnd-prewrap">
+            <bdi>{{ item.instructions }}</bdi>
+          </p>
+          @if (item.type === 'Bafo') {
+            <p class="prj-hint" i18n="@@round.bafoHint">
+              This is a best and final offer: the buyer has said it does not expect a further round.
+            </p>
+          }
+        </section>
+
+        @if (canRespond()) {
+          <section class="rnd-card rnd-card--act" aria-labelledby="round-act-title">
+            <h2 id="round-act-title" i18n="@@round.actTitle">Your answer</h2>
+            @if (remaining(); as left) {
+              <p class="rnd-countdown">
+                <span i18n="@@bidder.timeLeft">Time left:</span>&nbsp;
+                @if (left.days > 0) {
+                  <span i18n="@@round.daysLeft">{left.days, plural,
+                    =1 {1 day}
+                    other {{{ left.days }} days}
+                  }</span
+                  >&nbsp;
+                }
+                @if (left.hours > 0) {
+                  <span i18n="@@round.hoursLeft">{left.hours, plural,
+                    =1 {1 hour}
+                    other {{{ left.hours }} hours}
+                  }</span
+                  >&nbsp;
+                }
+                @if (left.days === 0) {
+                  <span i18n="@@round.minutesLeft">{left.minutes, plural,
+                    =0 {less than a minute}
+                    =1 {1 minute}
+                    other {{{ left.minutes }} minutes}
+                  }</span>
+                }
+                <small class="prj-hint rnd-block" i18n="@@round.serverClock"
+                  >By the server's clock; the server checks the deadline again when you
+                  submit.</small
+                >
+              </p>
+            }
+            @if (item.status === 'Declined') {
+              <p class="prj-hint" i18n="@@round.declinedState">
+                You told the buyer you will not revise. You can still prepare a response until the
+                deadline.
+              </p>
+              @if (item.declineComment) {
+                <p class="rnd-prewrap prj-hint">
+                  <bdi>{{ item.declineComment }}</bdi>
+                </p>
+              }
+            }
+            <div class="prj-actions">
+              <button class="prj-btn" type="button" [disabled]="busy()" (click)="respond()">
+                @if (hasDraft()) {
+                  <ng-container i18n="@@round.continue"
+                    >Continue your revised response</ng-container
+                  >
+                } @else {
+                  <ng-container i18n="@@round.start">Prepare a revised response</ng-container>
+                }
+              </button>
+              @if (item.status !== 'Declined' && !declining()) {
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="startDecline()"
+                  i18n="@@round.decline"
+                >
+                  Decline to revise
+                </button>
+              }
+            </div>
+            @if (declining()) {
+              <div class="rnd-decline">
+                <h3 id="round-decline-title" tabindex="-1" i18n="@@round.declineTitle">
+                  Decline to revise
+                </h3>
+                <p class="prj-hint" i18n="@@round.declineHint">
+                  Your earlier offer stays in force. You can change your mind until the deadline.
+                </p>
+                <div class="prj-field">
+                  <label for="round-decline-comment" i18n="@@round.declineComment"
+                    >Comment for the buyer (optional)</label
+                  >
+                  <textarea
+                    id="round-decline-comment"
+                    rows="3"
+                    [attr.maxlength]="commentMax"
+                    [(ngModel)]="comment"
+                  ></textarea>
+                </div>
+                <div class="prj-actions">
+                  <button class="prj-btn" type="button" [disabled]="busy()" (click)="decline()">
+                    <ng-container i18n="@@round.declineConfirm"
+                      >Send: I will not revise</ng-container
+                    >
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="declining.set(false)"
+                    i18n="@@common.cancel"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            }
+          </section>
+        }
+
+        <section class="rnd-card" aria-labelledby="round-current-title">
+          <h2 id="round-current-title" i18n="@@round.currentTitle">Your offer in force</h2>
+          <p class="prj-hint" i18n="@@round.currentHint">
+            Revision {{ item.currentRevisionNumber }} of your bid, priced in
+            <bdi dir="ltr">{{ currency() }}</bdi> ({{ currencyTitle() }}). Only you and the buyer
+            see it.
+          </p>
+          <dl class="rnd-facts">
+            <div>
+              <dt i18n="@@bidField.totalAmount">Total bid amount</dt>
+              <dd>
+                <bdi dir="ltr"
+                  >{{ amount(item.currentSubmission.totalAmount) }} {{ currency() }}</bdi
+                >
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@comparisonField.validityDays">Validity (days)</dt>
+              <dd>{{ item.currentSubmission.validityDays ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt i18n="@@comparisonField.durationDays">Duration (days)</dt>
+              <dd>{{ item.currentSubmission.durationDays ?? '—' }}</dd>
+            </div>
+            <div>
+              <dt i18n="@@comparisonField.warrantyMonths">Warranty (months)</dt>
+              <dd>{{ item.currentSubmission.warrantyMonths ?? '—' }}</dd>
+            </div>
+          </dl>
+          @if (item.currentSubmission.lines.length) {
+            <div class="prj-table-wrap">
+              <table class="prj-table">
+                <caption class="prj-visually-hidden" i18n="@@comparison.linesTitle">
+                  Priced lines
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" i18n="@@comparison.colLine">Line</th>
+                    <th scope="col" class="rnd-num" i18n="@@award.amount">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of item.currentSubmission.lines; track $index) {
+                    <tr>
+                      <th scope="row">
+                        <bdi>{{ line.description }}</bdi>
+                      </th>
+                      <td class="rnd-num">
+                        <bdi dir="ltr">{{ amount(line.amount) }}</bdi>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          @if (item.currentFiles.length) {
+            <h3 i18n="@@bidWorkspace.files">Files</h3>
+            <ul class="rnd-files" role="list">
+              @for (file of item.currentFiles; track file.id) {
+                <li>
+                  <button class="prj-btn prj-btn--ghost" type="button" (click)="download(file)">
+                    <bdi>{{ file.fileName }}</bdi>
+                  </button>
+                  <small class="prj-hint">{{ size(file.sizeBytes) }}</small>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <section class="rnd-card" aria-labelledby="round-contact-title">
+          <h2 id="round-contact-title" i18n="@@round.contactTitle">Questions about this round</h2>
+          <p i18n="@@round.contact">
+            Contact <bdi>{{ item.contactName }}</bdi> at
+            <bdi dir="ltr"
+              ><a [href]="'mailto:' + item.contactEmail">{{ item.contactEmail }}</a></bdi
+            >.
+          </p>
+        </section>
+      }
+    }
+  </main>
+</div>

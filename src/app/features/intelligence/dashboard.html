@@ -1,0 +1,230 @@
+<section class="dash" aria-labelledby="dash-title">
+  <h2 id="dash-title" i18n="@@dashboard.title">Your company today</h2>
+  @if (loading()) {
+    <p class="prj-hint" role="status" i18n="@@dashboard.loading">Loading the dashboard…</p>
+  } @else if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  } @else if (dashboard(); as view) {
+    <!-- CF-001 / CF-016: what is waiting on you comes first. -->
+    <app-my-work />
+    <section class="dash-block" aria-labelledby="dash-attention">
+      <h3 id="dash-attention" i18n="@@dashboard.attention">Needs attention</h3>
+      @if (
+        attention(view).length === 0 &&
+        !(view.closeouts && view.closeouts.pending + view.closeouts.reopened > 0)
+      ) {
+        <p class="prj-hint" i18n="@@dashboard.nothing">Nothing needs your attention right now.</p>
+      } @else {
+        <ul class="dash-list" role="list">
+          @if (view.closeouts; as closeouts) {
+            @if (closeouts.pending + closeouts.reopened > 0) {
+              <li>
+                @if (closeouts.pending > 0) {
+                  <a
+                    routerLink="/closeouts"
+                    [queryParams]="{ status: 'Pending' }"
+                    i18n="@@dashboard.closeoutGap"
+                    >Awards without a closeout: <bdi dir="ltr">{{ closeouts.pending }}</bdi></a
+                  >
+                }
+                @if (closeouts.reopened > 0) {
+                  <a
+                    routerLink="/closeouts"
+                    [queryParams]="{ status: 'Reopened' }"
+                    i18n="@@dashboard.reopened"
+                    >reopened for correction: <bdi dir="ltr">{{ closeouts.reopened }}</bdi></a
+                  >
+                }
+              </li>
+            }
+          }
+          @for (item of attention(view); track item.kind + item.id) {
+            <li>
+              <span class="prj-chip">{{ kindLabel(item) }}</span>
+              @if (linkable(view, item)) {
+                <a [routerLink]="link(item)"
+                  ><bdi dir="ltr" class="dash-code">{{ item.reference }}</bdi></a
+                >
+              } @else {
+                <bdi dir="ltr" class="dash-code">{{ item.reference }}</bdi>
+              }
+              @if (item.title) {
+                <bdi>{{ item.title }}</bdi>
+              }
+              @if (item.atUtc) {
+                <span class="prj-hint"
+                  ><bdi>{{ item.atUtc | businessDate: 'instant' }}</bdi></span
+                >
+              }
+            </li>
+          }
+        </ul>
+        @if (
+          view.evaluation &&
+          view.evaluation.pending +
+            view.evaluation.readyForDecision +
+            (view.evaluation.completedInPlan ?? 0) >
+            view.evaluation.items.length
+        ) {
+          <p class="prj-hint" i18n="@@dashboard.moreEvaluation">
+            Evaluations open: <bdi dir="ltr">{{ view.evaluation.pending }}</bdi> · ready for a
+            decision: <bdi dir="ltr">{{ view.evaluation.readyForDecision }}</bdi>
+          </p>
+        }
+      }
+    </section>
+
+    <dl class="dash-figures">
+      @if (view.portfolio; as portfolio) {
+        <div class="prj-card">
+          <dt id="dash-fig-projects" i18n="@@dashboard.activeProjects">Active projects</dt>
+          <dd class="dash-figure">
+            <a
+              routerLink="/projects"
+              [queryParams]="{ status: 'Active' }"
+              aria-labelledby="dash-fig-projects dash-fig-projects-n"
+              ><bdi id="dash-fig-projects-n" dir="ltr">{{ portfolio.activeProjects }}</bdi></a
+            >
+          </dd>
+          <dd class="prj-hint" i18n="@@dashboard.portfolioDetail">
+            on hold <bdi dir="ltr">{{ portfolio.onHoldProjects }}</bdi> · active work packages
+            <bdi dir="ltr">{{ portfolio.activeWorkPackages }}</bdi>
+          </dd>
+        </div>
+      }
+      @if (view.tenders; as tenders) {
+        <div class="prj-card">
+          <dt id="dash-fig-tenders" i18n="@@dashboard.openTenders">Tenders open for bids</dt>
+          <dd class="dash-figure">
+            <a
+              routerLink="/tenders"
+              [queryParams]="{ stage: 'OpenForBids' }"
+              aria-labelledby="dash-fig-tenders dash-fig-tenders-n"
+              ><bdi id="dash-fig-tenders-n" dir="ltr">{{ tenders.openForBids }}</bdi></a
+            >
+          </dd>
+          <dd class="prj-hint" i18n="@@dashboard.tenderDetail">
+            closing within 7 days <bdi dir="ltr">{{ tenders.closingSoon }}</bdi> · closed, bids to
+            open <bdi dir="ltr">{{ tenders.awaitingOpening }}</bdi> · drafts
+            <bdi dir="ltr">{{ tenders.drafts }}</bdi>
+          </dd>
+        </div>
+      }
+      @if (view.decisions; as decisions) {
+        <div class="prj-card">
+          <dt i18n="@@dashboard.approvals">Decisions awaiting approval</dt>
+          <dd class="dash-figure">
+            <bdi dir="ltr">{{ decisions.awaitingApproval }}</bdi>
+          </dd>
+          <dd class="prj-hint" i18n="@@dashboard.approvedDetail">
+            approved, award to issue <bdi dir="ltr">{{ decisions.approvedAwaitingAward }}</bdi>
+          </dd>
+          @if (decisions.awaitingYourApproval) {
+            <dd class="prj-hint" i18n="@@dashboard.yourApprovals">
+              yours to approve now <bdi dir="ltr">{{ decisions.awaitingYourApproval }}</bdi>
+            </dd>
+          }
+        </div>
+      }
+      @if (view.closeouts; as closeouts) {
+        <div class="prj-card">
+          <dt id="dash-fig-closeouts" i18n="@@dashboard.closeouts">Closeouts</dt>
+          <dd class="dash-figure">
+            <a
+              routerLink="/closeouts"
+              [queryParams]="{ status: 'Closed' }"
+              aria-labelledby="dash-fig-closeouts dash-fig-closeouts-n"
+              ><bdi id="dash-fig-closeouts-n" dir="ltr">{{ closeouts.closed }}</bdi></a
+            >
+          </dd>
+          <dd class="prj-hint" i18n="@@dashboard.closeoutDetail">
+            finalized · pending <bdi dir="ltr">{{ closeouts.pending }}</bdi> · in progress
+            <bdi dir="ltr">{{ closeouts.inProgress }}</bdi>
+          </dd>
+        </div>
+      }
+    </dl>
+
+    @if (view.evidence; as evidence) {
+      <section class="dash-block" aria-labelledby="dash-evidence">
+        <h3 id="dash-evidence" i18n="@@dashboard.evidenceTitle">Where your evidence is</h3>
+        @if (evidence.categories.length === 0) {
+          <p class="prj-hint" i18n="@@dashboard.noEvidence">
+            No finalized closeout yet. Evidence builds up here as closeouts are finalized.
+          </p>
+        } @else {
+          <p class="prj-hint" i18n="@@dashboard.evidenceHint">
+            Subcontractors with reusable history:
+            <bdi dir="ltr">{{ evidence.firmsWithHistory }}</bdi
+            >. Categories where no firm has three or more completed projects are thin evidence.
+          </p>
+          <ul class="dash-list" role="list">
+            @for (category of evidence.categories; track category.category) {
+              <li>
+                <strong>{{ categoryLabel(category.category) }}</strong>
+                <app-evidence-strength
+                  [strength]="category.strongestFirmEvidence"
+                  [dated]="category.dated"
+                />
+                <span i18n="@@dashboard.categoryCounts"
+                  >firms <bdi dir="ltr">{{ category.firms }}</bdi> · completed projects
+                  <bdi dir="ltr">{{ category.projects }}</bdi> · firms with 3 or more
+                  <bdi dir="ltr">{{ category.firmsWithModerateEvidence }}</bdi></span
+                >
+                <span class="prj-hint" i18n="@@dashboard.latest"
+                  >latest
+                  <bdi>{{ category.latestClosedAtUtc | businessDate: 'instant' }}</bdi></span
+                >
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+
+    @if (
+      (view.closeouts?.recentlyClosed?.length ?? 0) > 0 ||
+      (view.decisions?.recentAwards?.length ?? 0) > 0
+    ) {
+      <section class="dash-block" aria-labelledby="dash-recent">
+        <h3 id="dash-recent" i18n="@@dashboard.recentTitle">Recent outcomes</h3>
+        <ul class="dash-list" role="list">
+          @for (item of view.closeouts?.recentlyClosed ?? []; track item.id) {
+            <li>
+              <span class="prj-chip" i18n="@@dashboard.closedChip">Closeout finalized</span>
+              <a [routerLink]="link(item)"
+                ><bdi dir="ltr" class="dash-code">{{ item.reference }}</bdi></a
+              >
+              @if (item.detail) {
+                <bdi>{{ item.detail }}</bdi>
+              }
+              <span>{{ scheduleLabel(item.status) }}</span>
+              <span class="prj-hint"
+                ><bdi>{{ item.atUtc | businessDate: 'instant' }}</bdi></span
+              >
+            </li>
+          }
+          @for (item of view.decisions?.recentAwards ?? []; track item.id) {
+            <li>
+              <span class="prj-chip" i18n="@@dashboard.awardChip">Award issued</span>
+              <a [routerLink]="link(item)"
+                ><bdi dir="ltr" class="dash-code">{{ item.reference }}</bdi></a
+              >
+              @if (item.detail) {
+                <bdi>{{ item.detail }}</bdi>
+              }
+              <span class="prj-hint"
+                ><bdi>{{ item.atUtc | businessDate: 'instant' }}</bdi></span
+              >
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</section>

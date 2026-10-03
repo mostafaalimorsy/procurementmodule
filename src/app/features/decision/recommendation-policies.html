@@ -1,0 +1,412 @@
+<section class="prj-page dc-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@rpolicy.eyebrow">Recommendation and award</p>
+      <h1 i18n="@@rpolicy.title">Recommendation policies</h1>
+      <p class="prj-hint" i18n="@@rpolicy.intro">
+        The criteria and weights a recommendation ranks eligible bids by. Weights are your company's
+        choice and add up to 100. A version used by a recommendation never changes.
+      </p>
+    </div>
+    @if (canManage()) {
+      <button class="prj-btn" type="button" (click)="startNew()" i18n="@@policy.new">
+        New policy
+      </button>
+    }
+  </div>
+  @if (!canManage()) {
+    <p class="prj-note" data-testid="policy-read-only" i18n="@@policy.readOnly">
+      You can read these policies. A Procurement Manager or Company Admin changes them.
+    </p>
+  }
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  <div class="dc-split">
+    <nav class="dc-list-nav" aria-label="Policies" i18n-aria-label="@@policy.list">
+      @if (policies(); as list) {
+        <ul role="list">
+          @for (policy of list; track policy.id) {
+            <li>
+              <button
+                type="button"
+                class="dc-list-nav__item"
+                [class.is-active]="selected()?.id === policy.id"
+                [attr.aria-current]="selected()?.id === policy.id ? 'true' : null"
+                (click)="open(policy.id)"
+              >
+                <bdi>{{ policy.name }}</bdi>
+                <small class="prj-hint tnd-block">
+                  <span i18n="@@rpolicy.summary"
+                    >version {{ policy.currentVersionNumber }} · criteria:
+                    {{ policy.criteriaCount }}</span
+                  >
+                  @if (policy.historyNotInPlan) {
+                    ·
+                    <strong class="tnd-attention" i18n="@@rpolicy.needsReview"
+                      >needs review: past performance is not in your plan</strong
+                    >
+                  }
+                  @if (policy.weighsHistory) {
+                    · <span i18n="@@rpolicy.weighsHistory">weighs history</span>
+                  }
+                  @if (policy.status === 'Inactive') {
+                    · <span i18n="@@policy.inactive">Inactive</span>
+                  }
+                </small>
+              </button>
+            </li>
+          } @empty {
+            <li class="prj-hint" i18n="@@policy.none">No policy yet.</li>
+          }
+        </ul>
+      } @else {
+        <p class="prj-hint" i18n="@@common.loading">Loading…</p>
+      }
+    </nav>
+
+    <div class="dc-detail">
+      @if (editing()) {
+        <form class="dc-policy-form" (ngSubmit)="save()">
+          <h2>
+            @if (selected()) {
+              <ng-container i18n="@@policy.editTitle">Edit policy</ng-container>
+            } @else {
+              <ng-container i18n="@@policy.newTitle">New policy</ng-container>
+            }
+          </h2>
+          @if (selected()?.current?.lockedAtUtc) {
+            <p class="prj-note" role="note" i18n="@@rpolicy.lockedNote">
+              Version {{ selected()?.currentVersionNumber }} was used by a recommendation. Saving
+              creates version {{ (selected()?.currentVersionNumber ?? 0) + 1 }}; the used version
+              stays exactly as it was.
+            </p>
+          }
+          <div class="prj-field">
+            <label for="rp-name" i18n="@@policy.name">Name</label>
+            <input id="rp-name" name="name" [attr.maxlength]="nameMax" [(ngModel)]="form.name" />
+          </div>
+          <div class="prj-field">
+            <label for="rp-description" i18n="@@policy.description">Description</label>
+            <textarea
+              id="rp-description"
+              name="description"
+              rows="2"
+              [attr.maxlength]="descriptionMax"
+              [(ngModel)]="form.description"
+            ></textarea>
+          </div>
+          <div class="prj-field dc-short">
+            <label for="rp-pass" i18n="@@rpolicy.passMark"
+              >Technical pass mark out of 100 (optional)</label
+            >
+            <input
+              id="rp-pass"
+              name="pass"
+              type="text"
+              inputmode="decimal"
+              dir="ltr"
+              aria-describedby="rp-pass-hint"
+              [(ngModel)]="form.minimumTechnicalScore"
+            />
+            <small id="rp-pass-hint" class="prj-hint" i18n="@@rpolicy.passMarkHint"
+              >Bids whose mean technical score is below it are not eligible. One decimal
+              allowed.</small
+            >
+          </div>
+
+          <fieldset class="dc-criteria-form">
+            <legend i18n="@@policy.criteria">Criteria</legend>
+            @for (criterion of form.criteria; track $index; let index = $index) {
+              <div class="dc-criterion">
+                <div class="prj-field">
+                  <label [for]="'rp-kind-' + index" i18n="@@policy.criterionNumber"
+                    >Criterion {{ index + 1 }}</label
+                  >
+                  <select
+                    [id]="'rp-kind-' + index"
+                    [name]="'rp-kind-' + index"
+                    [attr.aria-describedby]="'rp-rule-' + index"
+                    [(ngModel)]="criterion.kind"
+                  >
+                    @for (kind of kinds; track kind) {
+                      <option
+                        [value]="kind"
+                        [disabled]="
+                          taken(kind, index) || (kind === 'PastPerformance' && !historyInPlan)
+                        "
+                      >
+                        {{ kindLabel(kind) }}
+                      </option>
+                    }
+                  </select>
+                  <small [id]="'rp-rule-' + index" class="prj-hint">{{
+                    kindRule(criterion.kind)
+                  }}</small>
+                </div>
+                <div class="prj-field">
+                  <label [for]="'rp-weight-' + index" i18n="@@policy.weight">Weight (%)</label>
+                  <input
+                    [id]="'rp-weight-' + index"
+                    [name]="'rp-weight-' + index"
+                    type="text"
+                    inputmode="decimal"
+                    dir="ltr"
+                    [(ngModel)]="criterion.weight"
+                  />
+                </div>
+                <div class="dc-criterion__actions">
+                  <button
+                    class="prj-btn prj-btn--ghost prj-btn--danger ev-btn-small"
+                    type="button"
+                    (click)="removeCriterion(index)"
+                  >
+                    <ng-container i18n="@@policy.remove">Remove</ng-container>
+                    <span class="prj-visually-hidden">{{ kindLabel(criterion.kind) }}</span>
+                  </button>
+                </div>
+              </div>
+            }
+            <button
+              id="rp-add"
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="allUsed()"
+              (click)="addCriterion()"
+              i18n="@@policy.addCriterion"
+            >
+              Add criterion
+            </button>
+            <p class="ev-total" role="status">
+              <span i18n="@@policy.total"
+                >Total weight: <bdi dir="ltr">{{ totalText() }}</bdi> / 100</span
+              >
+            </p>
+            @if (!historyInPlan) {
+              <p class="prj-hint" i18n="@@rpolicy.historyNotInPlan">
+                Past performance is not in your plan, so a policy cannot weigh it.
+              </p>
+            }
+            @if (weighsHistory()) {
+              <!-- CF-021 / CF-022 (ADR-127): how past performance applies — a change is a new policy version once it was used. -->
+              <fieldset class="prj-fieldset">
+                <legend i18n="@@rpolicy.historyRule">How past performance applies</legend>
+                <label class="tnd-choice">
+                  <input
+                    type="radio"
+                    name="historyRule"
+                    value="AllOrNothing"
+                    [(ngModel)]="form.historyRule"
+                  />
+                  <span i18n="@@rpolicy.ruleAllOrNothing"
+                    >Only when every eligible firm has at least 2 finalized closeouts in the
+                    category (all or nothing)</span
+                  >
+                </label>
+                <label class="tnd-choice">
+                  <input
+                    type="radio"
+                    name="historyRule"
+                    value="Partial"
+                    [(ngModel)]="form.historyRule"
+                  />
+                  <span i18n="@@rpolicy.rulePartial"
+                    >When at least one eligible firm has 2 or more; the others receive a disclosed
+                    neutral value</span
+                  >
+                </label>
+                @if (form.historyRule === 'Partial') {
+                  <div class="prj-field">
+                    <label for="rp-neutral" i18n="@@rpolicy.neutral"
+                      >Neutral history value (0–100, empty for 50)</label
+                    >
+                    <input
+                      id="rp-neutral"
+                      name="neutral"
+                      inputmode="decimal"
+                      dir="ltr"
+                      [(ngModel)]="form.neutralHistoryScore"
+                    />
+                  </div>
+                  <p class="prj-hint" i18n="@@rpolicy.partialHint">
+                    History is scored by rule v3 (cost and schedule against the award, client-caused
+                    variations excused, open claims and disputes, ratings and would-work-again).
+                    Every firm given the neutral value is flagged on the recommendation.
+                  </p>
+                } @else {
+                  <p class="prj-hint" i18n="@@rpolicy.historyHint2">
+                    Otherwise its weight is not applied and the recommendation says confidence is
+                    reduced; nothing is estimated. One finalized closeout is not yet a history.
+                  </p>
+                }
+              </fieldset>
+            }
+          </fieldset>
+          @if (formError()) {
+            <p class="prj-error-text" role="alert">{{ formError() }}</p>
+          }
+          <div class="prj-actions">
+            <button class="prj-btn" type="submit" [disabled]="busy()" i18n="@@common.save">
+              Save
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="cancelEdit()"
+              i18n="@@common.cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      } @else if (selected(); as policy) {
+        <h2>
+          <bdi>{{ policy.name }}</bdi>
+        </h2>
+        @if (policy.description) {
+          <p class="prj-hint">
+            <bdi>{{ policy.description }}</bdi>
+          </p>
+        }
+        <p class="prj-hint">
+          <span i18n="@@rpolicy.currentVersion">Version {{ policy.currentVersionNumber }}</span>
+          @if (policy.current.minimumTechnicalScore !== null) {
+            ·
+            <span i18n="@@rpolicy.passMarkShown"
+              >technical pass mark
+              <bdi dir="ltr">{{ policy.current.minimumTechnicalScore }} / 100</bdi></span
+            >
+          }
+          @if (policy.current.lockedAtUtc) {
+            · <span i18n="@@rpolicy.usedVersion">used by a recommendation (locked)</span>
+          }
+          @if (policy.status === 'Inactive') {
+            · <span i18n="@@policy.inactive">Inactive</span>
+          }
+        </p>
+        @if (usedVersion(policy); as used) {
+          <!-- CF-133 AC5: the exact version a recommendation used, read only. -->
+          <section
+            class="prj-note ev-used-version"
+            id="policy-used-version"
+            tabindex="-1"
+            aria-labelledby="policy-used-version-title"
+            data-testid="policy-used-version"
+          >
+            <h3 id="policy-used-version-title" i18n="@@policy.versionUsedRecommendation">
+              Version {{ used.number }} — used by this recommendation
+            </h3>
+            @if (used.minimumTechnicalScore !== null) {
+              <p class="prj-hint">
+                <span i18n="@@rpolicy.passMarkShown"
+                  >technical pass mark
+                  <bdi dir="ltr">{{ used.minimumTechnicalScore }} / 100</bdi></span
+                >
+              </p>
+            }
+            <ul role="list">
+              @for (criterion of used.criteria; track criterion.id) {
+                <li>
+                  {{ kindLabel(criterion.kind) }} · <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                </li>
+              }
+            </ul>
+            @if (used.historyRule) {
+              <p class="prj-hint">
+                <span i18n="@@rpolicy.historyRule">How past performance applies</span>:
+                @if (used.historyRule === 'Partial') {
+                  <span i18n="@@rpolicy.rulePartial"
+                    >When at least one eligible firm has 2 or more; the others receive a disclosed
+                    neutral value</span
+                  >
+                } @else {
+                  <span i18n="@@rpolicy.ruleAllOrNothing"
+                    >Only when every eligible firm has at least 2 finalized closeouts in the
+                    category (all or nothing)</span
+                  >
+                }
+              </p>
+            }
+          </section>
+        }
+        <div class="prj-table-wrap">
+          <table class="prj-table ev-table">
+            <caption class="prj-visually-hidden" i18n="@@policy.criteria">
+              Criteria
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@policy.criterionName">Criterion</th>
+                <th scope="col" i18n="@@policy.weight">Weight (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (criterion of policy.current.criteria; track criterion.id) {
+                <tr>
+                  <th scope="row">
+                    {{ kindLabel(criterion.kind) }}
+                    <small class="prj-hint tnd-block">{{ kindRule(criterion.kind) }}</small>
+                  </th>
+                  <td>
+                    <bdi dir="ltr">{{ criterion.weight }}</bdi>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (canManage()) {
+          <div class="prj-actions">
+            <button class="prj-btn" type="button" (click)="startEdit(policy)" i18n="@@policy.edit">
+              Edit
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="toggleStatus(policy)"
+            >
+              @if (policy.status === 'Active') {
+                <ng-container i18n="@@policy.deactivate">Make inactive</ng-container>
+              } @else {
+                <ng-container i18n="@@policy.activate">Activate</ng-container>
+              }
+            </button>
+          </div>
+        }
+        @if (policy.versions.length > 1) {
+          <h3 i18n="@@policy.history">Version history</h3>
+          <ul role="list" class="dc-list">
+            @for (version of policy.versions; track version.id) {
+              <li>
+                <span i18n="@@policy.versionLine"
+                  >Version {{ version.number }} ·
+                  {{ version.createdAtUtc | businessDate: 'instant' }} ·
+                  <bdi>{{ version.createdByName }}</bdi></span
+                >
+                @if (version.lockedAtUtc) {
+                  · <span i18n="@@rpolicy.usedVersion">used by a recommendation (locked)</span>
+                }
+                <ul role="list" class="dc-list">
+                  @for (criterion of version.criteria; track criterion.id) {
+                    <li>
+                      {{ kindLabel(criterion.kind) }} · <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                    </li>
+                  }
+                </ul>
+              </li>
+            }
+          </ul>
+        }
+      } @else {
+        <p class="prj-hint" i18n="@@policy.pick">Choose a policy, or create a new one.</p>
+      }
+    </div>
+  </div>
+</section>

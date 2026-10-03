@@ -1,0 +1,846 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/sourcing" i18n="@@nav.sourcing">Sourcing</a><span aria-hidden="true">/</span>
+    <span>
+      @if (sourcing()?.workPackage; as package) {
+        <bdi dir="ltr">{{ package.code }}</bdi>
+      } @else {
+        <ng-container i18n="@@sourcing.crumb">Work package sourcing</ng-container>
+      }
+    </span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  @if (notice()) {
+    <p id="sourcing-notice" class="prj-note" role="status" tabindex="-1">{{ notice() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@sourcing.loadingOne">Loading sourcing…</p>
+  } @else if (sourcing(); as item) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ item.workPackage.projectCode }}</bdi> ·
+          <bdi dir="ltr">{{ item.workPackage.code }}</bdi>
+        </p>
+        <h1>
+          <bdi>{{ item.workPackage.title }}</bdi>
+        </h1>
+        <p>
+          <span class="prj-chip" [class.prj-chip--Active]="item.status === 'ShortlistApproved'">{{
+            statusLabel(item.status)
+          }}</span>
+          &ngsp;
+          <span class="prj-hint">
+            <a [routerLink]="['/work-packages', item.workPackage.id]" i18n="@@sourcing.packageLink"
+              >Work package</a
+            >: {{ packageStatusLabel(item.workPackage.status) }} ·
+            <a [routerLink]="['/projects', item.workPackage.projectId]"
+              ><bdi>{{ item.workPackage.projectName }}</bdi></a
+            >
+          </span>
+        </p>
+      </div>
+      <div class="prj-actions">
+        @if (can(permissions.manage) && item.canApprove && !item.approvalRequestedAtUtc) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            [disabled]="busy()"
+            (click)="requestApproval()"
+          >
+            <ng-container i18n="@@sourcing.requestApproval">Mark ready for approval</ng-container>
+          </button>
+        }
+        @if (can(permissions.approve) && item.canApprove) {
+          <button class="prj-btn" type="button" (click)="open({ kind: 'approve' })">
+            <ng-container i18n="@@sourcing.approve">Approve shortlist</ng-container>
+          </button>
+        }
+        @if (can(permissions.approve) && item.canReopen) {
+          <button class="prj-btn prj-btn--ghost" type="button" (click)="openReopen()">
+            <ng-container i18n="@@sourcing.reopen">Reopen shortlist</ng-container>
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (item.approvalRequestedAtUtc) {
+      <p class="prj-note" role="status" i18n="@@sourcing.readyForApproval">
+        Ready for approval — marked by <bdi>{{ item.approvalRequestedByName }}</bdi
+        >, {{ item.approvalRequestedAtUtc | businessDate: 'instant' }}. Any change clears it.
+      </p>
+    }
+    @if (item.requireIndependentApproval) {
+      <p class="prj-hint" i18n="@@sourcing.fourEyes">
+        Your company requires the shortlist to be approved by someone other than who prepared or
+        last changed it.
+      </p>
+    }
+    <p class="prj-note src-guidance" role="note">
+      <strong i18n="@@sourcing.nextStep">Next step</strong>: {{ guidance(item) }}
+    </p>
+
+    <dl class="prj-summary src-counts">
+      <div>
+        <dt i18n="@@sourcing.candidates">Candidates</dt>
+        <dd>
+          <bdi dir="ltr">{{ counts().candidates }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@sourcing.qualified">Qualified</dt>
+        <dd>
+          <bdi dir="ltr">{{ counts().qualified }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@sourcing.shortlisted">Shortlisted</dt>
+        <dd>
+          <bdi dir="ltr">{{ counts().shortlisted }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@project.updated">Last updated</dt>
+        <dd>{{ item.updatedAtUtc | businessDate: 'instant' }}</dd>
+      </div>
+    </dl>
+
+    <section class="prj-section" aria-labelledby="trades-title">
+      <div class="prj-section-head">
+        <h2 id="trades-title" i18n="@@sourcing.tradesHeading">Trades being sourced</h2>
+        @if (canAddCandidates()) {
+          <button class="prj-btn prj-btn--ghost" type="button" (click)="openTrades()">
+            <ng-container i18n="@@sourcing.editTrades">Change trades</ng-container>
+          </button>
+        }
+      </div>
+      @if (item.trades.length) {
+        <p>
+          @for (trade of item.trades; track trade.id) {
+            <span class="prj-chip" [class.prj-chip--Cancelled]="!trade.isActive"
+              ><bdi>{{ trade.name }}</bdi> · <bdi dir="ltr">{{ trade.code }}</bdi>
+              @if (!trade.isActive) {
+                &ngsp;<ng-container i18n="@@directory.retiredSuffix">(retired)</ng-container>
+              }
+            </span>
+            &ngsp;
+          }
+        </p>
+      } @else {
+        <p class="prj-hint" i18n="@@sourcing.noTrades">
+          No trades named. Naming the trades you are sourcing for marks the candidates who perform
+          them.
+        </p>
+      }
+    </section>
+
+    @if (item.currentApproval; as approval) {
+      <section class="prj-section" aria-labelledby="approved-title">
+        <h2 id="approved-title" class="src-h2" i18n="@@sourcing.approvedShortlist">
+          Approved shortlist
+        </h2>
+        <p class="prj-hint" i18n="@@sourcing.approvedBy">
+          Round {{ approval.round }} · approved by <bdi>{{ approval.approvedByName }}</bdi> on
+          {{ approval.approvedAtUtc | businessDate: 'instant' }}
+        </p>
+        @if (approval.fastPath) {
+          <p><span class="prj-chip" i18n="@@sourcing.fastPathChip">Low-value fast path</span></p>
+        }
+        <ul class="src-members" role="list">
+          @for (member of approval.members; track member.subcontractorId) {
+            <li>
+              <bdi dir="ltr" class="src-code">{{ member.code }}</bdi>
+              <bdi>{{ member.legalName }}</bdi>
+              @if (member.currentDirectoryStatus && member.currentDirectoryStatus !== 'Active') {
+                <span
+                  class="prj-chip prj-chip--{{ member.currentDirectoryStatus }}"
+                  i18n="@@sourcing.nowStatus"
+                  >Now {{ directoryStatusLabel(member.currentDirectoryStatus) }} in the
+                  directory</span
+                >
+              }
+              @if (member.complianceAtApproval?.length) {
+                <span class="prj-hint tnd-block" i18n="@@sourcing.complianceAtApproval"
+                  >At approval:</span
+                >
+                <app-compliance-chips [items]="member.complianceAtApproval" />
+              }
+              <app-prequalification-evidence [evidence]="member.evidence" />
+            </li>
+          }
+        </ul>
+      </section>
+      <app-work-package-tender [workPackageId]="item.workPackage.id" />
+    }
+
+    <section class="prj-section" aria-labelledby="candidates-title">
+      <div class="prj-section-head">
+        <h2 id="candidates-title" i18n="@@sourcing.candidatesHeading">Candidates</h2>
+        @if (pickedCandidates().size) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="openAssessPicked()"
+            i18n="@@sourcing.assessPicked"
+          >
+            Prequalify selected ({{ pickedCandidates().size }})
+          </button>
+        }
+      </div>
+      @if (active().length === 0) {
+        <p class="prj-hint" i18n="@@sourcing.noCandidates">No candidates yet.</p>
+      } @else {
+        <ul class="prj-cards src-cards" role="list">
+          @for (candidate of active(); track candidate.id) {
+            <li
+              class="prj-card src-candidate"
+              [class.src-candidate--shortlisted]="candidate.isShortlisted"
+            >
+              <p class="prj-eyebrow">
+                @if (canBulkAssess(candidate)) {
+                  <input
+                    type="checkbox"
+                    [checked]="isCandidatePicked(candidate)"
+                    (change)="toggleCandidate(candidate, $any($event.target).checked)"
+                    aria-label="Select for prequalification"
+                    i18n-aria-label="@@sourcing.selectCandidate"
+                  />
+                }
+                <bdi dir="ltr">{{ candidate.code }}</bdi>
+                @if (candidate.isShortlisted) {
+                  · <span i18n="@@sourcing.onShortlist">On the shortlist</span>
+                }
+              </p>
+              <h3>
+                <bdi>{{ candidate.legalName }}</bdi>
+              </h3>
+              <p class="src-chips">
+                <span
+                  class="prj-chip prj-chip--{{
+                    candidate.result === 'Qualified'
+                      ? 'Active'
+                      : candidate.result === 'NotQualified'
+                        ? 'Blocked'
+                        : 'Draft'
+                  }}"
+                  >{{ resultLabel(candidate.result) }}</span
+                >
+                @if (candidate.directoryStatus !== 'Active') {
+                  <span class="prj-chip prj-chip--{{ candidate.directoryStatus }}">{{
+                    directoryStatusLabel(candidate.directoryStatus)
+                  }}</span>
+                }
+                @for (avl of candidate.vendor ?? []; track avl.tradeId) {
+                  <span class="prj-chip">{{ vendorLabel(avl.status) }}</span>
+                }
+              </p>
+              <p class="src-compliance"><app-compliance-chips [items]="candidate.compliance" /></p>
+              @if (candidate.trades.length) {
+                <p class="src-trades">
+                  @for (trade of candidate.trades; track trade.id) {
+                    <span class="src-trade" [class.src-trade--match]="trade.matchesSourcing"
+                      ><bdi>{{ trade.name }}</bdi>
+                      @if (trade.matchesSourcing) {
+                        <span class="prj-visually-hidden" i18n="@@sourcing.tradeMatchHidden"
+                          >(a sourced trade)</span
+                        >
+                      }
+                    </span>
+                  }
+                </p>
+              }
+              @if (location(candidate); as place) {
+                <p class="prj-hint">{{ place }}</p>
+              }
+              <details class="src-criteria">
+                <summary>
+                  @if (summarize(candidate.criteria); as summary) {
+                    <span i18n="@@sourcing.criteriaSummary"
+                      >Criteria: {{ summary.met }} met · {{ summary.notMet }} not met ·
+                      {{ summary.notAssessed }} not assessed</span
+                    >
+                  }
+                </summary>
+                <dl>
+                  @for (key of criteria; track key) {
+                    <dt>{{ criterionLabel(key) }}</dt>
+                    <dd [class.src-notmet]="candidate.criteria[key] === 'NotMet'">
+                      {{ outcomeLabel(candidate.criteria[key]) }}
+                    </dd>
+                  }
+                </dl>
+              </details>
+              @if (candidate.rationale) {
+                <p class="src-rationale">
+                  <strong i18n="@@sourcingField.rationale">Rationale</strong>:
+                  <bdi>{{ candidate.rationale }}</bdi>
+                </p>
+              }
+              @if (candidate.assessedAtUtc) {
+                <p class="prj-hint" i18n="@@sourcing.assessedBy">
+                  Assessed by <bdi>{{ candidate.assessedByName }}</bdi> on
+                  {{ candidate.assessedAtUtc | businessDate: 'instant' }}
+                </p>
+                <p><app-prequalification-evidence [evidence]="candidate.evidence" /></p>
+              }
+              @if (shortlistBlocker(candidate); as blocker) {
+                <p class="prj-hint">{{ blocker }}</p>
+              }
+              <div class="prj-actions src-card-actions">
+                @if (canAssess(candidate)) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="openAssess(candidate)"
+                  >
+                    <ng-container i18n="@@sourcing.assess">Prequalify</ng-container>
+                  </button>
+                }
+                @if (canShortlist(candidate)) {
+                  <button
+                    class="prj-btn"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="setShortlisted(candidate, true)"
+                  >
+                    <ng-container i18n="@@sourcing.addToShortlist">Add to shortlist</ng-container>
+                  </button>
+                }
+                @if (canUnshortlist(candidate)) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="setShortlisted(candidate, false)"
+                  >
+                    <ng-container i18n="@@sourcing.removeFromShortlist"
+                      >Take off shortlist</ng-container
+                    >
+                  </button>
+                }
+                @if (canRemove(candidate)) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="open({ kind: 'remove', candidate })"
+                  >
+                    <ng-container i18n="@@sourcing.removeCandidate">Stop considering</ng-container>
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (removed().length) {
+        <details class="src-removed">
+          <summary>
+            <span i18n="@@sourcing.removedHeading">No longer considered</span> (<bdi dir="ltr">{{
+              removed().length
+            }}</bdi
+            >)
+          </summary>
+          <ul class="src-members" role="list">
+            @for (candidate of removed(); track candidate.id) {
+              <li>
+                <bdi dir="ltr" class="src-code">{{ candidate.code }}</bdi>
+                <bdi>{{ candidate.legalName }}</bdi>
+                <span class="prj-chip">{{ resultLabel(candidate.result) }}</span>
+                @if (canRestore(candidate)) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="restore(candidate)"
+                  >
+                    <ng-container i18n="@@sourcing.considerAgain">Consider again</ng-container>
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    </section>
+
+    @if (showEvidence() && evidenceCandidates().length > 0) {
+      <app-candidate-evidence
+        [workPackageId]="item.workPackage.id"
+        [candidates]="evidenceCandidates()"
+      />
+    }
+
+    @if (canAddCandidates()) {
+      <section class="prj-section" aria-labelledby="discovery-title">
+        <h2 id="discovery-title" class="src-h2" i18n="@@sourcing.discoveryHeading">
+          Add candidates from the directory
+        </h2>
+        <form class="prj-filters" (ngSubmit)="discover(1)">
+          <div class="prj-field prj-field--grow">
+            <label for="discover-search" i18n="@@sourcing.discoverSearch"
+              >Search code, name or city</label
+            >
+            <input id="discover-search" name="search" type="search" [(ngModel)]="discoverSearch" />
+          </div>
+          <div class="prj-field">
+            <label for="discover-trade" i18n="@@directoryField.trade">Trade</label>
+            <select
+              id="discover-trade"
+              name="trade"
+              [(ngModel)]="discoverTradeId"
+              (change)="discover(1)"
+            >
+              <option value="" i18n="@@sourcing.anyTrade">Any trade</option>
+              @for (trade of trades(); track trade.id) {
+                <option [value]="trade.id">{{ trade.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="prj-field src-check">
+            <label>
+              <input
+                type="checkbox"
+                name="unavailable"
+                [(ngModel)]="showUnavailable"
+                (change)="discover(1)"
+              />
+              <ng-container i18n="@@sourcing.showUnavailable"
+                >Include inactive and blocked</ng-container
+              >
+            </label>
+          </div>
+          <div class="prj-field">
+            <button class="prj-btn" type="submit" i18n="@@sourcing.find">Find</button>
+          </div>
+        </form>
+        @if (discoveryError()) {
+          <p class="prj-note prj-note--error" role="alert">{{ discoveryError() }}</p>
+        }
+        @if (discoveryLoading() && !discovery()) {
+          <p class="prj-note" i18n="@@sourcing.searching">Searching the directory…</p>
+        } @else if (discovery(); as found) {
+          @if (found.items.length === 0) {
+            <p class="prj-hint" i18n="@@sourcing.noMatches">
+              No subcontractor in your directory matches. Change the search, or add the firm to the
+              directory first.
+            </p>
+          } @else {
+            <ul class="src-results" role="list" aria-live="polite">
+              @for (result of found.items; track result.subcontractorId) {
+                <li>
+                  <div>
+                    @if (!discoveryBlocker(result)) {
+                      <input
+                        type="checkbox"
+                        [id]="'pick-' + result.subcontractorId"
+                        [checked]="isPicked(result)"
+                        (change)="togglePick(result, $any($event.target).checked)"
+                        [attr.aria-label]="result.code"
+                      />
+                    }
+                    <bdi dir="ltr" class="src-code">{{ result.code }}</bdi>
+                    <bdi>{{ result.legalName }}</bdi>
+                    @if (result.matchesSourcingTrades) {
+                      <span class="prj-chip prj-chip--Active" i18n="@@sourcing.performsTrade"
+                        >Performs a sourced trade</span
+                      >
+                    }
+                    @if (location(result); as place) {
+                      <span class="prj-hint">{{ place }}</span>
+                    }
+                    @if (result.evidence; as evidence) {
+                      <app-discovery-history [evidence]="evidence" />
+                    }
+                  </div>
+                  @if (discoveryBlocker(result); as blocker) {
+                    <span class="prj-hint">{{ blocker }}</span>
+                  } @else {
+                    <button
+                      class="prj-btn prj-btn--ghost"
+                      type="button"
+                      [disabled]="busy()"
+                      (click)="add(result)"
+                    >
+                      @if (result.candidateState === 'removed') {
+                        <ng-container i18n="@@sourcing.considerAgain">Consider again</ng-container>
+                      } @else {
+                        <ng-container i18n="@@sourcing.addCandidate">Add as candidate</ng-container>
+                      }
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+            @if (picked().size) {
+              <div class="prj-actions">
+                <button
+                  class="prj-btn"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="addPicked()"
+                  i18n="@@sourcing.addPicked"
+                >
+                  Add selected ({{ picked().size }})
+                </button>
+                @if (canFastPath()) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="openFastPath()"
+                    i18n="@@sourcing.fastPath"
+                  >
+                    Approve selected on the fast path ({{ picked().size }})
+                  </button>
+                }
+              </div>
+            }
+            @if (found.totalPages > 1) {
+              <nav
+                class="prj-pager"
+                aria-label="Directory results"
+                i18n-aria-label="@@sourcing.resultPages"
+              >
+                <span i18n="@@common.pageOf"
+                  >Page <bdi dir="ltr">{{ found.page }}</bdi> of
+                  <bdi dir="ltr">{{ found.totalPages }}</bdi></span
+                >
+                <span class="prj-actions">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="found.page <= 1"
+                    (click)="discover(found.page - 1)"
+                    i18n="@@common.previous"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="found.page >= found.totalPages"
+                    (click)="discover(found.page + 1)"
+                    i18n="@@common.next"
+                  >
+                    Next
+                  </button>
+                </span>
+              </nav>
+            }
+          }
+        }
+      </section>
+    }
+
+    @if (pastApprovals().length) {
+      <section class="prj-section" aria-labelledby="history-title">
+        <h2 id="history-title" class="src-h2" i18n="@@sourcing.historyHeading">Approval history</h2>
+        <ol class="src-history">
+          @for (approval of pastApprovals(); track approval.id) {
+            <li>
+              <p i18n="@@sourcing.approvedBy">
+                Round {{ approval.round }} · approved by <bdi>{{ approval.approvedByName }}</bdi> on
+                {{ approval.approvedAtUtc | businessDate: 'instant' }}
+              </p>
+              @if (approval.fastPath) {
+                <p>
+                  <span class="prj-chip" i18n="@@sourcing.fastPathChip">Low-value fast path</span>
+                </p>
+              }
+              <p class="prj-hint" i18n="@@sourcing.revokedBy">
+                Reopened by <bdi>{{ approval.revokedByName }}</bdi> on
+                {{ approval.revokedAtUtc | businessDate: 'instant' }}
+              </p>
+              <p>
+                <strong i18n="@@sourcingField.reason">Reason</strong>:
+                <bdi>{{ approval.revocationReason }}</bdi>
+              </p>
+              <ul class="src-members" role="list">
+                @for (member of approval.members; track member.subcontractorId) {
+                  <li>
+                    <bdi dir="ltr" class="src-code">{{ member.code }}</bdi>
+                    <bdi>{{ member.legalName }}</bdi>
+                  </li>
+                }
+              </ul>
+            </li>
+          }
+        </ol>
+      </section>
+    }
+
+    @if (dialog(); as current) {
+      <app-confirm-dialog
+        [heading]="dialogHeading(current)"
+        [confirmLabel]="dialogConfirmLabel(current)"
+        [danger]="current.kind === 'remove'"
+        [busy]="busy()"
+        (confirmed)="confirmDialog()"
+        (cancelled)="close()"
+      >
+        @switch (current.kind) {
+          @case ('assess') {
+            @if (current.kind === 'assess') {
+              @if (current.others?.length) {
+                <p i18n="@@sourcing.assessManyIntro">
+                  The same criteria and decision are recorded for each of these candidates, one
+                  assessment each. Nothing is scored automatically.
+                </p>
+                <ul class="src-members" role="list">
+                  <li>
+                    <bdi dir="ltr" class="src-code">{{ current.candidate.code }}</bdi>
+                  </li>
+                  @for (other of current.others; track other.id) {
+                    <li>
+                      <bdi dir="ltr" class="src-code">{{ other.code }}</bdi>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p i18n="@@sourcing.assessIntro">
+                  Record each criterion for <bdi>{{ current.candidate.legalName }}</bdi
+                  >, then decide. Nothing is scored automatically.
+                </p>
+              }
+              @for (key of criteria; track key) {
+                <fieldset class="src-criterion">
+                  <legend>{{ criterionLabel(key) }}</legend>
+                  <!-- CF-033 (ADR-129): the history the criterion is judged on, where it is judged. -->
+                  @if (key === 'pastPerformance' && !current.others?.length && showEvidence()) {
+                    <app-prequalification-evidence-live
+                      [workPackageId]="item.workPackage.id"
+                      [subcontractorId]="current.candidate.subcontractorId"
+                    />
+                  }
+                  @for (outcome of outcomes; track outcome) {
+                    <label>
+                      <input
+                        type="radio"
+                        [name]="'criterion-' + key"
+                        [attr.name]="'criterion-' + key"
+                        [value]="outcome"
+                        [(ngModel)]="assessCriteria[key]"
+                      />
+                      {{ outcomeLabel(outcome) }}
+                    </label>
+                  }
+                </fieldset>
+              }
+              <fieldset class="src-criterion src-result">
+                <legend i18n="@@sourcing.decision">Decision</legend>
+                @for (result of results; track result) {
+                  <!-- Qualifying needs a firm Active in the directory; the hint below says why it is absent. -->
+                  @if (result !== 'Qualified' || current.candidate.directoryStatus === 'Active') {
+                    <label>
+                      <input
+                        type="radio"
+                        name="assess-result"
+                        [value]="result"
+                        [(ngModel)]="assessResult"
+                        (ngModelChange)="rationaleMissing.set(false)"
+                      />
+                      {{ resultLabel(result) }}
+                    </label>
+                  }
+                }
+                @if (current.candidate.directoryStatus !== 'Active') {
+                  <p class="prj-hint" i18n="@@sourcing.qualifiedUnavailable">
+                    Qualified is not available: this subcontractor is
+                    {{ directoryStatusLabel(current.candidate.directoryStatus) }} in the directory.
+                  </p>
+                }
+                @if (current.candidate.isShortlisted && assessResult !== 'Qualified') {
+                  <p class="prj-hint" i18n="@@sourcing.leavesShortlist">
+                    Saving this decision takes the candidate off the shortlist.
+                  </p>
+                }
+              </fieldset>
+              <div class="prj-field">
+                <label for="assess-rationale">
+                  <ng-container i18n="@@sourcingField.rationale">Rationale</ng-container>
+                  @if (needsRationale()) {
+                    <span aria-hidden="true">*</span>
+                  }
+                </label>
+                <textarea
+                  id="assess-rationale"
+                  name="rationale"
+                  rows="4"
+                  [attr.maxlength]="rationaleMax"
+                  [(ngModel)]="assessRationale"
+                  (ngModelChange)="rationaleMissing.set(false)"
+                  [attr.aria-required]="needsRationale() ? 'true' : null"
+                  [attr.aria-invalid]="rationaleMissing() ? 'true' : null"
+                  [attr.aria-describedby]="
+                    rationaleMissing()
+                      ? 'assess-rationale-hint assess-rationale-error'
+                      : 'assess-rationale-hint'
+                  "
+                ></textarea>
+                <span id="assess-rationale-hint" class="prj-hint">
+                  @if (needsRationale()) {
+                    @if (assessResult === 'NotQualified') {
+                      <ng-container i18n="@@problem.sourcingRationaleNotQualified"
+                        >Explain why this candidate does not qualify.</ng-container
+                      >
+                    } @else {
+                      <ng-container i18n="@@problem.sourcingRationaleOverride"
+                        >Explain why this candidate qualifies although a criterion is not
+                        met.</ng-container
+                      >
+                    }
+                  } @else {
+                    <ng-container i18n="@@sourcing.rationaleOptional"
+                      >Optional: the evidence behind this decision.</ng-container
+                    >
+                  }
+                </span>
+                @if (rationaleMissing()) {
+                  <span
+                    id="assess-rationale-error"
+                    class="prj-error-text"
+                    role="alert"
+                    i18n="@@sourcing.rationaleMissing"
+                    >A rationale is required for this decision.</span
+                  >
+                }
+              </div>
+            }
+          }
+          @case ('fastPath') {
+            @if (current.kind === 'fastPath') {
+              <p i18n="@@sourcing.fastPathConsequence">
+                These approved vendors are added, recorded as qualified and the shortlist is
+                approved in one step. The approval is marked as fast path in the history and on the
+                tender.
+              </p>
+              <ul class="src-members" role="list">
+                @for (firm of current.firms; track firm.subcontractorId) {
+                  <li>
+                    <bdi dir="ltr" class="src-code">{{ firm.code }}</bdi>
+                    <bdi>{{ firm.legalName }}</bdi>
+                  </li>
+                }
+              </ul>
+              <div class="prj-field">
+                <label for="fast-path-reason" i18n="@@sourcing.fastPathReason"
+                  >Reason for using the fast path</label
+                >
+                <textarea
+                  id="fast-path-reason"
+                  name="fastPathReason"
+                  rows="3"
+                  maxlength="2000"
+                  [(ngModel)]="fastPathRationale"
+                  (ngModelChange)="reasonMissing.set(false)"
+                ></textarea>
+              </div>
+              @if (reasonMissing()) {
+                <p class="prj-error-text" role="alert" i18n="@@sourcing.fastPathReasonMissing">
+                  Give a reason of at least a few words.
+                </p>
+              }
+            }
+          }
+          @case ('remove') {
+            <p i18n="@@sourcing.removeConsequence">
+              The candidate leaves the pool and the shortlist. Its prequalification is kept, and it
+              can be considered again while the shortlist is open.
+            </p>
+          }
+          @case ('approve') {
+            <p i18n="@@sourcing.approveConsequence">
+              The shortlisted subcontractors are approved to proceed to tendering. The shortlist
+              then cannot change unless it is reopened, and this approval is kept in the history.
+            </p>
+            <ul class="src-members" role="list">
+              @for (candidate of active(); track candidate.id) {
+                @if (candidate.isShortlisted) {
+                  <li>
+                    <bdi dir="ltr" class="src-code">{{ candidate.code }}</bdi>
+                    <bdi>{{ candidate.legalName }}</bdi>
+                  </li>
+                }
+              }
+            </ul>
+          }
+          @case ('reopen') {
+            <p i18n="@@sourcing.reopenConsequence">
+              The approval is revoked but kept in the history with your reason. Candidates keep
+              their prequalification and shortlist places so the change can be made and approved
+              again.
+            </p>
+            <div class="prj-field">
+              <label for="reopen-reason">
+                <ng-container i18n="@@sourcingField.reason">Reason</ng-container>
+                <span aria-hidden="true">*</span>
+              </label>
+              <textarea
+                id="reopen-reason"
+                name="reason"
+                rows="3"
+                [attr.maxlength]="reasonMax"
+                [(ngModel)]="reopenReason"
+                (ngModelChange)="reasonMissing.set(false)"
+                aria-required="true"
+                [attr.aria-invalid]="reasonMissing() ? 'true' : null"
+                [attr.aria-describedby]="reasonMissing() ? 'reopen-reason-error' : null"
+              ></textarea>
+              @if (reasonMissing()) {
+                <span
+                  id="reopen-reason-error"
+                  class="prj-error-text"
+                  role="alert"
+                  i18n="@@sourcing.reopenReasonMissing"
+                  >Explain why the approved shortlist is being reopened (at least
+                  {{ reasonMin }} characters).</span
+                >
+              }
+            </div>
+          }
+          @case ('trades') {
+            <p i18n="@@sourcing.tradesIntro">
+              Candidates who perform one of these trades are marked. Retired trades can stay but
+              cannot be newly added.
+            </p>
+            @if (tradeChoices().length === 0) {
+              <p class="prj-hint" i18n="@@sourcing.noTradeChoices">
+                Your company has no active trades yet. Trades are managed in the subcontractor
+                directory.
+              </p>
+            }
+            <fieldset class="src-criterion">
+              <legend class="prj-visually-hidden" i18n="@@sourcing.tradesHeading">
+                Trades being sourced
+              </legend>
+              @for (trade of tradeChoices(); track trade.id) {
+                <label>
+                  <input
+                    type="checkbox"
+                    [name]="'trade-' + trade.id"
+                    [checked]="selectedTrades.has(trade.id)"
+                    (change)="toggleTrade(trade.id, $any($event.target).checked)"
+                  />
+                  <bdi>{{ trade.name }}</bdi> · <bdi dir="ltr">{{ trade.code }}</bdi>
+                </label>
+              }
+            </fieldset>
+          }
+        }
+        @if (dialogError()) {
+          <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+        }
+      </app-confirm-dialog>
+    }
+  }
+</section>

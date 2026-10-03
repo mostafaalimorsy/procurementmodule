@@ -1,0 +1,9 @@
+@use 'decision-common';
+
+// ---- the approval matrix -----------------------------------------------------------------
+
+.dc-pair {
+  display: grid;
+  gap: 0 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}

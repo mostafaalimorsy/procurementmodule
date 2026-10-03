@@ -1,0 +1,384 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/subcontractors" i18n="@@nav.subcontractors">Subcontractors</a
+    ><span aria-hidden="true">/</span>
+    <span>
+      @if (subcontractor()?.code; as code) {
+        <bdi dir="ltr">{{ code }}</bdi>
+      } @else {
+        <ng-container i18n="@@directory.crumb">Subcontractor</ng-container>
+      }
+    </span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@directory.loadingOne">Loading subcontractor…</p>
+  } @else if (subcontractor(); as item) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ item.code }}</bdi>
+        </p>
+        <h1>
+          <bdi>{{ item.legalName }}</bdi>
+        </h1>
+        <p>
+          <span class="prj-chip prj-chip--{{ item.status }}">{{ statusLabel(item.status) }}</span>
+          @if (item.tradingName) {
+            &ngsp;<span class="prj-hint"
+              ><bdi>{{ item.tradingName }}</bdi></span
+            >
+          }
+        </p>
+      </div>
+      <div class="prj-actions">
+        @if (can(permissions.edit)) {
+          <a
+            class="prj-btn prj-btn--ghost"
+            [routerLink]="['/subcontractors', item.id, 'edit']"
+            i18n="@@common.edit"
+            >Edit</a
+          >
+        }
+        @for (action of actions(item); track action.to) {
+          <button
+            class="prj-btn"
+            [class.prj-btn--ghost]="action.kind === 'secondary'"
+            [class.prj-btn--danger]="action.kind === 'danger'"
+            type="button"
+            (click)="ask(action)"
+          >
+            {{ action.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (item.status === 'Blocked') {
+      <p class="prj-note prj-note--error" role="note">
+        <strong i18n="@@directory.blockReason">Block reason</strong>:
+        <bdi>{{ item.statusReason }}</bdi>
+      </p>
+    } @else if (item.status === 'Inactive' && item.statusReason) {
+      <p class="prj-note" role="note">
+        <strong i18n="@@directoryField.statusReason">Reason</strong>:
+        <bdi>{{ item.statusReason }}</bdi>
+      </p>
+    }
+
+    <!-- CF-014 (ADR-130): the firm's history at a glance, above the fold; the full evidence is further down. -->
+    @if (showIntelligence() && summary(); as profile) {
+      <app-intel-summary [profile]="profile" />
+    }
+
+    <div class="prj-layout">
+      <div>
+        <section class="prj-section" aria-labelledby="overview-title">
+          <h2 id="overview-title" i18n="@@directory.overview">Overview</h2>
+          <dl class="prj-summary">
+            <div>
+              <dt i18n="@@directoryField.legalName">Legal name</dt>
+              <dd>
+                <bdi>{{ item.legalName }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@directoryField.tradingName">Trading name</dt>
+              <dd>
+                <bdi>{{ item.tradingName || '—' }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@directoryField.commercialRegistration">Commercial registration no.</dt>
+              <dd>
+                <bdi dir="ltr" class="ltr-token">{{
+                  item.commercialRegistrationNumber || '—'
+                }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@directoryField.taxRegistration">Tax registration no.</dt>
+              <dd>
+                <bdi dir="ltr" class="ltr-token">{{ item.taxRegistrationNumber || '—' }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@directory.colLocation">Location</dt>
+              <dd>
+                {{ location(item) || '—' }}
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@directory.colUpdated">Updated</dt>
+              <dd>{{ item.updatedAtUtc | businessDate: 'instant' }}</dd>
+            </div>
+          </dl>
+          @if (item.imported) {
+            <p class="prj-hint" i18n="@@directory.importedHint">Added by a directory import.</p>
+          }
+        </section>
+
+        <section class="prj-section" aria-labelledby="trades-title">
+          <h2 id="trades-title" i18n="@@directoryField.trades">Trades</h2>
+          @if (item.trades.length) {
+            <p>
+              @for (trade of item.trades; track trade.id) {
+                <span class="prj-chip" [class.prj-chip--Cancelled]="!trade.isActive"
+                  ><bdi>{{ trade.name }}</bdi> · <bdi dir="ltr">{{ trade.code }}</bdi>
+                  @if (!trade.isActive) {
+                    &ngsp;<ng-container i18n="@@directory.retiredSuffix">(retired)</ng-container>
+                  }
+                </span>
+                &ngsp;
+              }
+            </p>
+          } @else {
+            <p class="prj-hint" i18n="@@directory.noTrades">No trades recorded yet.</p>
+          }
+        </section>
+
+        <app-subcontractor-compliance [subcontractorId]="item.id" />
+
+        <section class="prj-section" aria-labelledby="contacts-title">
+          <h2 id="contacts-title" i18n="@@directory.contacts">Contacts</h2>
+          @if (item.contacts.length) {
+            <div class="prj-table-wrap">
+              <table class="prj-table">
+                <caption class="prj-visually-hidden" i18n="@@directory.contactsCaption">
+                  Contacts at this subcontractor
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" i18n="@@directoryField.contactName">Contact name</th>
+                    <th scope="col" i18n="@@directoryField.contactJobTitle">Job title</th>
+                    <th scope="col" i18n="@@directory.email">Email</th>
+                    <th scope="col" i18n="@@directory.phone">Phone</th>
+                    @if (canManageData()) {
+                      <th scope="col">
+                        <span class="prj-visually-hidden" i18n="@@directory.contactActions"
+                          >Actions</span
+                        >
+                      </th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (contact of item.contacts; track contact.id) {
+                    <tr>
+                      <td>
+                        <bdi>{{ contact.name }}</bdi>
+                        @if (contact.isPrimary) {
+                          &ngsp;<span
+                            class="prj-chip prj-chip--Active"
+                            i18n="@@directory.primaryContact"
+                            >Primary contact</span
+                          >
+                        }
+                      </td>
+                      <td>
+                        <bdi>{{ contact.jobTitle || '—' }}</bdi>
+                      </td>
+                      <td>
+                        <bdi dir="ltr">{{ contact.email || '—' }}</bdi>
+                      </td>
+                      <td>
+                        <bdi dir="ltr">{{ contact.phone || '—' }}</bdi>
+                      </td>
+                      @if (canManageData()) {
+                        <td>
+                          <!-- CF-071 (ADR-134): erasure on request; the primary contact first hands over its role. -->
+                          @if (!contact.isPrimary && contact.name !== 'Erased contact') {
+                            @if (erasingContact() === contact.id) {
+                              <button
+                                type="button"
+                                class="prj-btn prj-btn--danger"
+                                [disabled]="busy()"
+                                (click)="eraseContact(contact.id)"
+                                i18n="@@directory.confirmEraseContact"
+                              >
+                                Confirm: erase permanently
+                              </button>
+                              <button
+                                type="button"
+                                class="prj-btn prj-btn--ghost"
+                                (click)="erasingContact.set(null)"
+                                i18n="@@common.cancel"
+                              >
+                                Cancel
+                              </button>
+                            } @else {
+                              <button
+                                type="button"
+                                class="prj-btn prj-btn--ghost"
+                                [disabled]="busy()"
+                                (click)="erasingContact.set(contact.id)"
+                                i18n="@@directory.eraseContact"
+                              >
+                                Erase personal data
+                              </button>
+                            }
+                          }
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <p class="prj-hint" i18n="@@directory.noContacts">No contacts recorded yet.</p>
+          }
+        </section>
+
+        <section class="prj-section" aria-labelledby="notes-title">
+          <h2 id="notes-title" i18n="@@directoryField.notes">Notes</h2>
+          @if (item.notes) {
+            <p style="white-space: pre-line">
+              <bdi>{{ item.notes }}</bdi>
+            </p>
+          } @else {
+            <p class="prj-hint" i18n="@@directory.noNotes">No notes yet.</p>
+          }
+        </section>
+
+        @if (showIntelligence()) {
+          <app-subcontractor-intelligence
+            [subcontractorId]="item.id"
+            [workPackageId]="workPackageId"
+            [initialCategory]="category"
+            (loaded)="summary.set($event)"
+          />
+        } @else if (showPerformance()) {
+          <!-- CF-014: one delivery section — the intelligence one when the plan has it, otherwise the project performance history. -->
+          <app-subcontractor-performance [subcontractorId]="item.id" />
+        }
+      </div>
+    </div>
+
+    @if (pending(); as action) {
+      <app-confirm-dialog
+        [heading]="action.heading"
+        [confirmLabel]="action.label"
+        [danger]="action.danger"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="dismiss()"
+      >
+        <p>{{ action.consequence }}</p>
+        @if (action.to === 'Blocked') {
+          <!-- Red-team G044 (CF-044 AC6): the live work this block affects, before it is confirmed. -->
+          <section class="prj-note" aria-labelledby="block-live-title" data-testid="block-live">
+            <h3 id="block-live-title" i18n="@@directory.blockLiveTitle">
+              Live work with this firm
+            </h3>
+            @if (engagementsFailed()) {
+              <p class="prj-error-text" role="alert">
+                <span i18n="@@directory.blockLiveError"
+                  >The firm's live invitations and decisions could not be loaded. You can still
+                  block it.</span
+                >
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  (click)="loadEngagements(item.id)"
+                  i18n="@@common.reload"
+                >
+                  Reload
+                </button>
+              </p>
+            } @else if (engagements(); as live) {
+              <p>
+                <span i18n="@@directory.blockLiveInvitations">{live.invitations.length, plural,
+                  =0 {No open invitations}
+                  =1 {1 open invitation}
+                  other {{{ live.invitations.length }} open invitations}
+                }</span>
+              </p>
+              @if (live.invitations.length) {
+                <ul role="list">
+                  @for (entry of live.invitations; track entry.tenderId) {
+                    <li>
+                      <a [routerLink]="['/tenders', entry.tenderId]"
+                        ><bdi dir="ltr" class="ltr-token">{{ entry.tenderReference }}</bdi></a
+                      >
+                      — <bdi>{{ entry.tenderTitle }}</bdi>
+                    </li>
+                  }
+                </ul>
+              }
+              <p>
+                <span i18n="@@directory.blockPendingDecisions">{live.decisions.length, plural,
+                  =0 {No pending decisions}
+                  =1 {1 pending decision}
+                  other {{{ live.decisions.length }} pending decisions}
+                }</span>
+              </p>
+              @if (live.decisions.length) {
+                <ul role="list">
+                  @for (entry of live.decisions; track entry.tenderId) {
+                    <li>
+                      <a [routerLink]="['/tenders', entry.tenderId, 'decision']"
+                        ><bdi dir="ltr" class="ltr-token">{{ entry.tenderReference }}</bdi></a
+                      >
+                      — <bdi>{{ entry.tenderTitle }}</bdi> ·
+                      {{ decisionStateLabel(entry.decisionState) }}
+                    </li>
+                  }
+                </ul>
+              }
+              @if (live.invitations.length || live.decisions.length) {
+                <p class="prj-hint" i18n="@@directory.blockLiveHint">
+                  Blocking does not notify the firm. Its bids become ineligible and these decisions
+                  cannot be approved or awarded — tell the Procurement Manager.
+                </p>
+              }
+            } @else {
+              <p class="prj-hint" i18n="@@common.loading">Loading…</p>
+            }
+          </section>
+        }
+        @if (action.reason !== 'none') {
+          <div class="prj-field">
+            <label for="status-reason">
+              @if (action.reason === 'required') {
+                <ng-container i18n="@@directory.blockReason">Block reason</ng-container>
+                <span aria-hidden="true">*</span>
+              } @else {
+                <ng-container i18n="@@directory.optionalReason">Reason (optional)</ng-container>
+              }
+            </label>
+            <textarea
+              id="status-reason"
+              name="reason"
+              maxlength="500"
+              [(ngModel)]="reason"
+              [attr.aria-invalid]="reasonMissing() ? 'true' : null"
+              [attr.aria-describedby]="reasonMissing() ? 'status-reason-error' : null"
+            ></textarea>
+            @if (reasonMissing()) {
+              <span
+                id="status-reason-error"
+                class="prj-error-text"
+                role="alert"
+                i18n="@@problem.blockReasonRequired"
+                >Explain why this subcontractor is blocked.</span
+              >
+            }
+          </div>
+        }
+      </app-confirm-dialog>
+    }
+  }
+</section>

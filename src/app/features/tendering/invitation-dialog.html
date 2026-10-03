@@ -1,0 +1,519 @@
+<div class="prj-dialog" (click)="backdrop($event)">
+  <div
+    class="tnd-dialog"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    appAutofocus
+    [attr.aria-labelledby]="titleId"
+  >
+    <div class="prj-section-head">
+      <h2 [id]="titleId">
+        <bdi dir="ltr">{{ invitation().subcontractorCode }}</bdi> ·
+        <bdi>{{ invitation().subcontractorName }}</bdi>
+      </h2>
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="close()" i18n="@@common.close">
+        Close
+      </button>
+    </div>
+
+    <dl class="tnd-review">
+      <div>
+        <dt i18n="@@tenderBuilder.colRecipient">Recipient</dt>
+        <dd>
+          <bdi>{{ invitation().recipientName }}</bdi>
+          <bdi dir="ltr" class="tnd-block">{{ invitation().recipientEmail }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@control.colResponse">Response</dt>
+        <dd>
+          {{ statusLabel(invitation().status) }}
+          @if (invitation().expired) {
+            <span class="prj-hint tnd-block" i18n="@@tenderInvitation.expired"
+              >The deadline passed without an answer.</span
+            >
+          }
+          @if (invitation().declineReason) {
+            <span class="tnd-block">{{ declineLabel(invitation().declineReason!) }}</span>
+          }
+          @if (invitation().declineComment) {
+            <q class="tnd-block"
+              ><bdi>{{ invitation().declineComment }}</bdi></q
+            >
+          }
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@control.colEmail">Email</dt>
+        <dd>
+          {{ deliveryLabel(invitation().deliveryStatus) }}
+          @if (invitation().deliveryStatus === 'Failed') {
+            <span class="tnd-attention tnd-block">{{
+              failureLabel(invitation().lastFailureCategory)
+            }}</span>
+          }
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@control.colOpened">Opened</dt>
+        <dd>
+          @if (invitation().firstOpenedAtUtc) {
+            {{ invitation().firstOpenedAtUtc | businessDate: 'instant' }}
+            <span class="prj-hint tnd-block" i18n="@@tenderInvitation.openCount"
+              >Opened: {{ invitation().openCount }}</span
+            >
+          } @else {
+            <span i18n="@@control.notOpened">Not opened</span>
+          }
+        </dd>
+      </div>
+      @if (invitation().revokedAtUtc) {
+        <div class="prj-span-all">
+          <dt i18n="@@invitationStatus.revoked">Revoked</dt>
+          <dd i18n="@@tenderInvitation.revokedBy">
+            By <bdi>{{ invitation().revokedByName }}</bdi> on
+            {{ invitation().revokedAtUtc | businessDate: 'instant' }}:
+            <bdi>{{ invitation().revocationReason }}</bdi>
+          </dd>
+        </div>
+      }
+    </dl>
+
+    @if (error()) {
+      <p class="prj-error-text" role="alert" [id]="errorId">{{ error() }}</p>
+    }
+    @if (notice()) {
+      <p class="prj-note" role="status" tabindex="-1" [id]="noticeId">{{ notice() }}</p>
+    }
+
+    @if (canManage()) {
+      @if (pending(); as action) {
+        <div class="tnd-confirm" role="group" [attr.aria-labelledby]="pendingId">
+          <h3 [id]="pendingId" tabindex="-1">
+            @switch (action) {
+              @case ('resend') {
+                <ng-container i18n="@@tenderInvitation.askResend"
+                  >Send the invitation email again?</ng-container
+                >
+              }
+              @case ('remind') {
+                <ng-container i18n="@@tenderInvitation.askRemind"
+                  >Send a reminder now?</ng-container
+                >
+              }
+              @case ('regenerate') {
+                <ng-container i18n="@@tenderInvitation.askRegenerate"
+                  >Replace the invitation link?</ng-container
+                >
+              }
+              @case ('revoke') {
+                <ng-container i18n="@@tenderInvitation.askRevoke"
+                  >Revoke this invitation?</ng-container
+                >
+              }
+              @case ('recipient') {
+                <ng-container i18n="@@tenderInvitation.askRecipient"
+                  >Change the recipient?</ng-container
+                >
+              }
+              @case ('second') {
+                <ng-container i18n="@@tenderInvitation.askSecond"
+                  >Add a second recipient?</ng-container
+                >
+              }
+              @case ('removeSecond') {
+                <ng-container i18n="@@tenderInvitation.askRemoveSecond"
+                  >Remove the second recipient?</ng-container
+                >
+              }
+            }
+          </h3>
+          @switch (action) {
+            @case ('resend') {
+              <p i18n="@@tenderInvitation.resendBody">
+                The same invitation, with the same link, goes to
+                <bdi>{{ invitation().recipientEmail }}</bdi
+                >.
+              </p>
+            }
+            @case ('remind') {
+              <p i18n="@@tenderInvitation.remindBody">
+                A reminder with the same link goes to <bdi>{{ invitation().recipientEmail }}</bdi
+                >.
+              </p>
+            }
+            @case ('regenerate') {
+              <p i18n="@@tenderInvitation.replaceBody">
+                The current links stop working immediately. The firm receives its new personal link
+                only by email; you get a new view-only link. Use this if a link was forwarded or
+                exposed.
+              </p>
+              @if (invitation().canResend) {
+                <label class="tnd-choice">
+                  <input type="checkbox" [(ngModel)]="emailNewLink" />
+                  <ng-container i18n="@@tenderInvitation.emailNewLink"
+                    >Email the new link to the recipient</ng-container
+                  >
+                </label>
+              }
+            }
+            @case ('revoke') {
+              <p i18n="@@tenderInvitation.revokeBody">
+                The firm is withdrawn from this tender: its link stops working and nothing more is
+                sent. This cannot be undone.
+              </p>
+              <div class="prj-field">
+                <label for="revoke-reason" i18n="@@tenderField.reason">Reason</label>
+                <textarea
+                  id="revoke-reason"
+                  rows="3"
+                  [attr.aria-invalid]="error() ? 'true' : null"
+                  [attr.aria-describedby]="error() ? errorId : null"
+                  [attr.maxlength]="reasonMax"
+                  [(ngModel)]="reason"
+                  (input)="error.set('')"
+                ></textarea>
+              </div>
+            }
+            @case ('second') {
+              <div class="prj-field">
+                <label for="second-recipient" i18n="@@tenderInvitation.secondRecipientLabel"
+                  >Second recipient</label
+                >
+                <select id="second-recipient" [(ngModel)]="contactId">
+                  @for (contact of secondOptions(); track contact.contactId) {
+                    <option [value]="contact.contactId">
+                      {{ contact.name }} — {{ contact.email }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <p class="prj-hint" i18n="@@tenderInvitation.secondRecipientHint">
+                Another contact of the same firm receives its own personal link by email. Either
+                person can answer and work on the firm's one bid; the record shows which link acted.
+              </p>
+            }
+            @case ('removeSecond') {
+              <p i18n="@@tenderInvitation.removeSecondHint">
+                The second recipient's link stops working at once. The first recipient's link is not
+                affected.
+              </p>
+            }
+            @case ('recipient') {
+              <div class="prj-field">
+                <label for="new-recipient" i18n="@@tenderInvitation.newRecipient"
+                  >New recipient</label
+                >
+                <select id="new-recipient" [(ngModel)]="contactId">
+                  @for (contact of contacts(); track contact.contactId) {
+                    <option [value]="contact.contactId">
+                      {{ contact.name }} — {{ contact.email }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <p class="prj-hint" i18n="@@tenderInvitation.recipientHint">
+                Earlier emails stay recorded with the address they went to, and emails not yet sent
+                are withdrawn. The current link keeps working: replace the link if the previous
+                recipient must lose access.
+              </p>
+            }
+          }
+          <div class="prj-actions">
+            <button
+              class="prj-btn"
+              type="button"
+              [class.prj-btn--danger]="action === 'revoke' || action === 'regenerate'"
+              [disabled]="busy()"
+              (click)="run()"
+            >
+              @if (busy()) {
+                <ng-container i18n="@@common.working">Working…</ng-container>
+              } @else {
+                <ng-container i18n="@@tenderInvitation.confirm">Confirm</ng-container>
+              }
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="back()"
+              i18n="@@common.cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div
+          class="prj-actions tnd-actions"
+          tabindex="-1"
+          [id]="actionsId"
+          role="group"
+          aria-label="Invitation actions"
+          i18n-aria-label="@@tenderInvitation.actions"
+        >
+          @if (invitation().canResend) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="ask('resend')"
+              i18n="@@tenderInvitation.resend"
+            >
+              Resend invitation
+            </button>
+          }
+          @if (invitation().canRemind) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="ask('remind')"
+              i18n="@@tenderInvitation.remind"
+            >
+              Send reminder
+            </button>
+          }
+          @if (invitation().canCopyLink) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="revealLink()"
+              i18n="@@tenderInvitation.copyViewLink"
+            >
+              Show view-only link
+            </button>
+          }
+          @if (invitation().firmLinkShown) {
+            <p class="tnd-attention tnd-block" i18n="@@tenderInvitation.firmLinkShown">
+              This firm's personal link was shown to a user by an earlier version, so for its
+              protection it can now only view the invitation. Replace the link and email the new one
+              so the firm can answer and bid again.
+            </p>
+          }
+          @if (invitation().canChangeRecipient && contacts().length > 1) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="ask('recipient')"
+              i18n="@@tenderInvitation.changeRecipient"
+            >
+              Change recipient
+            </button>
+          }
+          @if (invitation().secondRecipient; as second) {
+            <p class="prj-hint tnd-block">
+              <ng-container i18n="@@tenderInvitation.secondRecipientNow"
+                >Second recipient: <bdi>{{ second.name }}</bdi> —
+                <bdi dir="ltr">{{ second.email }}</bdi></ng-container
+              >
+              @if (second.linkIssued) {
+                ·
+                <ng-container i18n="@@tenderInvitation.secondLinkEmailed"
+                  >own link issued</ng-container
+                >
+              } @else {
+                ·
+                <ng-container i18n="@@tenderInvitation.secondLinkLater"
+                  >link issued at publication</ng-container
+                >
+              }
+            </p>
+            @if (invitation().canChangeRecipient) {
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="ask('removeSecond')"
+                i18n="@@tenderInvitation.removeSecond"
+              >
+                Remove second recipient
+              </button>
+            }
+          } @else if (invitation().canChangeRecipient && secondOptions().length) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="ask('second')"
+              i18n="@@tenderInvitation.addSecond"
+            >
+              Add a second recipient
+            </button>
+          }
+          @if (invitation().canRegenerate) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="ask('regenerate')"
+              i18n="@@tenderInvitation.regenerate"
+            >
+              Replace link
+            </button>
+          }
+          @if (invitation().canRevoke) {
+            <button
+              class="prj-btn prj-btn--ghost prj-btn--danger"
+              type="button"
+              (click)="ask('revoke')"
+              i18n="@@tenderInvitation.revoke"
+            >
+              Revoke invitation
+            </button>
+          }
+        </div>
+      }
+
+      @if (link(); as current) {
+        <div class="tnd-link" role="group" aria-labelledby="link-title">
+          <h3 id="link-title" i18n="@@tenderInvitation.viewLinkTitle">View-only invitation link</h3>
+          <p class="tnd-attention" i18n="@@tenderInvitation.viewLinkWarning">
+            Anyone with this link can see the tender and its documents, but nobody can answer or bid
+            with it. <bdi>{{ invitation().subcontractorName }}</bdi> answers and bids only through
+            the personal link in its invitation email; resend the invitation if the firm needs it
+            again.
+          </p>
+          <label
+            class="prj-visually-hidden"
+            for="invitation-link"
+            i18n="@@tenderInvitation.viewLinkTitle"
+            >View-only invitation link</label
+          >
+          <input
+            id="invitation-link"
+            class="tnd-link-input"
+            dir="ltr"
+            readonly
+            [value]="current.url"
+            (focus)="$any($event.target).select()"
+          />
+          <button class="prj-btn" type="button" (click)="copy()">
+            @if (copied()) {
+              <ng-container i18n="@@tenderInvitation.copied">Copied</ng-container>
+            } @else {
+              <ng-container i18n="@@tenderInvitation.copy">Copy</ng-container>
+            }
+          </button>
+          <span class="prj-visually-hidden" role="status">
+            @if (copied()) {
+              <ng-container i18n="@@tenderInvitation.copiedAnnounce"
+                >Link copied to the clipboard.</ng-container
+              >
+            }
+          </span>
+          @if (copyFailed()) {
+            <p class="prj-error-text" role="alert" i18n="@@tenderInvitation.copyFailed">
+              The link could not be copied automatically. It is selected: copy it with your
+              keyboard.
+            </p>
+          }
+        </div>
+      }
+    }
+
+    <h3 i18n="@@tenderInvitation.historyTitle">Activity</h3>
+    @if (activityError()) {
+      <p class="prj-error-text" role="alert">{{ activityError() }}</p>
+    } @else if (activity(); as history) {
+      <ol class="tnd-timeline" role="list">
+        @for (item of history.events; track item.id) {
+          <li>
+            <span>{{ eventLabel(item.type) }}</span>
+            @if (item.type === 'EmailFailed' && item.detail) {
+              <span class="tnd-attention"> — {{ failureLabel(item.detail) }}</span>
+            }
+            @if (item.type === 'Declined' && item.detail) {
+              <span> — {{ declineLabel(item.detail) }}</span>
+            }
+            @if (item.type === 'NoticeQueued' && item.detail) {
+              <span> — {{ kindLabel(item.detail) }}</span>
+            }
+            @if (item.type === 'QuestionAsked' && item.detail) {
+              <span>
+                — <bdi dir="ltr">{{ item.detail }}</bdi></span
+              >
+            }
+            @if (item.type === 'AddendumAcknowledged' && item.detail) {
+              <span>
+                —
+                <ng-container i18n="@@addendum.numbered"
+                  >Addendum {{ item.detail }}</ng-container
+                ></span
+              >
+            }
+            <small class="prj-hint tnd-block">
+              {{ item.occurredAtUtc | businessDate: 'instant' }}
+              @if (item.actorKind === 'User') {
+                · <bdi>{{ item.actorName }}</bdi>
+              } @else if (item.actorKind === 'Bidder') {
+                · <ng-container i18n="@@tenderInvitation.byBidder">by the bidder</ng-container>
+              } @else {
+                · <ng-container i18n="@@tenderInvitation.bySystem">automatic</ng-container>
+              }
+            </small>
+          </li>
+        }
+      </ol>
+      @if (history.deliveries.length) {
+        <h3 i18n="@@tenderInvitation.emailsTitle">Emails</h3>
+        <div class="prj-table-wrap" role="region" aria-labelledby="emails-caption" tabindex="0">
+          <table class="prj-table">
+            <caption
+              id="emails-caption"
+              class="prj-visually-hidden"
+              i18n="@@tenderInvitation.emailsTitle"
+            >
+              Emails
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@tenderInvitation.colKind">Email</th>
+                <th scope="col" i18n="@@tenderInvitation.colTo">To</th>
+                <th scope="col" i18n="@@tenderInvitation.colOutcome">Outcome</th>
+                <th scope="col" i18n="@@tenderInvitation.colFrom">From</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (delivery of history.deliveries; track delivery.id) {
+                <tr>
+                  <td>
+                    {{ kindLabel(delivery.kind) }}
+                    <small class="prj-hint tnd-block">{{
+                      delivery.queuedAtUtc | businessDate: 'instant'
+                    }}</small>
+                    @if (delivery.templateVersion !== null) {
+                      <small class="prj-hint tnd-block" i18n="@@tenderInvitation.templateVersion"
+                        >Template version {{ delivery.templateVersion }} ({{
+                          languageName(delivery.locale)
+                        }})</small
+                      >
+                    }
+                  </td>
+                  <td>
+                    <bdi dir="ltr">{{ delivery.recipientEmail }}</bdi>
+                  </td>
+                  <td>
+                    {{ attemptLabel(delivery.status) }}
+                    @if (delivery.failureCategory) {
+                      <small class="tnd-attention tnd-block">{{
+                        failureLabel(delivery.failureCategory)
+                      }}</small>
+                    }
+                    @if (delivery.completedAtUtc) {
+                      <small class="prj-hint tnd-block">{{
+                        delivery.completedAtUtc | businessDate: 'instant'
+                      }}</small>
+                    }
+                  </td>
+                  <td>
+                    <bdi dir="ltr">{{ delivery.fromAddress ?? '—' }}</bdi>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else {
+      <p class="prj-hint" i18n="@@tenderInvitation.loadingHistory">Loading activity…</p>
+    }
+  </div>
+</div>

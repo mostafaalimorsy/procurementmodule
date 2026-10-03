@@ -1,0 +1,248 @@
+<div class="tnd-schedule">
+  <p class="prj-hint" i18n="@@schedule.hint">
+    Optional. Issue the bill of quantities bidders price item by item. Leave it empty for a lump-sum
+    tender. Quantities have at most three decimals and are never rounded; each amount a bidder sees
+    is exactly quantity × rate.
+  </p>
+  @if (editable()) {
+    <div class="prj-form-actions">
+      <label class="prj-btn prj-btn--ghost" [for]="idPrefix() + '-file'">
+        <span i18n="@@schedule.import">Read an XLSX or CSV file…</span>
+      </label>
+      <input
+        class="prj-visually-hidden"
+        type="file"
+        accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+        [id]="idPrefix() + '-file'"
+        [disabled]="reading()"
+        (change)="read($event)"
+      />
+      <a class="prj-btn prj-btn--ghost" [href]="templateUrl()" download i18n="@@schedule.template"
+        >Download the column template</a
+      >
+    </div>
+  }
+  @if (reading()) {
+    <p class="prj-hint" role="status" i18n="@@schedule.reading">Reading the file…</p>
+  }
+  @if (readError()) {
+    <p class="prj-note prj-note--error" role="alert">{{ readError() }}</p>
+  }
+  @if (status()) {
+    <p class="prj-note" role="status">{{ status() }}</p>
+  }
+  @if (report(); as result) {
+    <section class="prj-note" [class.prj-note--error]="!result.canApply" aria-live="polite">
+      <p>
+        @if (result.canApply) {
+          <span i18n="@@schedule.reportReady"
+            >{{ result.rows }} rows read; all {{ result.items.length }} items are valid. Nothing is
+            applied until you choose to.</span
+          >
+        } @else {
+          <span i18n="@@schedule.reportErrors"
+            >{{ result.rows }} rows read; {{ rowIssues().length }} cannot be used. Correct the file
+            and read it again — a schedule is applied whole or not at all.</span
+          >
+        }
+      </p>
+      @if (fileIssues().length || rowIssues().length) {
+        <ul>
+          @for (issue of fileIssues(); track $index) {
+            <li>{{ issueText(issue) }}</li>
+          }
+          @for (issue of rowIssues(); track $index) {
+            <li>{{ issueText(issue) }}</li>
+          }
+        </ul>
+      }
+      <div class="prj-form-actions">
+        @if (result.canApply && editable()) {
+          <button type="button" class="prj-btn" (click)="apply()" i18n="@@schedule.apply">
+            Replace the schedule with these {{ result.items.length }} items
+          </button>
+        }
+        <button
+          type="button"
+          class="prj-btn prj-btn--ghost"
+          (click)="discard()"
+          i18n="@@schedule.discard"
+        >
+          Discard the report
+        </button>
+      </div>
+    </section>
+  }
+
+  @if (count()) {
+    <div
+      class="prj-table-wrap"
+      role="region"
+      [attr.aria-labelledby]="idPrefix() + '-caption'"
+      tabindex="0"
+    >
+      <table class="prj-table tnd-schedule-table">
+        <caption
+          [id]="idPrefix() + '-caption'"
+          class="prj-visually-hidden"
+          i18n="@@schedule.caption"
+        >
+          Price schedule items
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ fieldLabel('key') }}</th>
+            <th scope="col">{{ fieldLabel('section') }}</th>
+            <th scope="col">{{ fieldLabel('description') }}</th>
+            <th scope="col">{{ fieldLabel('unit') }}</th>
+            <th scope="col">{{ fieldLabel('type') }}</th>
+            <th scope="col">{{ fieldLabel('quantity') }}</th>
+            <th scope="col">{{ fieldLabel('provisionalAmount') }}</th>
+            <th scope="col">
+              <span class="prj-visually-hidden" i18n="@@common.actions">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items(); track $index; let i = $index) {
+            <tr>
+              <td>
+                <input
+                  dir="ltr"
+                  [attr.aria-label]="fieldLabel('key') + ' ' + (i + 1)"
+                  [disabled]="!editable()"
+                  [(ngModel)]="item.key"
+                  (ngModelChange)="touched()"
+                  maxlength="50"
+                  size="8"
+                />
+              </td>
+              <td>
+                <input
+                  [attr.aria-label]="fieldLabel('section') + ' ' + (i + 1)"
+                  [disabled]="!editable()"
+                  [(ngModel)]="item.section"
+                  (ngModelChange)="touched()"
+                  maxlength="200"
+                  size="10"
+                />
+              </td>
+              <td>
+                <textarea
+                  rows="1"
+                  [attr.aria-label]="fieldLabel('description') + ' ' + (i + 1)"
+                  [disabled]="!editable()"
+                  [(ngModel)]="item.description"
+                  (ngModelChange)="touched()"
+                  maxlength="1000"
+                ></textarea>
+              </td>
+              <td>
+                <input
+                  [attr.aria-label]="fieldLabel('unit') + ' ' + (i + 1)"
+                  [disabled]="!editable()"
+                  [(ngModel)]="item.unit"
+                  (ngModelChange)="touched()"
+                  maxlength="20"
+                  size="4"
+                />
+              </td>
+              <td>
+                <select
+                  [attr.aria-label]="fieldLabel('type') + ' ' + (i + 1)"
+                  [disabled]="!editable()"
+                  [(ngModel)]="item.type"
+                  (ngModelChange)="touched()"
+                >
+                  @for (type of types; track type) {
+                    <option [value]="type">{{ typeLabel(type) }}</option>
+                  }
+                </select>
+              </td>
+              <td>
+                @if (hasQuantity(item)) {
+                  <input
+                    dir="ltr"
+                    inputmode="decimal"
+                    [attr.aria-label]="fieldLabel('quantity') + ' ' + (i + 1)"
+                    [disabled]="!editable()"
+                    [(ngModel)]="item.quantity"
+                    (ngModelChange)="touched()"
+                    size="8"
+                  />
+                } @else {
+                  <span aria-hidden="true">—</span>
+                }
+              </td>
+              <td>
+                @if (item.type === 'ProvisionalSum') {
+                  <input
+                    dir="ltr"
+                    inputmode="decimal"
+                    [attr.aria-label]="fieldLabel('provisionalAmount') + ' ' + (i + 1)"
+                    [disabled]="!editable()"
+                    [(ngModel)]="item.provisionalAmount"
+                    (ngModelChange)="touched()"
+                    size="10"
+                  />
+                } @else {
+                  <span aria-hidden="true">—</span>
+                }
+              </td>
+              <td class="tnd-schedule-actions">
+                @if (editable()) {
+                  <button
+                    type="button"
+                    class="prj-btn prj-btn--ghost"
+                    [disabled]="i === 0"
+                    (click)="move(i, -1)"
+                    i18n-aria-label="@@schedule.moveUp"
+                    aria-label="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    class="prj-btn prj-btn--ghost"
+                    [disabled]="i === count() - 1"
+                    (click)="move(i, 1)"
+                    i18n-aria-label="@@schedule.moveDown"
+                    aria-label="Move down"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    class="prj-btn prj-btn--ghost"
+                    (click)="remove(i)"
+                    i18n="@@schedule.remove"
+                  >
+                    Remove
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <p class="prj-hint" i18n="@@schedule.empty">No price schedule: bidders state a lump sum.</p>
+  }
+  @if (editable()) {
+    <div class="prj-form-actions">
+      <button
+        type="button"
+        class="prj-btn prj-btn--ghost"
+        [disabled]="count() >= maxItems"
+        (click)="add()"
+        i18n="@@schedule.add"
+      >
+        Add an item
+      </button>
+      <span class="prj-hint" i18n="@@schedule.count"
+        >{{ count() }} of at most {{ maxItems }} items</span
+      >
+    </div>
+  }
+</div>

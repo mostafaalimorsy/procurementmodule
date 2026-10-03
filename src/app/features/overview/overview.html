@@ -1,0 +1,93 @@
+@if (routeNotice()) {
+  <p class="route-notice" role="alert">{{ routeNotice() }}</p>
+}
+
+@if (session.identity(); as identity) {
+  <div class="eyebrow">
+    <bdi>{{ identity.companyName || companyWorkspaceLabel }}</bdi>
+  </div>
+  <h1 i18n="@@overview.welcome">
+    Welcome, <bdi>{{ identity.displayName || identity.email || teamMemberLabel }}</bdi
+    >.
+  </h1>
+  <p class="intro" i18n="@@overview.authIntro">
+    Prepare procurement through your company’s projects and work packages. Your role determines the
+    actions available to you.
+  </p>
+  <!-- CF-016: My work comes first (on the dashboard); one link that fits this person's role. -->
+  @if (roleLink(); as link) {
+    <p class="role-link">
+      <a
+        class="workspace-action"
+        [routerLink]="link.path"
+        [queryParams]="link.query ?? null"
+        [fragment]="link.fragment ?? undefined"
+        >{{ link.label }}</a
+      >
+    </p>
+  } @else if (!canViewProjects() && !canManageUsers()) {
+    <p i18n="@@overview.noActions">Your current role has no workspace actions available yet.</p>
+  }
+  <!-- CF-013 (ADR-165): first-run setup, for the people who can do each step, while anything is left. -->
+  <app-setup-checklist />
+  <app-dashboard />
+} @else {
+  <div class="eyebrow" i18n="@@overview.eyebrow">YOUR WORKSPACE</div>
+  <h1 i18n="@@overview.hero">A foundation for<br />better subcontractor decisions.</h1>
+  <p class="intro" i18n="@@overview.intro">
+    Sign in to access your company’s procurement workspace.
+  </p>
+  <section class="workspace-note" aria-labelledby="workspace-title">
+    <span class="section-number" aria-hidden="true"
+      ><bdi dir="ltr">01</bdi><span class="section-separator">/</span></span
+    >
+    <div>
+      <h2 id="workspace-title" i18n="@@overview.start">Start with your company account</h2>
+      <p i18n="@@overview.invitationHelp">
+        Your administrator provides access through a secure invitation.
+      </p>
+      <a class="workspace-action" routerLink="/login" i18n="@@overview.companySignIn"
+        >Company sign in</a
+      >
+    </div>
+  </section>
+}
+@if (showDiagnostics()) {
+  <!-- CF-100 (ADR-160): the service check is the Company Admin's, collapsed; everyone sees the banner below when something is down. -->
+  <details
+    class="connectivity"
+    [open]="health.live() === 'unavailable' || health.ready() === 'unavailable'"
+  >
+    <summary>
+      <h2 id="connectivity-title" i18n="@@overview.serviceConnection">Service connection</h2>
+    </summary>
+    <div class="section-heading">
+      <button type="button" (click)="health.check()" [disabled]="health.checking()">
+        @if (health.checking()) {
+          <span i18n="@@overview.checkingAction">Checking…</span>
+        } @else {
+          <span i18n="@@overview.checkAgain">Check again</span>
+        }
+      </button>
+    </div>
+    <dl aria-live="polite" aria-atomic="true" [attr.aria-busy]="health.checking()">
+      <div>
+        <dt i18n="@@overview.application">Application</dt>
+        <dd><app-status-indicator [state]="health.live()" /></dd>
+      </div>
+      <div>
+        <dt i18n="@@overview.dataConnection">Data connection</dt>
+        <dd><app-status-indicator [state]="health.ready()" /></dd>
+      </div>
+    </dl>
+    @if (health.live() === 'unavailable' || health.ready() === 'unavailable') {
+      <p class="connection-help" i18n="@@overview.connectionHelp">
+        A service could not be reached. Check your connection and try again.
+      </p>
+    }
+  </details>
+} @else if (health.live() === 'unavailable' || health.ready() === 'unavailable') {
+  <p class="route-notice" role="alert" i18n="@@overview.connectionBanner">
+    The service cannot be reached right now. Check your connection and try again in a moment.
+  </p>
+}

@@ -1,0 +1,134 @@
+@use './app/shared/styles/tokens';
+@use './app/shared/styles/projects';
+@use './app/shared/styles/shell';
+
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--color-background);
+  color: var(--color-ink);
+}
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  line-height: 1.6;
+}
+:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Explicitly isolate technical tokens; ordinary user prose keeps its natural direction. */
+.ltr-token {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+/* An identifier is data: a code shown inside an uppercase eyebrow must keep its real case. */
+bdi[dir='ltr'],
+.ltr-token {
+  letter-spacing: normal;
+  text-transform: none;
+}
+input[dir='ltr'],
+textarea[dir='ltr'] {
+  text-align: start;
+}
+.directional-icon {
+  display: inline-block;
+}
+html[dir='rtl'] .directional-icon {
+  transform: scaleX(-1);
+}
+input,
+select,
+button,
+textarea {
+  font-family: var(--font-ui);
+}
+/* Arabic joins naturally; English uppercase/tracking is a Latin-only hierarchy cue. */
+html:lang(ar) body {
+  line-height: 1.75;
+}
+html:lang(ar) body *:not(:lang(en)) {
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+/* Untranslated English-only surfaces carry their own language and direction. */
+html:lang(ar) [lang='en'] {
+  --font-body: 'Avenir Next', Avenir, 'Segoe UI', sans-serif;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-ui: var(--font-body);
+  --font-label: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-body);
+}
+html:lang(ar) app-overview {
+  .eyebrow {
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  h1 {
+    font-size: clamp(2.2rem, 4.5vw, 3.7rem);
+    font-weight: 600;
+    line-height: 1.38;
+  }
+  .intro {
+    font-size: 1.08rem;
+    line-height: 1.8;
+  }
+  h2 {
+    font-size: 1.05rem;
+    line-height: 1.55;
+    font-weight: 600;
+  }
+  .workspace-note p,
+  .connection-help {
+    line-height: 1.8;
+  }
+  button,
+  .workspace-action {
+    font-weight: 600;
+  }
+}
+html:lang(ar) app-tenant-login {
+  h1 {
+    font-size: clamp(2.4rem, 6vw, 4.7rem);
+    line-height: 1.32;
+    font-weight: 600;
+  }
+  .eyebrow,
+  .form-index {
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .auth-intro > p:not(.eyebrow) {
+    line-height: 1.8;
+  }
+  .primary,
+  label {
+    font-weight: 600;
+  }
+}
+
+// CF-003 (ADR-109): printing a page prints its content only, not the workspace shell.
+@media print {
+  .shell-header,
+  .primary-nav,
+  .skip-link {
+    display: none !important;
+  }
+}
+
+/* CF-099: a long name or code never widens the page — headings wrap inside any word on a phone. */
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
+}

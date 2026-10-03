@@ -1,0 +1,235 @@
+@if (store.company(); as item) {
+  <div class="grid">
+    <section class="panel" aria-labelledby="assigned-title">
+      <h2 id="assigned-title" i18n="@@company.assignedPackage">Assigned package</h2>
+      @if (assigned(); as current) {
+        <p>
+          <strong
+            ><bdi>{{ current.revision.displayName }}</bdi></strong
+          >
+          · <bdi dir="ltr">{{ current.pack.code }}</bdi> ·
+          <ng-container i18n="@@plan.revision"
+            >revision <bdi dir="ltr">{{ current.revision.number }}</bdi></ng-container
+          >
+          ·
+          @if (current.isCurrent) {
+            <span class="state-chip" i18n="@@revision.current">Current</span>
+          } @else {
+            <span class="state-chip state-chip--muted" i18n="@@revision.superseded"
+              >Superseded</span
+            >
+          }
+        </p>
+        @if (current.revision.workflowIssue) {
+          <p
+            class="error"
+            role="note"
+            data-testid="plan-incomplete"
+            i18n="@@plan.incompleteWorkflow"
+          >
+            This revision's workflow cannot be finished (saved before the workflow rules). The
+            company keeps it unchanged; move it to a complete revision when it suits the customer.
+          </p>
+        }
+        <app-package-terms
+          [features]="current.revision.features"
+          [limits]="current.revision.limits"
+        />
+        @if (newer(); as latest) {
+          <p class="muted" i18n="@@plan.grandfathered">
+            This company keeps the terms it bought. Revision
+            <bdi dir="ltr">{{ latest.number }}</bdi> of this package is newer; it applies only if
+            you change the plan below.
+          </p>
+        }
+      }
+    </section>
+
+    <section class="panel" aria-labelledby="usage-title">
+      <h2 id="usage-title" i18n="@@usage.title">Usage</h2>
+      @if (quotas().length) {
+        @for (quota of quotas(); track quota.key) {
+          <app-quota-usage [quota]="quota" />
+        }
+        <p class="muted" i18n="@@usage.help">
+          Counted now from the company’s own records. Approaching means 80% or more of a limit.
+        </p>
+      } @else if (store.usage()) {
+        <p class="muted" i18n="@@usage.none">No measured capacity is included in this plan.</p>
+      } @else {
+        <p class="muted" i18n="@@usage.unavailable">Usage could not be read right now.</p>
+      }
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="change-title">
+    <h2 id="change-title" i18n="@@plan.changeTitle">Change plan</h2>
+    <p class="muted" i18n="@@company.assignmentHelp">
+      A revision preserves the company's entitlement terms. Applying another revision is an explicit
+      commercial change. Lower limits do not delete or suspend existing records.
+    </p>
+    <app-revision-picker
+      name="change-revision"
+      [label]="newRevisionLabel"
+      [packages]="store.packages()"
+      [excludeId]="item.packageRevisionId"
+      [(value)]="selectedId"
+    />
+
+    @if (diff(); as plan) {
+      <div class="table-scroll">
+        <table class="diff">
+          <caption class="visually-hidden" i18n="@@plan.diffCaption">
+            Current and new plan terms
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@plan.term">Term</th>
+              <th scope="col" i18n="@@plan.current">Current</th>
+              <th scope="col" i18n="@@plan.new">New</th>
+              <th scope="col" i18n="@@plan.usageColumn">Current usage</th>
+              <th scope="col" i18n="@@plan.resultColumn">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (limit of plan.limits; track limit.key) {
+              <tr [class.reduced]="limit.change === 'decrease' || limit.change === 'removed'">
+                <th scope="row">{{ quotaName(limit.key) }}</th>
+                <td>
+                  @if (limit.current === null) {
+                    <ng-container i18n="@@quota.notIncluded">Not included</ng-container>
+                  } @else {
+                    <bdi dir="ltr">{{ limit.current }}</bdi>
+                  }
+                </td>
+                <td>
+                  @if (limit.next === null) {
+                    <ng-container i18n="@@quota.notIncluded">Not included</ng-container>
+                  } @else {
+                    <bdi dir="ltr">{{ limit.next }}</bdi>
+                  }
+                  &ngsp;
+                  @switch (limit.change) {
+                    @case ('increase') {
+                      <small class="muted"
+                        >· <ng-container i18n="@@change.increase">Increase</ng-container></small
+                      >
+                    }
+                    @case ('decrease') {
+                      <small>· <strong i18n="@@change.decrease">Decrease</strong></small>
+                    }
+                    @case ('added') {
+                      <small class="muted"
+                        >· <ng-container i18n="@@change.added">Added</ng-container></small
+                      >
+                    }
+                    @case ('removed') {
+                      <small>· <strong i18n="@@change.removed">Removed</strong></small>
+                    }
+                  }
+                </td>
+                <td>
+                  @if (usageFor(limit.key); as usage) {
+                    <bdi dir="ltr">{{ usage.usage }}</bdi>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  @if (resultBand(limit); as band) {
+                    <span class="result" [attr.data-band]="band"
+                      ><app-band-label [band]="band"
+                    /></span>
+                  } @else {
+                    —
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <ul class="consequences">
+        @for (limit of overAfterChange(); track limit.key) {
+          <li class="warning" i18n="@@plan.overConsequence">
+            {{ quotaName(limit.key) }}: current usage
+            <bdi dir="ltr">{{ usageFor(limit.key)?.usage }}</bdi> is above the new limit
+            <bdi dir="ltr">{{ limit.next ?? 0 }}</bdi
+            >. Everything already there is kept, and new additions are refused until usage is back
+            within the limit.
+          </li>
+        }
+        @for (feature of plan.addedFeatures; track feature) {
+          <li i18n="@@plan.featureAdded">Adds {{ featureName(feature) }}.</li>
+        }
+        @for (feature of plan.removedFeatures; track feature) {
+          <li class="warning" i18n="@@plan.featureRemoved">
+            Removes {{ featureName(feature) }}: its screens and actions become unavailable to this
+            company. Its records are kept.
+          </li>
+        }
+      </ul>
+      @if (plan.reducesTerms) {
+        <p class="warning" i18n="@@plan.reductionNote">
+          Lower terms never delete, suspend or cancel anything. Where usage is above a new limit,
+          existing records stay and only new additions are refused until usage is back within it.
+        </p>
+      }
+      <div class="actions">
+        <button type="button" [disabled]="store.busy()" (click)="openConfirm()">
+          <ng-container i18n="@@plan.change">Change plan</ng-container>
+        </button>
+        @if (plan.removedFeatures.length) {
+          <!-- CF-061 (ADR-133): the change can wait for a read-only wind-down instead of cutting in-flight work off. -->
+          <button type="button" class="secondary" [disabled]="store.busy()" (click)="windDown()">
+            <ng-container i18n="@@plan.windDown"
+              >Wind down first: read-only for 30 days, then this plan</ng-container
+            >
+          </button>
+        }
+        <button type="button" class="secondary" (click)="selectedId.set('')">
+          <ng-container i18n="@@common.cancel">Cancel</ng-container>
+        </button>
+      </div>
+    }
+  </section>
+
+  @if (confirming() && selected(); as target) {
+    <app-confirm-dialog
+      [heading]="confirmTitle"
+      [confirmLabel]="confirmLabel"
+      [danger]="!!diff()?.reducesTerms"
+      [busy]="store.busy()"
+      (confirmed)="change()"
+      (cancelled)="confirming.set(false)"
+    >
+      <p i18n="@@plan.confirmBody">
+        <bdi>{{ item.name }}</bdi> moves to <bdi>{{ target.revision.displayName }}</bdi> (revision
+        <bdi dir="ltr">{{ target.revision.number }}</bdi
+        >). The new terms apply from its next request.
+      </p>
+      <app-package-terms [features]="target.revision.features" [limits]="target.revision.limits" />
+      @if (frozenKeys().length) {
+        <app-in-flight-counts [counts]="store.inFlight()" [keys]="frozenKeys()" />
+        @if (frozenCount() > 0) {
+          <label class="checkbox">
+            <input
+              id="plan-confirm-in-flight"
+              type="checkbox"
+              [checked]="acknowledged()"
+              (change)="acknowledged.set($any($event.target).checked)"
+            />
+            <ng-container i18n="@@plan.confirmInFlight"
+              >I understand this freezes the work above at once.</ng-container
+            >
+          </label>
+        }
+      }
+      @if (overAfterChange().length) {
+        <p class="warning" i18n="@@plan.confirmOver">
+          Some usage will be above the new limits. Nothing is deleted or suspended.
+        </p>
+      }
+    </app-confirm-dialog>
+  }
+}

@@ -1,0 +1,207 @@
+<p class="eyebrow" i18n="@@companies.eyebrow">Platform control plane</p>
+<h1 i18n="@@companies.title">Companies</h1>
+<p i18n="@@companies.intro">
+  Provision and manage commercial tenants. Company data and user permissions remain tenant-scoped.
+</p>
+@if (error()) {
+  <p role="alert" class="error">{{ error() }}</p>
+}
+@if (loading()) {
+  <p role="status" i18n="@@companies.loading">Loading companies…</p>
+}
+<section class="panel" aria-labelledby="registry-title">
+  <div class="list-filter">
+    <h2 id="registry-title" i18n="@@companies.registry">Registry</h2>
+    <label class="check">
+      <input
+        type="checkbox"
+        name="attention"
+        [checked]="attentionOnly()"
+        (change)="attentionOnly.set($any($event.target).checked)"
+      />
+      <span i18n="@@companies.attentionFilter">Only companies approaching or above a limit</span>
+    </label>
+  </div>
+  <div class="table-scroll">
+    <table>
+      <caption class="visually-hidden" i18n="@@companies.caption">
+        Companies with their status and most pressing plan utilization
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col" i18n="@@companies.colCompany">Company</th>
+          <th scope="col" i18n="@@companies.colCode">Code</th>
+          <th scope="col" i18n="@@companies.colStatus">Status</th>
+          <th scope="col" i18n="@@companies.colCommercial">Commercial terms</th>
+          <th scope="col" i18n="@@companies.colUtilization">Utilization</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (company of visible(); track company.id) {
+          <tr>
+            <td>
+              <a [routerLink]="['/platform/companies', company.id]"
+                ><bdi>{{ company.name }}</bdi></a
+              >
+            </td>
+            <td>
+              <bdi dir="ltr">{{ company.code }}</bdi>
+            </td>
+            <td>
+              @if (company.accessState === 'Purged') {
+                <ng-container i18n="@@companyStatus.purged">Data deleted</ng-container>
+              } @else if (company.accessState === 'ReadOnlyGrace') {
+                <ng-container i18n="@@companyStatus.readOnly">Read-only (grace)</ng-container>
+              } @else if (company.isActive) {
+                <ng-container i18n="@@status.active">Active</ng-container>
+              } @else {
+                <ng-container i18n="@@companyStatus.suspended">Suspended</ng-container>
+              }
+            </td>
+            <td><app-commercial-chip [company]="company" /></td>
+            <td>
+              @if (summaries().get(company.id); as summary) {
+                <a
+                  class="result"
+                  [attr.data-band]="summary.band"
+                  [routerLink]="['/platform/companies', company.id, 'plan']"
+                >
+                  {{ quotaName(summary.quota.key) }}
+                  <bdi dir="ltr">{{ summary.quota.usage }} / {{ summary.quota.limit }}</bdi>
+                  · <app-band-label [band]="summary.band" />
+                </a>
+              } @else {
+                —
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5">
+              @if (attentionOnly()) {
+                <ng-container i18n="@@companies.noneNeedAttention"
+                  >No company is approaching or above a limit.</ng-container
+                >
+              } @else {
+                <ng-container i18n="@@companies.empty">No companies to show.</ng-container>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="panel" aria-labelledby="provision-title">
+  <h2 id="provision-title" i18n="@@companies.provisionTitle">Provision company</h2>
+  <p class="muted" i18n="@@companies.provisionHelp">
+    The first Company Admin receives a one-time invitation and chooses their own password. The
+    invitation must be accepted before the account can be used.
+  </p>
+  @if (!packages().length && !loading()) {
+    <p i18n="@@companies.needPackage">
+      Create an active <a routerLink="/platform/packages">package</a> before provisioning a company.
+    </p>
+  }
+  <form (ngSubmit)="provision()" #form="ngForm">
+    <div class="grid">
+      <div>
+        <label
+          ><span i18n="@@companies.name">Company name</span
+          ><input name="name" required maxlength="200" [(ngModel)]="name"
+        /></label>
+        <label
+          ><span i18n="@@companies.code">Company code</span
+          ><input
+            dir="ltr"
+            class="ltr-token"
+            name="code"
+            required
+            maxlength="64"
+            [(ngModel)]="code"
+            placeholder="company-key"
+        /></label>
+        <app-revision-picker
+          name="revision"
+          [label]="revisionLabel"
+          [packages]="packages()"
+          [(value)]="packageRevisionId"
+        />
+        <label
+          ><span i18n="@@companies.adminName">First Company Admin name</span
+          ><input
+            name="adminName"
+            required
+            maxlength="160"
+            autocomplete="name"
+            [(ngModel)]="firstAdminDisplayName"
+        /></label>
+        <label
+          ><span i18n="@@companies.adminEmail">First Company Admin email</span
+          ><input
+            dir="ltr"
+            class="ltr-token"
+            name="admin"
+            type="email"
+            required
+            [(ngModel)]="firstAdminEmail"
+            autocomplete="off"
+        /></label>
+      </div>
+      <app-policy-fields
+        [capabilities]="capabilities()"
+        (policyChange)="policy = $event"
+        (enforceableChange)="enforceable.set($event)"
+      />
+    </div>
+    <!-- CF-127 / OD-15 (ADR-138): the commercial footing, recorded in the same step; it changes no access or security control. -->
+    <fieldset class="grid" data-testid="provision-commercial">
+      <legend i18n="@@companies.commercialLegend">Commercial terms</legend>
+      <label
+        ><span i18n="@@companies.commercialMode">Mode</span
+        ><select name="commercialMode" required [(ngModel)]="commercialMode">
+          <option value="" i18n="@@companies.chooseMode">Choose</option>
+          @for (mode of modes; track mode) {
+            <option [value]="mode">{{ modeLabel(mode) }}</option>
+          }
+        </select></label
+      >
+      <label
+        ><span i18n="@@companies.commercialStarts">Starts on</span
+        ><input name="commercialStartsOn" type="date" required [(ngModel)]="commercialStartsOn"
+      /></label>
+      <label
+        ><span i18n="@@companies.commercialEnds">Ends on (required for a pilot)</span
+        ><input
+          name="commercialEndsOn"
+          type="date"
+          [required]="commercialMode !== 'Subscribed'"
+          [(ngModel)]="commercialEndsOn"
+      /></label>
+      <label
+        ><span i18n="@@companies.commercialReference">Contract reference</span
+        ><input name="commercialReference" maxlength="200" [(ngModel)]="commercialReference"
+      /></label>
+      <small class="muted" i18n="@@companies.commercialHelp"
+        >Recorded for the operator only. A paid pilot gets exactly the same security, access and
+        plan rules as any other company; nothing is billed.</small
+      >
+    </fieldset>
+    <button
+      [disabled]="
+        form.invalid ||
+        !packageRevisionId ||
+        !policy.emailDomains.length ||
+        !enforceable() ||
+        loading() ||
+        busy()
+      "
+    >
+      @if (busy()) {
+        <span i18n="@@companies.provisioning">Provisioning…</span>
+      } @else {
+        <span i18n="@@companies.provision">Provision company</span>
+      }
+    </button>
+  </form>
+</section>

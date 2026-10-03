@@ -1,0 +1,325 @@
+<div class="shell shell--workspace">
+  <a class="skip-link" [attr.href]="skipHref" (click)="skipToContent($event)" i18n="@@shell.skip"
+    >Skip to content</a
+  >
+  <header class="shell-header">
+    <div class="shell-bar">
+      <a
+        class="brand"
+        routerLink="/"
+        aria-label="Subcontractor Intelligence home"
+        i18n-aria-label="@@shell.homeLabel"
+      >
+        <span class="brand-mark" aria-hidden="true">SI</span>
+        <span class="brand-name" i18n="@@shell.brand"
+          >Subcontractor<br /><strong>Intelligence</strong></span
+        >
+      </a>
+      @if (session.identity()?.companyName; as company) {
+        <span class="context-chip">
+          <span class="visually-hidden" i18n="@@shell.companyContext">Company workspace:</span
+          >&ngsp;<bdi dir="auto" [title]="company">{{ company }}</bdi>
+        </span>
+      }
+      <button
+        type="button"
+        class="menu-toggle"
+        id="workspace-menu-toggle"
+        aria-controls="workspace-menu"
+        [attr.aria-expanded]="menuOpen()"
+        (click)="toggleMenu()"
+      >
+        <span class="menu-toggle-icon" aria-hidden="true"></span>
+        <span i18n="@@shell.menu">Menu</span>
+      </button>
+    </div>
+
+    <div class="shell-menu" id="workspace-menu" [class.is-open]="menuOpen()">
+      <nav class="primary-nav" aria-label="Workspace" i18n-aria-label="@@shell.workspaceNavigation">
+        @if (session.identity()) {
+          <a
+            routerLink="/"
+            [class.is-active]="section() === 'overview'"
+            [attr.aria-current]="section() === 'overview' ? 'page' : null"
+            i18n="@@nav.overview"
+            >Overview</a
+          >
+          @if (showProjects()) {
+            <a
+              routerLink="/projects"
+              [class.is-active]="section() === 'projects'"
+              [attr.aria-current]="section() === 'projects' ? 'page' : null"
+              i18n="@@nav.projects"
+              >Projects</a
+            >
+          }
+          @if (showSubcontractors()) {
+            <a
+              routerLink="/subcontractors"
+              [class.is-active]="section() === 'subcontractors'"
+              [attr.aria-current]="section() === 'subcontractors' ? 'page' : null"
+              i18n="@@nav.subcontractors"
+              >Subcontractors</a
+            >
+          }
+          @if (showSourcing()) {
+            <a
+              routerLink="/sourcing"
+              [class.is-active]="section() === 'sourcing'"
+              [attr.aria-current]="section() === 'sourcing' ? 'page' : null"
+              i18n="@@nav.sourcing"
+              >Sourcing</a
+            >
+          }
+          @if (showTenders()) {
+            <a
+              routerLink="/tenders"
+              [class.is-active]="section() === 'tenders'"
+              [attr.aria-current]="section() === 'tenders' ? 'page' : null"
+              i18n="@@nav.tenders"
+              >Tenders</a
+            >
+          }
+          @if (showCloseouts()) {
+            <!-- CF-012 (B-012-2): past outcomes (CF-002) are a tab of the closeout records, so Closeouts stays marked there. -->
+            <a
+              routerLink="/closeouts"
+              [class.is-active]="section() === 'closeouts' || section() === 'retrospective'"
+              [attr.aria-current]="section() === 'closeouts' ? 'page' : null"
+              i18n="@@nav.closeouts"
+              >Closeouts</a
+            >
+          }
+          <a
+            routerLink="/search"
+            [class.is-active]="section() === 'search'"
+            [attr.aria-current]="section() === 'search' ? 'page' : null"
+            i18n="@@nav.search"
+            >Search</a
+          >
+          <!-- CF-012 (ADR-158): configuration and administration sit under Settings, apart from the work areas. -->
+          @if (showSettings()) {
+            <details
+              class="nav-settings"
+              (toggle)="settingsOpen.set($any($event.target).open)"
+              (keydown.escape)="closeSettings($event)"
+            >
+              <summary
+                id="nav-settings-summary"
+                [class.is-active]="settingsSection()"
+                i18n="@@nav.settings"
+              >
+                Settings
+              </summary>
+              <div class="nav-settings-menu">
+                @if (showPolicies()) {
+                  <a
+                    routerLink="/evaluation-policies"
+                    [class.is-active]="section() === 'policies'"
+                    [attr.aria-current]="section() === 'policies' ? 'page' : null"
+                    i18n="@@nav.evaluationPolicies"
+                    >Scorecard policies</a
+                  >
+                }
+                @if (showRecommendationPolicies()) {
+                  <a
+                    routerLink="/recommendation-policies"
+                    [class.is-active]="section() === 'recommendationPolicies'"
+                    [attr.aria-current]="section() === 'recommendationPolicies' ? 'page' : null"
+                    i18n="@@nav.recommendationPolicies"
+                    >Recommendation policies</a
+                  >
+                }
+                @if (showApprovalMatrix() || showApprovalRoutes()) {
+                  <a
+                    [routerLink]="
+                      showApprovalMatrix() ? '/approval-matrix' : '/approval-matrix/read'
+                    "
+                    [class.is-active]="section() === 'approvalMatrix'"
+                    [attr.aria-current]="section() === 'approvalMatrix' ? 'page' : null"
+                    i18n="@@nav.approvalMatrix"
+                    >Approval rules</a
+                  >
+                }
+                @if (showAudit()) {
+                  <a
+                    routerLink="/admin/audit"
+                    [class.is-active]="section() === 'audit'"
+                    [attr.aria-current]="section() === 'audit' ? 'page' : null"
+                    i18n="@@nav.audit"
+                    >Audit log</a
+                  >
+                }
+                <!-- CF-012 (B-012-2): the pilot metrics sit under Settings, after the audit log. -->
+                @if (showPilotMetrics()) {
+                  <a
+                    routerLink="/pilot-metrics"
+                    [class.is-active]="section() === 'pilotMetrics'"
+                    [attr.aria-current]="section() === 'pilotMetrics' ? 'page' : null"
+                    i18n="@@nav.pilotMetrics"
+                    >Pilot metrics</a
+                  >
+                }
+                @if (showCompanyUsers()) {
+                  <a
+                    routerLink="/admin/users"
+                    [class.is-active]="section() === 'users'"
+                    [attr.aria-current]="section() === 'users' ? 'page' : null"
+                    i18n="@@nav.users"
+                    >Company users</a
+                  >
+                }
+                @if (showCompanyEmail()) {
+                  <a
+                    routerLink="/admin/email"
+                    [class.is-active]="section() === 'email'"
+                    [attr.aria-current]="section() === 'email' ? 'page' : null"
+                    i18n="@@nav.companyEmail"
+                    >Email delivery</a
+                  >
+                }
+                @if (showCompanySettings()) {
+                  <a
+                    routerLink="/admin/company"
+                    [class.is-active]="section() === 'company'"
+                    [attr.aria-current]="section() === 'company' ? 'page' : null"
+                    i18n="@@nav.companySettings"
+                    >Company settings</a
+                  >
+                }
+              </div>
+            </details>
+          }
+        } @else {
+          <a
+            routerLink="/login"
+            [class.is-active]="section() === 'signin'"
+            [attr.aria-current]="section() === 'signin' ? 'page' : null"
+            i18n="@@login.companySignIn"
+            >Company sign in</a
+          >
+        }
+      </nav>
+
+      <div class="shell-utilities">
+        <app-language-selector />
+        @if (session.identity(); as identity) {
+          <div
+            class="account"
+            aria-label="Your account"
+            i18n-aria-label="@@shell.account"
+            role="group"
+          >
+            <span class="account-identity">
+              <bdi class="account-name">{{ identity.displayName || identity.email }}</bdi>
+              @if (roleLabel()) {
+                <small>{{ roleLabel() }}</small>
+              }
+            </span>
+            <button type="button" class="shell-signout" (click)="logout()" i18n="@@shell.logout">
+              Sign out
+            </button>
+            <button
+              type="button"
+              class="shell-signout shell-signout--all"
+              id="workspace-signout-all"
+              (click)="confirmingSignOutAll.set(true)"
+              i18n="@@shell.logoutEverywhere"
+            >
+              Sign out on all devices
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <!-- CF-068 (ADR-146): two minutes before the company's idle timeout ends the session. -->
+    @if (session.identity() && idle.warning()) {
+      <div class="prj-note" role="alertdialog" aria-live="assertive" data-testid="idle-warning">
+        <p i18n="@@shell.idleWarning">
+          You will be signed out in two minutes because there was no activity.
+        </p>
+        <button type="button" class="prj-btn" (click)="staySignedIn()" i18n="@@shell.staySignedIn">
+          Stay signed in
+        </button>
+      </div>
+    }
+    <!-- CF-061 (ADR-133): the company's read-only grace, on every page while it lasts. -->
+    @if (session.identity()?.readOnlyUntilUtc; as until) {
+      <p
+        class="prj-note shell-read-only"
+        role="status"
+        data-testid="read-only-banner"
+        i18n="@@shell.readOnly"
+      >
+        Read-only until <bdi>{{ until | businessDate: 'instant' }}</bdi
+        >: you can view and export your company's data, but nothing can be created, changed or sent.
+      </p>
+    }
+    <!-- CF-060 (ADR-137): a plan that stops before the full loop says where. -->
+    @switch (entitlements.workflowEndsAt()) {
+      @case ('evaluation') {
+        <p
+          class="prj-note"
+          role="note"
+          data-testid="workflow-end-banner"
+          i18n="@@shell.planEndsAtEvaluation"
+        >
+          Your plan ends at evaluation: bids can be opened and evaluated here, and a tender then
+          closes without an award in the product.
+        </p>
+      }
+      @case ('award') {
+        <p
+          class="prj-note"
+          role="note"
+          data-testid="workflow-end-banner"
+          i18n="@@shell.planEndsAtAward"
+        >
+          Your plan ends at the award: performance closeouts and intelligence are not included.
+        </p>
+      }
+      @case ('tendering') {
+        <p
+          class="prj-note prj-note--error"
+          role="note"
+          data-testid="workflow-end-banner"
+          i18n="@@shell.planEndsAtTendering"
+        >
+          Your plan does not include bid opening: submitted bids cannot be opened. Ask your provider
+          to complete the plan.
+        </p>
+      }
+    }
+    @if (signingOut()) {
+      <p class="session-transition" role="status" i18n="@@shell.signingOut">
+        Signing out securely…
+      </p>
+    } @else {
+      <router-outlet />
+    }
+  </main>
+  <!-- CF-087 (ADR-156 §1): ending every session of the account is stated before it happens. -->
+  @if (confirmingSignOutAll()) {
+    <app-confirm-dialog
+      heading="Sign out on all devices?"
+      i18n-heading="@@shell.logoutEverywhereHeading"
+      [confirmLabel]="signOutAllLabel"
+      [cancelLabel]="staySignedInLabel"
+      [danger]="true"
+      [busy]="signingOut()"
+      (confirmed)="confirmSignOutAll()"
+      (cancelled)="confirmingSignOutAll.set(false)"
+    >
+      <p i18n="@@shell.logoutEverywhereBody">
+        Every session of your account ends — on this device and on any other phone or computer where
+        you are signed in. Unsaved work there is lost.
+      </p>
+    </app-confirm-dialog>
+  }
+  <footer class="shell-footer" i18n="@@shell.footer">
+    Subcontractor Bid + Performance Intelligence
+  </footer>
+</div>

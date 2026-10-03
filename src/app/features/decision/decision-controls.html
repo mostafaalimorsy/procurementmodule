@@ -1,0 +1,159 @@
+@if (controls(); as c) {
+  <section class="prj-section" aria-labelledby="controls-title">
+    <h2 id="controls-title" i18n="@@controls.title">Decision controls</h2>
+    <dl class="dc-facts">
+      <div>
+        <dt i18n="@@controls.invited">Invited</dt>
+        <dd dir="ltr">{{ c.invited }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@controls.submitted">Bids opened</dt>
+        <dd dir="ltr">{{ c.submitted }}</dd>
+      </div>
+      <div>
+        <dt i18n="@@controls.eligible">Compliant bids</dt>
+        <dd>
+          @if (c.minimumCompliantBids !== null) {
+            <ng-container i18n="@@controls.eligibleOfMinimum"
+              ><bdi dir="ltr">{{ c.eligible }}</bdi> (your company requires
+              <bdi dir="ltr">{{ c.minimumCompliantBids }}</bdi
+              >)</ng-container
+            >
+          } @else {
+            <bdi dir="ltr">{{ c.eligible }}</bdi>
+          }
+        </dd>
+      </div>
+      @if (c.estimate !== null) {
+        <div>
+          <dt i18n="@@controls.estimate">Package estimate</dt>
+          <dd>
+            <bdi dir="ltr">{{ money(c.estimate) }} {{ c.estimateCurrency }}</bdi>
+            @if (c.estimateAtPublication) {
+              <!-- Red-team B7 (CF-037 AC3): the value in force when the tender was published, beside the current one. -->
+              <small class="prj-hint tnd-block" i18n="@@controls.estimateAtPublication"
+                >At publication:
+                <bdi dir="ltr"
+                  >{{ money(c.estimateAtPublication) }} {{ c.estimateCurrency }}</bdi
+                ></small
+              >
+            }
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@controls.tolerance">Over-budget tolerance</dt>
+          <dd>
+            <bdi dir="ltr">{{ c.overBudgetTolerancePercent }} %</bdi>
+          </dd>
+        </div>
+        @if (c.proposedVariancePercent !== null) {
+          <div>
+            <dt i18n="@@controls.proposedVariance">Saved award value against the estimate</dt>
+            <dd>
+              <bdi dir="ltr">{{ percent(c.proposedVariancePercent) }}</bdi>
+            </dd>
+          </div>
+        }
+      }
+    </dl>
+
+    @if (notComparable()) {
+      <!-- Red-team B7 (CF-037 AC4): the estimate is in another currency, so no bid is compared with it. -->
+      <p class="prj-note" role="note" i18n="@@controls.estimateNotComparable">
+        Not comparable: the estimate is in <bdi dir="ltr">{{ c.estimateCurrency }}</bdi
+        >, the bids in <bdi dir="ltr">{{ workspace().currency }}</bdi
+        >. Nothing is converted.
+      </p>
+    }
+    @if (c.limitedCompetition) {
+      <p class="prj-note tnd-attention-box" role="note" i18n="@@controls.limitedNote">
+        Limited competition: fewer compliant bids than your company requires. The ranking is not
+        market-tested; the decision needs a justification, and every approver sees it.
+      </p>
+    }
+    @if (c.historyCategoryMissing) {
+      <p class="prj-note" role="note" i18n="@@controls.categoryMissing">
+        This package has no category, so no performance history is used. Choose its trade on the
+        work package.
+      </p>
+    }
+    @if (c.estimateChangedAfterPublication) {
+      <p class="prj-note tnd-attention-box" role="note" i18n="@@controls.estimateChanged">
+        The package estimate was changed after this tender was published. Its history and reasons
+        are on the work package.
+      </p>
+    }
+    @if (c.proposedOverBudget) {
+      <p class="prj-note tnd-attention-box" role="note" i18n="@@controls.overBudgetNote">
+        The saved award value is above the package estimate beyond your company's tolerance. The
+        decision needs an over-budget reason and an Approver/Director approves it.
+      </p>
+    }
+
+    <div class="prj-table-wrap">
+      <table class="prj-table ev-table">
+        <caption i18n="@@controls.tableCaption">
+          Standing and validity of every opened bid
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@controls.firm">Firm</th>
+            <th scope="col" i18n="@@controls.standing">Directory standing</th>
+            <th scope="col" i18n="@@controls.validity">Bid validity</th>
+            <th scope="col" i18n="@@controls.compliance">Compliance</th>
+            @if (c.estimate !== null && !notComparable()) {
+              <th scope="col" class="dc-num" i18n="@@controls.variance">
+                Leveled total against the estimate
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of c.candidates; track row.openingBidId) {
+            <tr>
+              <th scope="row">
+                <bdi dir="ltr" class="tnd-code">{{ row.subcontractorCode }}</bdi>
+              </th>
+              <td>
+                <span
+                  class="dc-state"
+                  [class.dc-state--good]="row.standing === 'Active'"
+                  [class.dc-state--warn]="row.standing !== 'Active'"
+                  >{{ standingLabel(row.standing) }}</span
+                >
+              </td>
+              <td>
+                <span
+                  class="dc-state"
+                  [class.dc-state--good]="row.validityState === 'Valid'"
+                  [class.dc-state--warn]="
+                    row.validityState === 'LapsingSoon' || row.validityState === 'Lapsed'
+                  "
+                  [class.dc-state--muted]="row.validityState === 'NotStated'"
+                  >{{ validityLabel(row.validityState) }}</span
+                >
+                @if (row.validUntilUtc) {
+                  <small class="prj-hint dcc-validity" i18n="@@controls.validUntil"
+                    ><bdi dir="ltr">{{ row.validityDays }}</bdi> days, until
+                    {{ row.validUntilUtc | zonedInstant: workspace().timeZoneId }}</small
+                  >
+                }
+              </td>
+              <td><app-compliance-chips [items]="row.compliance" /></td>
+              @if (c.estimate !== null && !notComparable()) {
+                <td class="dc-num">
+                  <bdi dir="ltr">{{ percent(row.estimateVariancePercent) }}</bdi>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (basis(); as b) {
+      <p class="prj-hint" i18n="@@controls.basisHint">
+        Validity runs {{ basisLabel(b) }}, as your company's governance settings define it.
+      </p>
+    }
+  </section>
+}

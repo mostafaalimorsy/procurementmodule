@@ -1,0 +1,525 @@
+// Shared shell and navigation system for both product contexts. Global navigation marks the
+// current section with a 3px accent bar and a heavier weight (never colour alone); detail-page
+// tabs use a lighter 2px ink underline so the two levels never read as the same control.
+// Logical properties throughout, so every rule mirrors in Arabic without an override.
+
+.shell {
+  display: flex;
+  min-block-size: 100dvh;
+  flex-direction: column;
+}
+
+.shell-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  column-gap: 2rem;
+  padding-inline: clamp(1rem, 5vw, 5rem);
+  border-block-end: 1px solid var(--color-border);
+}
+
+.shell-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-block-size: 4.5rem;
+  min-inline-size: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  inline-size: 2.8rem;
+  block-size: 2.8rem;
+  background: var(--color-ink);
+  color: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+.context-chip {
+  display: inline-flex;
+  min-inline-size: 0;
+  max-inline-size: 18rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* CF-099: the name is cut at its own end (with an ellipsis) in either direction — the chip's direction no longer decides which end. */
+.context-chip bdi {
+  overflow: hidden;
+  min-inline-size: 0;
+  text-overflow: ellipsis;
+}
+
+.menu-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.55rem;
+  min-block-size: var(--touch-target);
+  margin-inline-start: auto;
+  padding-inline: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.menu-toggle-icon {
+  inline-size: 1rem;
+  block-size: 2px;
+  background: currentColor;
+  box-shadow:
+    0 -5px 0 currentColor,
+    0 5px 0 currentColor;
+}
+
+// The menu shares the brand row only while the whole navigation fits beside it; otherwise it takes
+// its own row. Wrapping (never horizontal overflow) is the last resort for long or translated labels.
+.shell-menu {
+  display: flex;
+  flex: 1 1 52rem;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0 1.5rem;
+  min-inline-size: 0;
+}
+
+.primary-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.primary-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  margin-block-end: -1px;
+  padding-inline: 0.9rem;
+  border-block-end: var(--nav-indicator) solid transparent;
+  color: var(--color-ink);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.primary-nav a:hover {
+  border-block-end-color: var(--color-border);
+}
+
+.primary-nav a.is-active {
+  border-block-end-color: var(--color-accent);
+  font-weight: 650;
+}
+
+.shell-utilities {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-inline-start: auto;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-inline-start: 1rem;
+  border-inline-start: 1px solid var(--color-border);
+}
+
+.account-identity {
+  display: grid;
+  min-inline-size: 0;
+  font-size: 0.85rem;
+  line-height: 1.25;
+}
+
+.account-name {
+  overflow: hidden;
+  max-inline-size: 14rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-identity small {
+  color: var(--color-muted);
+}
+
+.shell-signout {
+  min-block-size: var(--touch-target);
+  padding-inline: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.shell-signout:hover {
+  border-color: var(--color-accent);
+}
+
+.shell main {
+  flex: 1;
+  inline-size: 100%;
+  max-inline-size: 86rem;
+  margin-inline: auto;
+  padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 5vw, 5rem);
+}
+
+.shell-footer {
+  padding: 1.5rem clamp(1rem, 5vw, 5rem);
+  border-block-start: 1px solid var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.session-transition {
+  max-inline-size: 40rem;
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.shell-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-block: 0 1.5rem;
+  padding: 0.9rem 1rem;
+  border-inline-start: 3px solid var(--color-warning);
+  background: var(--color-surface);
+  color: var(--color-warning);
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: 1rem;
+  inset-block-start: -5rem;
+  z-index: 2;
+  padding: 0.75rem;
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+
+.skip-link:focus {
+  inset-block-start: 1rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// Platform Console: a dark identity bar so an operator can never mistake it for a customer.
+.shell--platform .shell-header {
+  border-block-end-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-dark);
+}
+
+.shell--platform .brand,
+.shell--platform .primary-nav a {
+  color: var(--color-on-dark);
+}
+
+.shell--platform .brand-mark {
+  background: var(--color-on-dark);
+  color: var(--color-ink);
+}
+
+.shell--platform .context-chip,
+.shell--platform .menu-toggle,
+.shell--platform .shell-signout,
+.shell--platform .account {
+  border-color: var(--color-border-on-dark);
+}
+
+.shell--platform .context-chip,
+.shell--platform .account-identity small {
+  color: var(--color-muted-on-dark);
+}
+
+.shell--platform .primary-nav a:hover {
+  border-block-end-color: var(--color-border-on-dark);
+}
+
+.shell--platform .primary-nav a.is-active {
+  border-block-end-color: var(--color-accent-on-dark);
+}
+
+.shell--platform .shell-signout:hover {
+  border-color: var(--color-accent-on-dark);
+}
+
+.shell--platform .shell-header :focus-visible {
+  outline-color: var(--color-accent-on-dark);
+}
+
+// Route-level detail navigation: links, not ARIA tabs, because each one is its own address.
+.detail-tabs {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  margin-block: 1.5rem 2rem;
+  border-block-end: 1px solid var(--color-border);
+  scrollbar-width: thin;
+}
+
+nav.detail-tabs a {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-block-size: var(--touch-target);
+  margin-block-end: -1px;
+  padding-inline: 1rem;
+  border-block-end: 2px solid transparent;
+  color: var(--color-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+nav.detail-tabs a:hover {
+  color: var(--color-ink);
+}
+
+nav.detail-tabs a.is-active {
+  border-block-end-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+@media (max-width: 64rem) {
+  .shell-header {
+    flex-direction: column;
+  }
+
+  .shell-bar {
+    inline-size: 100%;
+  }
+
+  .menu-toggle {
+    display: inline-flex;
+  }
+
+  .shell-menu {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    padding-block: 0.5rem 1rem;
+    border-block-start: 1px solid var(--color-border);
+  }
+
+  .shell--platform .shell-menu {
+    border-block-start-color: var(--color-border-on-dark);
+  }
+
+  .shell-menu.is-open,
+  .shell-menu.is-static {
+    display: flex;
+  }
+
+  .primary-nav {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .primary-nav a {
+    margin-block-end: 0;
+    border-block-end: 0;
+    border-inline-start: var(--nav-indicator) solid transparent;
+  }
+
+  .primary-nav a:hover {
+    border-inline-start-color: var(--color-border);
+  }
+
+  .primary-nav a.is-active {
+    border-inline-start-color: var(--color-accent);
+  }
+
+  .shell--platform .primary-nav a.is-active {
+    border-inline-start-color: var(--color-accent-on-dark);
+  }
+
+  .shell-utilities {
+    flex-direction: column;
+    align-items: stretch;
+    margin-inline-start: 0;
+  }
+
+  .account {
+    justify-content: space-between;
+    padding-block-start: 0.75rem;
+    padding-inline-start: 0;
+    border-block-start: 1px solid var(--color-border);
+    border-inline-start: 0;
+  }
+
+  .context-chip {
+    max-inline-size: 40vw;
+  }
+}
+
+@media (max-width: 30rem) {
+  .brand-name {
+    display: none;
+  }
+}
+
+/* CF-012 (ADR-158): Settings — configuration and administration, apart from the work areas. A disclosure: a dropdown on wide
+   screens, listed in place in the small-screen menu. */
+.nav-settings {
+  position: relative;
+  display: flex;
+}
+
+.nav-settings > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-block-size: var(--touch-target);
+  margin-block-end: -1px;
+  padding-inline: 0.9rem;
+  border-block-end: var(--nav-indicator) solid transparent;
+  color: var(--color-ink);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  list-style: none;
+}
+
+.nav-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-settings > summary::after {
+  content: '▾';
+  font-size: 0.75em;
+}
+
+.nav-settings > summary.is-active {
+  border-block-end-color: var(--color-accent);
+  font-weight: 650;
+}
+
+.nav-settings-menu {
+  position: absolute;
+  z-index: 20;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 15rem;
+  padding: 0.35rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  box-shadow: 0 0.5rem 1.5rem rgb(24 42 43 / 12%);
+}
+
+.primary-nav .nav-settings-menu a {
+  margin-block-end: 0;
+  border-block-end: 0;
+  border-inline-start: var(--nav-indicator) solid transparent;
+}
+
+.primary-nav .nav-settings-menu a.is-active {
+  border-inline-start-color: var(--color-accent);
+}
+
+@media (max-width: 64rem) {
+  .nav-settings {
+    flex-direction: column;
+  }
+
+  .nav-settings > summary {
+    margin-block-end: 0;
+    border-block-end: 0;
+    border-inline-start: var(--nav-indicator) solid transparent;
+  }
+
+  .nav-settings > summary.is-active {
+    border-inline-start-color: var(--color-accent);
+  }
+
+  .nav-settings-menu {
+    position: static;
+    min-inline-size: 0;
+    padding: 0;
+    padding-inline-start: 1rem;
+    border: 0;
+    box-shadow: none;
+  }
+}
+
+/* CF-087 (ADR-161): the second, rarer sign-out reads as a link beside the main one. */
+.shell-signout--all {
+  padding-inline: 0.4rem;
+  border-color: transparent;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+/* CF-012 (ADR-158): on wide screens the workspace header is two rows — the brand and the account on the first, the whole width for the
+   work areas and Settings on the second — so the navigation fits one row at 1440 px instead of wrapping beside the brand. */
+@media (min-width: 64.01rem) {
+  .shell--workspace .shell-header {
+    display: grid;
+    grid-template-areas:
+      'bar utilities'
+      'nav nav';
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+
+  .shell--workspace .shell-bar {
+    grid-area: bar;
+  }
+
+  .shell--workspace .shell-menu {
+    display: contents;
+  }
+
+  .shell--workspace .primary-nav {
+    grid-area: nav;
+  }
+
+  .shell--workspace .shell-utilities {
+    grid-area: utilities;
+    justify-self: end;
+  }
+}

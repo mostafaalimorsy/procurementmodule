@@ -1,0 +1,484 @@
+@if (error()) {
+  <p class="prj-note prj-note--error" role="alert">
+    {{ error() }}
+    <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+      Reload
+    </button>
+  </p>
+}
+@if (workspace(); as view) {
+  @if (!view.policy) {
+    <p class="prj-note" role="note" i18n="@@evaluation.technicalNoPolicy">
+      You can read the technical evidence now. Scorecards open once the evaluation policy is chosen.
+    </p>
+  } @else if (!view.canScore) {
+    <p class="prj-note" role="note">{{ blockedReason() }}</p>
+  }
+
+  <div class="ev-split">
+    <nav class="ev-bidlist" aria-label="Bids" i18n-aria-label="@@evaluation.bidList">
+      <ul role="list">
+        @for (bid of view.bids; track bid.openingBidId) {
+          <li>
+            <button
+              type="button"
+              class="ev-bidlist__item"
+              [class.is-active]="selected()?.openingBidId === bid.openingBidId"
+              [attr.aria-current]="selected()?.openingBidId === bid.openingBidId ? 'true' : null"
+              (click)="select(bid)"
+            >
+              <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+              >{{ ' ' }}
+              <span class="tnd-block"
+                ><bdi>{{ bid.subcontractorName }}</bdi></span
+              >
+              <small class="prj-hint tnd-block">
+                <ng-container i18n="@@evaluation.yourScorecard">Your scorecard:</ng-container>
+                {{ statusLabel(bid.myScorecard?.status ?? null) }}
+              </small>
+            </button>
+          </li>
+        }
+      </ul>
+    </nav>
+
+    @if (selected(); as bid) {
+      <div class="ev-detail">
+        <h2 class="ev-detail__title">
+          <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+          >{{ ' ' }}
+          <bdi>{{ bid.subcontractorName }}</bdi>
+        </h2>
+        <p class="prj-hint">
+          <span i18n="@@evaluation.technicalMeta"
+            >Bid <bdi dir="ltr">{{ bid.bidReference }}</bdi> · submitted
+            {{ bid.submittedAtUtc | businessDate: 'instant' }} · answered tender revision
+            {{ bid.answeredTenderRevision }}</span
+          >
+          @if (bid.currentRound > 0) {
+            <span class="tnd-attention tnd-block" i18n="@@evaluation.technicalRevised"
+              >Revised in negotiation round {{ bid.currentRound }}: the response in force is
+              revision {{ bid.currentRevisionNumber }}.</span
+            >
+          }
+        </p>
+        @if (bid.rescoreRequired) {
+          <p class="prj-note tnd-attention-box" role="note" i18n="@@evaluation.rescoreRequired">
+            The revised response changed the technical answers. Scorecards of the earlier revision
+            no longer count: this bid needs a new submitted scorecard.
+          </p>
+        }
+        @for (flag of bid.flags; track flag.key) {
+          <p class="ev-flag ev-flag--{{ flag.severity }}">
+            <span class="ev-flag__mark" aria-hidden="true">{{
+              flag.severity === 'warning' ? '!' : 'i'
+            }}</span>
+            {{ flagLabel(flag) }}
+          </p>
+        }
+
+        <section class="prj-section" aria-labelledby="technical-response-title">
+          <h3 id="technical-response-title" i18n="@@evaluation.technicalResponse">
+            Technical response
+          </h3>
+          <dl class="ev-response">
+            <div>
+              <dt i18n="@@bidField.scopeCompliance">Scope compliance</dt>
+              <dd>
+                @if (bid.scopeCompliance === 'Full') {
+                  <ng-container i18n="@@evaluation.scopeFull">Covers the whole scope</ng-container>
+                } @else {
+                  <ng-container i18n="@@evaluation.scopeDeviations"
+                    >Departs from the scope</ng-container
+                  >
+                }
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@bidField.technicalApproach">Technical approach and methodology</dt>
+              <dd class="ev-prose">
+                @if (bid.technicalApproach) {
+                  <bdi>{{ bid.technicalApproach }}</bdi>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                }
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@bidField.technicalDeviations">Technical deviations</dt>
+              <dd>
+                @if (bid.technicalDeviations.length) {
+                  <ul>
+                    @for (item of bid.technicalDeviations; track $index) {
+                      <li>
+                        <bdi>{{ item }}</bdi>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.noneStated">None stated</span>
+                }
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@bidField.technicalNotes">Technical notes</dt>
+              <dd class="ev-prose">
+                @if (bid.technicalNotes) {
+                  <bdi>{{ bid.technicalNotes }}</bdi>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                }
+              </dd>
+            </div>
+          </dl>
+          <h4 i18n="@@evaluation.technicalFiles">Technical files</h4>
+          @if (bid.files.length) {
+            <ul class="ev-files" role="list">
+              @for (file of bid.files; track file.id) {
+                <li>
+                  <a [href]="fileUrl(file.id)" download
+                    ><bdi>{{ file.fileName }}</bdi></a
+                  >
+                  <small class="prj-hint">
+                    {{ size(file.sizeBytes) }}
+                    @if (file.requirementLabel) {
+                      · <bdi>{{ file.requirementLabel }}</bdi>
+                    }
+                  </small>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="prj-hint" i18n="@@evaluation.noTechnicalFiles">
+              No file of this bid is classified technical.
+            </p>
+          }
+          @if (bid.withheldFileCount > 0) {
+            <p class="prj-hint" i18n="@@evaluation.filesRestrictedHint">
+              Files visible to commercial readers only: {{ bid.withheldFileCount }}. A file may
+              contain prices, so it stays restricted until it is classified technical.
+            </p>
+          }
+        </section>
+
+        @if (view.policy; as policy) {
+          <section class="prj-section" aria-labelledby="scorecard-title">
+            <h3 id="scorecard-title">
+              <ng-container i18n="@@evaluation.yourScorecardTitle">Your scorecard</ng-container>
+              <span class="prj-chip ev-card-status">{{
+                statusLabel(bid.myScorecard?.status ?? null)
+              }}</span>
+            </h3>
+            <p class="prj-hint" i18n="@@evaluation.scaleHint">
+              Score each criterion from 0 to {{ policy.scaleMaximum }} (one decimal allowed). The
+              weighted score is calculated by the server: score ÷ {{ policy.scaleMaximum }} ×
+              weight, added up to a total out of 100.
+            </p>
+            <div class="prj-table-wrap">
+              <table class="prj-table ev-scorecard">
+                <caption class="prj-visually-hidden" i18n="@@evaluation.scorecardCaption">
+                  Scorecard criteria
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" i18n="@@evaluation.colCriterion">Criterion</th>
+                    <th scope="col" i18n="@@evaluation.colWeight">Weight</th>
+                    <th scope="col" i18n="@@evaluation.colScore">Score</th>
+                    <th scope="col" i18n="@@evaluation.colComment">Comment</th>
+                    <th scope="col" i18n="@@evaluation.colEvidence">Evidence reference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (criterion of criteria(); track criterion.id) {
+                    <tr>
+                      <th scope="row">
+                        <bdi>{{ criterion.name }}</bdi>
+                        <small class="prj-hint tnd-block">{{
+                          categoryLabel(criterion.category)
+                        }}</small>
+                        @if (criterion.guidance) {
+                          <small class="prj-hint tnd-block"
+                            ><bdi>{{ criterion.guidance }}</bdi></small
+                          >
+                        }
+                      </th>
+                      <td>
+                        <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                      </td>
+                      <td>
+                        <label
+                          class="prj-visually-hidden"
+                          [for]="'score-' + criterion.id"
+                          i18n="@@evaluation.scoreFor"
+                          >Score for {{ criterion.name }}</label
+                        >
+                        <input
+                          class="ev-score"
+                          type="text"
+                          inputmode="decimal"
+                          dir="ltr"
+                          [id]="'score-' + criterion.id"
+                          [(ngModel)]="entry(criterion.id).score"
+                          (ngModelChange)="touched()"
+                          [disabled]="!editable()"
+                          [attr.aria-invalid]="scoreInvalid(criterion.id) ? 'true' : null"
+                          (input)="formError.set('')"
+                        />
+                        <small class="prj-hint" dir="ltr">/ {{ policy.scaleMaximum }}</small>
+                      </td>
+                      <td>
+                        <label
+                          class="prj-visually-hidden"
+                          [for]="'comment-' + criterion.id"
+                          i18n="@@evaluation.commentFor"
+                          >Comment for {{ criterion.name }}</label
+                        >
+                        <textarea
+                          rows="2"
+                          [id]="'comment-' + criterion.id"
+                          [attr.maxlength]="commentMax"
+                          [(ngModel)]="entry(criterion.id).comment"
+                          (ngModelChange)="touched()"
+                          [disabled]="!editable()"
+                          [attr.aria-required]="criterion.commentRequired ? 'true' : null"
+                        ></textarea>
+                        @if (criterion.commentRequired) {
+                          <small class="prj-hint" i18n="@@evaluation.required">Required</small>
+                        }
+                      </td>
+                      <td>
+                        <label
+                          class="prj-visually-hidden"
+                          [for]="'evidence-' + criterion.id"
+                          i18n="@@evaluation.evidenceFor"
+                          >Evidence reference for {{ criterion.name }}</label
+                        >
+                        <input
+                          type="text"
+                          [id]="'evidence-' + criterion.id"
+                          [attr.maxlength]="evidenceMax"
+                          [(ngModel)]="entry(criterion.id).evidence"
+                          (ngModelChange)="touched()"
+                          [disabled]="!editable()"
+                          [attr.aria-required]="criterion.evidenceRequired ? 'true' : null"
+                        />
+                        @if (criterion.evidenceRequired) {
+                          <small class="prj-hint" i18n="@@evaluation.required">Required</small>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (bid.myScorecard; as card) {
+              @if (card.scoresCurrentResponse === false) {
+                <p
+                  class="prj-note tnd-attention-box"
+                  role="note"
+                  i18n="@@evaluation.cardSuperseded"
+                >
+                  Superseded: this scorecard scores revision {{ card.revisionNumber }}, which is no
+                  longer the response in force. It no longer counts.
+                </p>
+              }
+              <p class="ev-total" role="status">
+                @if (card.weightedTotal !== null) {
+                  <span i18n="@@evaluation.weightedTotal"
+                    >Weighted total: <bdi dir="ltr">{{ card.weightedTotal }}</bdi> / 100</span
+                  >
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.weightedTotalPending"
+                    >The weighted total appears once every criterion is scored.</span
+                  >
+                }
+              </p>
+              @if (card.gaps.length && card.status === 'Draft') {
+                <ul class="ev-gaps" role="list">
+                  @for (gap of card.gaps; track $index) {
+                    <li>
+                      {{ gapLabel(gap.key) }}
+                      @for (criterion of criteria(); track criterion.id) {
+                        @if (criterion.id === gap.subjectId) {
+                          — <bdi>{{ criterion.name }}</bdi>
+                        }
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            }
+            @if (formError()) {
+              <p class="prj-error-text" role="alert">{{ formError() }}</p>
+            }
+            <div class="prj-actions">
+              @if (editable()) {
+                <button
+                  class="prj-btn"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="save(true)"
+                  i18n="@@evaluation.submitScorecard"
+                >
+                  Submit scorecard
+                </button>
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="save()"
+                  i18n="@@evaluation.saveDraft"
+                >
+                  Save draft
+                </button>
+              } @else if (bid.myScorecard?.status === 'Submitted' && view.canScore) {
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="reopen()"
+                  i18n="@@evaluation.reopenScorecard"
+                >
+                  Reopen to correct
+                </button>
+              }
+            </div>
+          </section>
+
+          <section class="prj-section" aria-labelledby="submitted-title">
+            <h3 id="submitted-title" i18n="@@evaluation.submittedScorecards">
+              Submitted scorecards
+            </h3>
+            <p class="prj-hint">
+              @if (view.seesAllScorecards) {
+                <ng-container i18n="@@evaluation.seesAll"
+                  >Every evaluator's latest submission. Scores are shown per evaluator, never
+                  averaged.</ng-container
+                >
+              } @else {
+                <span i18n="@@evaluation.seesOwn"
+                  >Your own submissions. Scorecards submitted by all evaluators:
+                  {{ bid.submittedScorecardCount }}.</span
+                >
+              }
+            </p>
+            @for (card of bid.submittedScorecards; track card.id) {
+              <details class="ev-submitted">
+                <summary>
+                  <bdi>{{ card.evaluatorName }}</bdi> ·
+                  <span i18n="@@evaluation.submittedTotal"
+                    >total <bdi dir="ltr">{{ card.weightedTotal }}</bdi> / 100 · submission
+                    {{ card.number }}</span
+                  >
+                  · {{ card.submittedAtUtc | businessDate: 'instant' }}
+                  @if (card.scoresCurrentResponse === false) {
+                    ·
+                    <strong class="tnd-attention" i18n="@@evaluation.submittedSuperseded"
+                      >Superseded (revision {{ card.revisionNumber }}) — no longer counts</strong
+                    >
+                  }
+                </summary>
+                <ul role="list">
+                  @for (score of card.scores; track score.criterionId) {
+                    <li>
+                      <bdi>{{ score.name }}</bdi
+                      >:
+                      <bdi dir="ltr"
+                        >{{ score.score }} / {{ card.scaleMaximum }} →
+                        {{ score.weightedScore }}</bdi
+                      >
+                      @if (score.comment) {
+                        <span class="tnd-block prj-hint"
+                          ><bdi>{{ score.comment }}</bdi></span
+                        >
+                      }
+                      @if (score.evidence) {
+                        <span class="tnd-block prj-hint"
+                          ><bdi>{{ score.evidence }}</bdi></span
+                        >
+                      }
+                    </li>
+                  }
+                </ul>
+              </details>
+            } @empty {
+              <p class="prj-hint" i18n="@@evaluation.noSubmitted">Nothing submitted yet.</p>
+            }
+          </section>
+        }
+
+        <section class="prj-section" aria-labelledby="technical-notes-title">
+          <h3 id="technical-notes-title" i18n="@@evaluation.technicalNotesTitle">
+            Technical notes and concerns
+          </h3>
+          <p class="prj-hint" i18n="@@evaluation.notesInternal">
+            Internal to your company. Bidders never see them.
+          </p>
+          @for (note of bid.notes; track note.id) {
+            <article class="ev-note" [class.ev-note--concern]="note.kind === 'Concern'">
+              <p class="prj-hint">
+                @if (note.kind === 'Concern') {
+                  <strong i18n="@@evaluation.concern">Concern</strong> ·
+                }
+                @if (note.kind === 'Moderation') {
+                  <strong i18n="@@evaluation.moderation">Moderation</strong> ·
+                }
+                <bdi>{{ note.authorName }}</bdi> · {{ note.writtenAtUtc | businessDate: 'instant' }}
+              </p>
+              <p class="ev-prose">
+                <bdi>{{ note.text }}</bdi>
+              </p>
+            </article>
+          } @empty {
+            <p class="prj-hint" i18n="@@evaluation.noNotes">No notes yet.</p>
+          }
+          @if (view.access.score && view.evaluation?.status === 'InProgress') {
+            <div class="prj-field">
+              <label for="technical-note" i18n="@@evaluation.addNote">Add a note</label>
+              <textarea
+                id="technical-note"
+                rows="3"
+                [attr.maxlength]="noteMax"
+                [(ngModel)]="noteText"
+              ></textarea>
+            </div>
+            <label class="tnd-choice">
+              <input
+                type="checkbox"
+                [ngModel]="noteKind === 'Concern'"
+                (ngModelChange)="noteKind = $event ? 'Concern' : 'Comment'"
+              />
+              <span i18n="@@evaluation.markConcern"
+                >Mark as a concern (shown with the deviations and gaps)</span
+              >
+            </label>
+            @if (view.access.complete) {
+              <label class="tnd-choice">
+                <input
+                  type="checkbox"
+                  [ngModel]="noteKind === 'Moderation'"
+                  (ngModelChange)="noteKind = $event ? 'Moderation' : 'Comment'"
+                />
+                <span i18n="@@evaluation.markModeration"
+                  >Record as the panel's moderation of divergent scores (the scores stay as
+                  submitted)</span
+                >
+              </label>
+            }
+            <div class="prj-actions">
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="busy()"
+                (click)="addNote()"
+                i18n="@@evaluation.saveNote"
+              >
+                Add note
+              </button>
+            </div>
+          }
+        </section>
+      </div>
+    }
+  </div>
+}

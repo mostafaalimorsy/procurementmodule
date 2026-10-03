@@ -1,0 +1,21 @@
+@use 'decision-common';
+
+// ---- approval and award ------------------------------------------------------------------
+
+.dc-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
+
+.dc-strong {
+  font-weight: 600;
+}
+
+.dc-steps {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding-inline-start: 1.25rem;
+}

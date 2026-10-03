@@ -1,0 +1,209 @@
+<section class="prj-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@sourcing.eyebrow">Sourcing &amp; prequalification</p>
+      <h1 i18n="@@sourcing.listTitle">Sourcing</h1>
+      <p i18n="@@sourcing.listIntro">
+        Work packages whose subcontractors are being considered, prequalified and shortlisted. Start
+        sourcing from an active work package.
+      </p>
+    </div>
+    @if (canStart()) {
+      <div class="prj-actions">
+        <button
+          class="prj-btn"
+          type="button"
+          (click)="openPicker()"
+          i18n="@@sourcing.startFromList"
+        >
+          Start sourcing
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (picking()) {
+    <section class="prj-section" aria-labelledby="picker-title">
+      <h2 id="picker-title" i18n="@@sourcing.pickerTitle">Choose a work package to source</h2>
+      <p class="prj-hint" i18n="@@sourcing.pickerHint">
+        Active work packages that have no sourcing yet.
+      </p>
+      <form class="prj-filters" (ngSubmit)="findStartable()">
+        <div class="prj-field">
+          <label for="picker-search" i18n="@@sourcing.pickerSearch"
+            >Search by code, title or project</label
+          >
+          <input
+            id="picker-search"
+            name="pickerSearch"
+            maxlength="100"
+            [(ngModel)]="pickerSearch"
+          />
+        </div>
+        <button class="prj-btn prj-btn--ghost" type="submit" i18n="@@sourcing.search">
+          Search
+        </button>
+      </form>
+      @if (startable(); as packages) {
+        @if (packages.length) {
+          <ul class="src-list" role="list">
+            @for (item of packages; track item.id) {
+              <li>
+                <bdi dir="ltr" class="tnd-code">{{ item.code }}</bdi> <bdi>{{ item.title }}</bdi>
+                <span class="prj-hint">
+                  · <bdi dir="ltr">{{ item.projectCode }}</bdi>
+                  <bdi>{{ item.projectName }}</bdi></span
+                >
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="!!starting()"
+                  (click)="start(item)"
+                >
+                  <ng-container i18n="@@sourcing.startThis">Start</ng-container>
+                  <span class="prj-visually-hidden"
+                    ><bdi>{{ item.code }}</bdi></span
+                  >
+                </button>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="prj-hint" i18n="@@sourcing.pickerEmpty">
+            No active work package without sourcing matches.
+          </p>
+        }
+      }
+    </section>
+  }
+
+  <div class="prj-filters">
+    <div class="prj-field">
+      <label for="sourcing-search" i18n="@@sourcing.searchLabel">Search</label>
+      <input
+        id="sourcing-search"
+        name="search"
+        maxlength="100"
+        [(ngModel)]="search"
+        (keyup.enter)="applyFilter()"
+        i18n-placeholder="@@sourcing.searchPlaceholder"
+        placeholder="Work package or project code, title"
+      />
+    </div>
+    <div class="prj-field">
+      <label for="sourcing-status" i18n="@@sourcing.filterStatus">Sourcing status</label>
+      <select id="sourcing-status" name="status" [(ngModel)]="status" (change)="applyFilter()">
+        <option value="" i18n="@@sourcing.filterAll">All</option>
+        @for (option of statuses; track option) {
+          <option [value]="option">{{ statusLabel(option) }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@sourcing.loadingList">Loading sourcing…</p>
+  } @else if (result(); as page) {
+    @if (page.items.length === 0) {
+      <div class="prj-empty">
+        @if (status || search) {
+          <h2 i18n="@@sourcing.filteredEmptyTitle">No sourcing matches this filter</h2>
+          <p i18n="@@sourcing.filteredEmptyBody">Choose another status to see more.</p>
+        } @else {
+          <h2 i18n="@@sourcing.emptyTitle">No work package is being sourced yet</h2>
+          <p i18n="@@sourcing.emptyBody">
+            Open an active work package and choose Start sourcing to consider subcontractors from
+            your directory.
+          </p>
+          <a class="prj-btn" routerLink="/projects" i18n="@@sourcing.goToProjects"
+            >Go to projects</a
+          >
+        }
+      </div>
+    } @else {
+      <ul class="prj-cards src-list" role="list">
+        @for (item of page.items; track item.id) {
+          <li class="prj-card">
+            <p class="prj-eyebrow">
+              <bdi dir="ltr">{{ item.workPackage.projectCode }}</bdi> ·
+              <bdi dir="ltr">{{ item.workPackage.code }}</bdi>
+            </p>
+            <h3>
+              <a [routerLink]="['/sourcing', item.id]"
+                ><bdi>{{ item.workPackage.title }}</bdi></a
+              >
+            </h3>
+            <p>
+              <span
+                class="prj-chip"
+                [class.prj-chip--Active]="item.status === 'ShortlistApproved'"
+                >{{ statusLabel(item.status) }}</span
+              >
+              &ngsp;
+              @if (item.approvalRequestedAtUtc) {
+                <span class="prj-chip" i18n="@@sourcing.readyChip">Ready for approval</span>&ngsp;
+              }
+              <span class="prj-chip prj-chip--{{ item.workPackage.status }}">
+                <ng-container i18n="@@sourcing.packagePrefix">Work package</ng-container>:
+                {{ packageStatusLabel(item.workPackage.status) }}
+              </span>
+            </p>
+            <dl>
+              <dt i18n="@@sourcing.candidates">Candidates</dt>
+              <dd>
+                <bdi dir="ltr">{{ item.candidateCount }}</bdi>
+              </dd>
+              <dt i18n="@@sourcing.qualified">Qualified</dt>
+              <dd>
+                <bdi dir="ltr">{{ item.qualifiedCount }}</bdi>
+              </dd>
+              <dt i18n="@@sourcing.shortlisted">Shortlisted</dt>
+              <dd>
+                <bdi dir="ltr">{{ item.shortlistedCount }}</bdi>
+              </dd>
+              <dt i18n="@@project.updated">Last updated</dt>
+              <dd>{{ item.updatedAtUtc | businessDate: 'instant' }}</dd>
+            </dl>
+          </li>
+        }
+      </ul>
+      @if (page.totalPages > 1) {
+        <nav class="prj-pager" aria-label="Sourcing pages" i18n-aria-label="@@sourcing.pages">
+          <span i18n="@@common.pageOf"
+            >Page <bdi dir="ltr">{{ page.page }}</bdi> of
+            <bdi dir="ltr">{{ page.totalPages }}</bdi></span
+          >
+          <span class="prj-actions">
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page <= 1"
+              (click)="goToPage(page.page - 1)"
+              i18n="@@common.previous"
+            >
+              Previous
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page >= page.totalPages"
+              (click)="goToPage(page.page + 1)"
+              i18n="@@common.next"
+            >
+              Next
+            </button>
+          </span>
+        </nav>
+      }
+    }
+  }
+</section>

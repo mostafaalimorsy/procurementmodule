@@ -1,0 +1,466 @@
+@let view = workspace();
+<section class="prj-section" aria-labelledby="prepare-title">
+  <h2 id="prepare-title" i18n="@@decision.prepareTitle">Prepare the decision</h2>
+  <!-- Red-team G073 (CF-057 AC5): the invitations went out on a fast-path shortlist. -->
+  <app-shortlist-basis [basis]="view.shortlistBasis" />
+  @if (!recommendation()) {
+    <p class="prj-hint" i18n="@@decision.needRecommendation">
+      Compute a recommendation first. The decision is prepared on the latest recommendation.
+    </p>
+  } @else if (status() === 'PendingApproval' || status() === 'Approved' || status() === 'Awarded') {
+    <p class="prj-note" role="note" i18n="@@decision.submittedNote">
+      The decision was submitted. It changes only as a new version if an approver returns it or its
+      submitter withdraws it. See the approval section.
+    </p>
+  } @else if (!fresh()) {
+    <p class="prj-note prj-note--error" role="note" i18n="@@decision.recommendationStale">
+      The recommendation is not current. Compute it again before preparing or submitting the
+      decision.
+    </p>
+  } @else if (!view.access.prepare) {
+    <p class="prj-hint" i18n="@@decision.prepareNotPermitted">
+      Procurement leadership prepares the decision. You can follow it here.
+    </p>
+  }
+
+  @if (view.draft; as draft) {
+    <p class="prj-hint" i18n="@@decision.draftSaved">
+      Draft last saved {{ draft.updatedAtUtc | businessDate: 'instant' }} by
+      <bdi>{{ draft.preparedByName }}</bdi
+      >.
+    </p>
+  }
+
+  @if (editable()) {
+    <form class="dc-form" novalidate (ngSubmit)="save()">
+      <div class="prj-field">
+        <label for="decision-proposed" i18n="@@decision.proposedLabel">Proposed for award</label>
+        <select
+          id="decision-proposed"
+          name="proposed"
+          [ngModel]="form.proposed"
+          (ngModelChange)="pickProposed($event)"
+        >
+          @if (!form.proposed) {
+            <option value="" disabled i18n="@@decision.chooseFirm">Choose a firm</option>
+          }
+          @for (candidate of choices(); track candidate.openingBidId) {
+            @if (isPreviousAwardee(candidate)) {
+              <option
+                [value]="candidate.openingBidId"
+                disabled
+                i18n="@@decision.proposedOptionPreviousAwardee"
+              >
+                Recommendation rank {{ candidate.rank }} — {{ candidate.subcontractorCode }}
+                {{ candidate.subcontractorName }} (earlier award declined or withdrawn)
+              </option>
+            } @else {
+              <option [value]="candidate.openingBidId" i18n="@@decision.proposedOption">
+                Recommendation rank {{ candidate.rank }} — {{ candidate.subcontractorCode }}
+                {{ candidate.subcontractorName }}
+              </option>
+            }
+          }
+        </select>
+        @if (suggestion(); as suggested) {
+          <small class="prj-hint dc-promotion-hint">
+            @if (suggested.source === 'reserve_rank_1') {
+              <span i18n="@@decision.promotionReserveHint"
+                >Suggested after the earlier award ended:
+                <bdi dir="ltr">{{ suggested.candidate.subcontractorCode }}</bdi> —
+                <bdi>{{ suggested.candidate.subcontractorName }}</bdi
+                >, the first reserve that award kept.</span
+              >
+            } @else {
+              <span i18n="@@decision.promotionNextRankedHint"
+                >Suggested after the earlier award ended:
+                <bdi dir="ltr">{{ suggested.candidate.subcontractorCode }}</bdi> —
+                <bdi>{{ suggested.candidate.subcontractorName }}</bdi
+                >, the next-ranked eligible bid.</span
+              >
+            }
+          </small>
+        }
+        @if (excluded().length > 0) {
+          <small class="prj-hint dc-previous-awardees" i18n="@@decision.previousAwardeesNote"
+            >Firms whose award on this tender was declined or withdrawn cannot be proposed again.
+            The first rank is judged without them, so the next-ranked firm needs no override
+            reason.</small
+          >
+        }
+        @if (!view.access.override) {
+          <small class="prj-hint" i18n="@@decision.onlyTopRanked"
+            >You may propose a firm ranked first. Proposing another firm needs the override
+            right.</small
+          >
+        }
+      </div>
+
+      @if (isOverride()) {
+        <div class="prj-note tnd-attention-box" role="note">
+          <p i18n="@@decision.overrideNote">
+            This firm is not ranked first by the recommendation. The decision is recorded as an
+            override and its reason is shown to every approver.
+          </p>
+          <div class="prj-field">
+            <label for="decision-override" i18n="@@decision.overrideReason"
+              >Override reason (required)</label
+            >
+            <textarea
+              id="decision-override"
+              name="overrideReason"
+              rows="3"
+              aria-required="true"
+              [attr.maxlength]="reasonMax"
+              [(ngModel)]="form.overrideReason"
+              (ngModelChange)="edited()"
+            ></textarea>
+          </div>
+        </div>
+      }
+
+      <div class="prj-field dc-value-field">
+        <label for="decision-value" i18n="@@decision.awardValue">Award value</label>
+        <span class="dc-money-input">
+          <input
+            id="decision-value"
+            name="awardValue"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            aria-describedby="decision-value-hint"
+            [(ngModel)]="form.awardValue"
+            (ngModelChange)="edited()"
+            (blur)="tidyValue()"
+          />
+          <bdi dir="ltr" class="dc-currency">{{ currency() }}</bdi>
+        </span>
+        <small id="decision-value-hint" class="prj-hint">
+          @if (proposed(); as candidate) {
+            <span i18n="@@decision.valueHint"
+              >The proposed bid's leveled total is
+              <bdi dir="ltr">{{ money(candidate.leveledTotal) }} {{ currency() }}</bdi
+              >. A different value needs a reason.</span
+            >
+          }
+        </small>
+      </div>
+      @if (valueDiffers()) {
+        <div class="prj-field">
+          <label for="decision-value-reason" i18n="@@decision.valueReason"
+            >Why the value differs (required)</label
+          >
+          <textarea
+            id="decision-value-reason"
+            name="valueReason"
+            rows="2"
+            aria-required="true"
+            [attr.maxlength]="reasonMax"
+            [(ngModel)]="form.valueReason"
+            (ngModelChange)="edited()"
+          ></textarea>
+        </div>
+      }
+      @if (overBudget()) {
+        <div class="prj-note tnd-attention-box" role="note">
+          <p i18n="@@decision.overBudgetNote">
+            This value is above the package estimate beyond your company's tolerance. The reason
+            goes to every approver, and an Approver/Director approves the decision.
+          </p>
+          <div class="prj-field">
+            <label for="decision-over-budget" i18n="@@decision.overBudgetReason"
+              >Over-budget reason (required)</label
+            >
+            <textarea
+              id="decision-over-budget"
+              name="overBudgetReason"
+              rows="2"
+              aria-required="true"
+              [attr.maxlength]="reasonMax"
+              [(ngModel)]="form.overBudgetReason"
+              (ngModelChange)="edited()"
+            ></textarea>
+          </div>
+        </div>
+      }
+      @if (staleRevision()) {
+        <div class="prj-note tnd-attention-box" role="note">
+          <p i18n="@@decision.revisionAcknowledgementNote">
+            This bid answered an earlier revision of the tender (or did not acknowledge a required
+            addendum). Say why the decision stands on it; every approver sees the reason and it is
+            kept on the award record.
+          </p>
+          <div class="prj-field">
+            <label for="decision-revision-ack" i18n="@@decision.revisionAcknowledgementReason"
+              >Why this bid stands (required)</label
+            >
+            <textarea
+              id="decision-revision-ack"
+              name="revisionAcknowledgementReason"
+              rows="2"
+              aria-required="true"
+              [attr.maxlength]="reasonMax"
+              [(ngModel)]="form.revisionAcknowledgementReason"
+              (ngModelChange)="edited()"
+            ></textarea>
+          </div>
+        </div>
+      }
+      @if (limited()) {
+        <fieldset class="prj-fieldset tnd-attention-box">
+          <legend i18n="@@decision.competitionLegend">Limited competition (required)</legend>
+          <p class="prj-hint" i18n="@@decision.competitionHint">
+            Fewer compliant bids than your company requires. Say why the decision stands; every
+            approver sees it and it stays on the record.
+          </p>
+          <div class="prj-field">
+            <label for="decision-competition-category" i18n="@@decision.competitionCategory"
+              >Justification</label
+            >
+            <select
+              id="decision-competition-category"
+              name="competitionCategory"
+              aria-required="true"
+              [(ngModel)]="form.competitionCategory"
+              (ngModelChange)="edited()"
+            >
+              <option value="" disabled i18n="@@decision.chooseJustification">
+                Choose a justification
+              </option>
+              @for (category of justifications; track category) {
+                <option [value]="category">{{ justificationLabel(category) }}</option>
+              }
+            </select>
+          </div>
+          <div class="prj-field">
+            <label for="decision-competition-reason" i18n="@@decision.competitionReason"
+              >Explanation</label
+            >
+            <textarea
+              id="decision-competition-reason"
+              name="competitionReason"
+              rows="2"
+              aria-required="true"
+              [attr.maxlength]="reasonMax"
+              [(ngModel)]="form.competitionReason"
+              (ngModelChange)="edited()"
+            ></textarea>
+          </div>
+        </fieldset>
+      }
+      <div class="prj-field">
+        <label for="decision-rationale" i18n="@@decision.rationale">Rationale</label>
+        <textarea
+          id="decision-rationale"
+          name="rationale"
+          rows="4"
+          [attr.maxlength]="rationaleMax"
+          [(ngModel)]="form.rationale"
+          (ngModelChange)="edited()"
+        ></textarea>
+      </div>
+
+      @if (others().length) {
+        <fieldset class="prj-fieldset">
+          <legend i18n="@@decision.othersLegend">The other bids</legend>
+          <p class="prj-hint" i18n="@@decision.othersHint">
+            Keep eligible bids in reserve, in order, or mark them not selected. "Not selected" is
+            the bid's outcome in this decision; it is not an approver rejecting the proposal.
+          </p>
+          @for (candidate of others(); track candidate.openingBidId) {
+            @let choice = disposition(candidate.openingBidId);
+            <div class="dc-other">
+              <p class="dc-other__firm">
+                <span [id]="'firm-' + candidate.openingBidId"
+                  ><bdi dir="ltr" class="tnd-code">{{ candidate.subcontractorCode }}</bdi
+                  >{{ ' ' }}<bdi>{{ candidate.subcontractorName }}</bdi></span
+                >
+                <small class="prj-hint tnd-block">
+                  @if (candidate.eligible) {
+                    <ng-container i18n="@@decision.otherRank"
+                      >Recommendation rank {{ candidate.rank }}</ng-container
+                    >
+                  } @else {
+                    {{ ineligibleLabel(candidate.ineligibleReason) }}
+                  }
+                </small>
+              </p>
+              <div
+                class="dc-other__choice"
+                role="radiogroup"
+                [attr.aria-labelledby]="'firm-' + candidate.openingBidId"
+              >
+                @if (candidate.eligible) {
+                  <label class="tnd-choice">
+                    <input
+                      type="radio"
+                      value="Reserve"
+                      [name]="'disposition-' + candidate.openingBidId"
+                      [attr.name]="'disposition-' + candidate.openingBidId"
+                      [(ngModel)]="choice.disposition"
+                      (ngModelChange)="edited()"
+                    />
+                    <span i18n="@@decision.reserve">Keep in reserve</span>
+                  </label>
+                }
+                <label class="tnd-choice">
+                  <input
+                    type="radio"
+                    value="Reject"
+                    [name]="'disposition-' + candidate.openingBidId"
+                    [attr.name]="'disposition-' + candidate.openingBidId"
+                    [(ngModel)]="choice.disposition"
+                    (ngModelChange)="edited()"
+                  />
+                  <span i18n="@@decision.notSelected">Not selected (reject the bid)</span>
+                </label>
+              </div>
+              @if (choice.disposition === 'Reserve' && candidate.eligible) {
+                <div class="prj-field dc-other__detail">
+                  <label [for]="'reserve-' + candidate.openingBidId" i18n="@@decision.reserveOrder"
+                    >Reserve order</label
+                  >
+                  <input
+                    [id]="'reserve-' + candidate.openingBidId"
+                    [name]="'reserve-' + candidate.openingBidId"
+                    type="text"
+                    inputmode="numeric"
+                    dir="ltr"
+                    [(ngModel)]="choice.reserveRank"
+                    (ngModelChange)="edited()"
+                  />
+                </div>
+              } @else {
+                <div class="prj-field dc-other__detail">
+                  <label [for]="'reject-' + candidate.openingBidId" i18n="@@decision.rejectReason"
+                    >Internal reason (optional, never sent to the firm)</label
+                  >
+                  <input
+                    [id]="'reject-' + candidate.openingBidId"
+                    [name]="'reject-' + candidate.openingBidId"
+                    [attr.maxlength]="reasonMax"
+                    [(ngModel)]="choice.reason"
+                    (ngModelChange)="edited()"
+                  />
+                </div>
+              }
+            </div>
+          }
+        </fieldset>
+      }
+
+      <section class="dc-route" aria-labelledby="route-title">
+        <h3 id="route-title" i18n="@@decision.routeTitle">Approval route</h3>
+        @if (view.routePreview; as route) {
+          <ng-container *ngTemplateOutlet="routeView; context: { route: route }" />
+        } @else {
+          <p class="prj-hint" i18n="@@decision.routePending">
+            The route is chosen from the approval matrix once an award value is saved.
+          </p>
+        }
+      </section>
+
+      @if (error()) {
+        <p class="prj-error-text" role="alert">{{ error() }}</p>
+      }
+      <div class="prj-actions">
+        <button class="prj-btn prj-btn--ghost" type="submit" [disabled]="busy()">
+          <ng-container i18n="@@decision.saveDraft">Save draft</ng-container>
+        </button>
+        @if (view.access.submit) {
+          <button
+            class="prj-btn"
+            type="button"
+            [disabled]="busy() || !view.decisionVersion"
+            (click)="startSubmit()"
+          >
+            <ng-container i18n="@@decision.submit">Submit for approval</ng-container>
+          </button>
+        }
+      </div>
+      @if (dirty()) {
+        <p class="prj-hint" role="status" i18n="@@decision.unsaved">Unsaved changes.</p>
+      }
+    </form>
+  }
+</section>
+
+<ng-template #routeView let-route="route">
+  <p>
+    <!-- CF-099 AC3: the server says which route is the default; a rule's name is never read as a flag. -->
+    @if (route.isDefault) {
+      <span i18n="@@decision.routeDefault"
+        >No approval rule matches, so the default route applies: one approval by an
+        Approver/Director.</span
+      >
+    } @else {
+      <span i18n="@@decision.routeRule"
+        >Rule <bdi>{{ route.ruleName }}</bdi></span
+      >
+    }
+    @if (readsRules) {
+      <!-- CF-136 AC6: the rule that routes this decision, highlighted in the approval routes. -->
+      ·
+      <a
+        routerLink="/approval-matrix/read"
+        [queryParams]="{ rule: route.isDefault ? 'default' : route.ruleName }"
+        i18n="@@decision.routeSeeRule"
+        >See this rule in the approval routes</a
+      >
+    }
+  </p>
+  @if (route.requiredApprovals === 0) {
+    <p class="prj-hint" i18n="@@decision.routeNone">
+      This route needs no approval: the decision is approved when it is submitted.
+    </p>
+  } @else {
+    <ol class="dc-list" role="list">
+      @for (step of route.steps; track step.step) {
+        <li i18n="@@decision.routeStep">Step {{ step.step }}: {{ roleLabel(step.role) }}</li>
+      }
+    </ol>
+  }
+  @if (route.allowSelfApproval) {
+    <p class="tnd-attention" i18n="@@decision.selfApprovalAllowed">
+      This rule allows the submitter to approve their own decision.
+    </p>
+  }
+</ng-template>
+
+@if (confirming()) {
+  <app-confirm-dialog
+    heading="Submit the decision for approval?"
+    i18n-heading="@@decision.submitHeading"
+    confirmLabel="Submit for approval"
+    i18n-confirmLabel="@@decision.submit"
+    [busy]="busy()"
+    (confirmed)="confirmSubmit()"
+    (cancelled)="confirming.set(false)"
+  >
+    <p i18n="@@decision.submitBody">
+      Approvers receive this exact saved version:
+      <bdi dir="ltr">{{ proposed()?.subcontractorCode }}</bdi> —
+      <bdi>{{ proposed()?.subcontractorName }}</bdi> for
+      <bdi dir="ltr">{{ form.awardValue }} {{ currency() }}</bdi
+      >. Submitting does not award; the award is issued only after approval.
+    </p>
+    @if (limited()) {
+      <p class="tnd-attention" i18n="@@decision.submitLimited">
+        Competition was limited; the justification goes with it.
+      </p>
+    }
+    @if (overBudget()) {
+      <p class="tnd-attention" i18n="@@decision.submitOverBudget">
+        The value is above the estimate; the over-budget reason goes with it.
+      </p>
+    }
+    @if (isOverride()) {
+      <p class="tnd-attention" i18n="@@decision.submitOverride">
+        It overrides the recommendation; the override reason goes with it.
+      </p>
+    }
+    @if (confirmError()) {
+      <p class="prj-error-text" role="alert">{{ confirmError() }}</p>
+    }
+  </app-confirm-dialog>
+}

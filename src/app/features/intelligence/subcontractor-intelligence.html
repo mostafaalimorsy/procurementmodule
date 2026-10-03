@@ -1,0 +1,478 @@
+<section class="prj-section intel" aria-labelledby="intel-title">
+  <div class="intel-head">
+    <div>
+      <h2 id="intel-title" i18n="@@intel.title">Subcontractor intelligence</h2>
+      <p class="prj-hint" i18n="@@intel.private">
+        Private to your company and computed from your own records: invitations, bids, decisions and
+        finalized closeouts. Every figure shows how much evidence it rests on.
+      </p>
+    </div>
+    <div class="prj-field">
+      <label for="intel-scope" i18n="@@intel.scope">Category</label>
+      <select id="intel-scope" name="scope" [(ngModel)]="scope" (change)="choose()">
+        <option value="*" i18n="@@intel.allCategories">All categories</option>
+        @for (option of profile()?.categories ?? []; track option.key) {
+          <option [value]="option.key">{{ categoryLabel(option.category) }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <p class="prj-visually-hidden" aria-live="polite">{{ announcement() }}</p>
+  @if (loading()) {
+    <p class="prj-hint" role="status" i18n="@@intel.loading">Loading intelligence…</p>
+  } @else if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  } @else if (profile(); as view) {
+    <p class="prj-hint">
+      <span i18n="@@intel.showing"
+        >Showing: <strong>{{ scopeLabel() }}</strong></span
+      >
+      ·
+      <span i18n="@@intel.rule"
+        >Definitions <bdi dir="ltr" class="ltr-token">{{ view.rule }}</bdi></span
+      >
+      @if (view.truncated) {
+        · <span i18n="@@intel.truncated">Only the 500 most recent invitations are counted.</span>
+      }
+    </p>
+    @if (
+      view.categoryKey !== null &&
+      view.procurement.issued === 0 &&
+      view.evidence.completedProjects === 0
+    ) {
+      <p class="prj-note" i18n="@@intel.noCategoryHistory">
+        No history in this category yet: no invitation and no completed project. Evidence from other
+        categories is never applied here.
+      </p>
+    }
+
+    <dl class="intel-overview">
+      <div class="prj-card">
+        <dt i18n="@@intel.reliability">Response reliability</dt>
+        <dd class="intel-figure">
+          <bdi dir="ltr">{{ rate(view.procurement.reliabilityPercent) }}</bdi>
+        </dd>
+        <dd>
+          @if (view.procurement.valid > 0) {
+            <span i18n="@@intel.reliabilityEvidence"
+              >Submitted <bdi dir="ltr">{{ view.procurement.submitted }}</bdi> of
+              <bdi dir="ltr">{{ view.procurement.valid }}</bdi> valid invitations</span
+            >
+          } @else {
+            <span i18n="@@intel.noValidInvitation">No valid invitation yet — no rate.</span>
+          }
+        </dd>
+      </div>
+      <div class="prj-card">
+        <dt i18n="@@intel.speed">Time to first bid</dt>
+        @if (windowShare(view.procurement.windowShareToFirstSubmission); as share) {
+          <dd class="intel-figure" data-testid="intel-window-share">
+            <span i18n="@@intel.windowShare"
+              >uses <bdi dir="ltr">{{ share }} %</bdi> of the bidding window</span
+            >
+          </dd>
+          <dd>
+            @if (view.procurement.windowShareToFirstSubmission?.count === 1) {
+              <span i18n="@@intel.windowShareOne">One tender only — not a typical share.</span>
+            } @else {
+              <span i18n="@@intel.windowShareMedian"
+                >Median of
+                <bdi dir="ltr">{{ view.procurement.windowShareToFirstSubmission?.count }}</bdi>
+                submissions, measured against the deadline in force when the firm submitted</span
+              >
+            }
+          </dd>
+          <dd class="prj-hint" data-testid="intel-elapsed">
+            <span i18n="@@intel.elapsed"
+              >Elapsed from invitation:
+              <bdi dir="ltr">{{
+                duration(central(view.procurement.hoursToFirstSubmission))
+              }}</bdi></span
+            >
+          </dd>
+        } @else {
+          <dd class="intel-figure">
+            <bdi dir="ltr">{{ duration(central(view.procurement.hoursToFirstSubmission)) }}</bdi>
+          </dd>
+          <dd>
+            @switch (view.procurement.hoursToFirstSubmission.count) {
+              @case (0) {
+                <span i18n="@@intel.speedNone">No submitted bid yet.</span>
+              }
+              @case (1) {
+                <span i18n="@@intel.speedOne">One submission only — not a typical time.</span>
+              }
+              @default {
+                <span i18n="@@intel.speedMedian"
+                  >Median of
+                  <bdi dir="ltr">{{ view.procurement.hoursToFirstSubmission.count }}</bdi>
+                  submissions, from invitation to first submitted bid</span
+                >
+              }
+            }
+          </dd>
+        }
+      </div>
+      <div class="prj-card">
+        <dt i18n="@@intel.awardRate">Award rate</dt>
+        <dd class="intel-figure">
+          <bdi dir="ltr">{{ rate(view.awards.awardRatePercent) }}</bdi>
+        </dd>
+        <dd>
+          @if (view.awards.participations > 0) {
+            <span i18n="@@intel.awardEvidence"
+              >Awarded <bdi dir="ltr">{{ view.awards.awards }}</bdi> of
+              <bdi dir="ltr">{{ view.awards.participations }}</bdi> decided tenders it bid in</span
+            >
+          } @else {
+            <span i18n="@@intel.noDecidedTender">No decided tender with this firm's bid yet.</span>
+          }
+        </dd>
+      </div>
+      @if (view.competitiveness; as competitive) {
+        <div class="prj-card">
+          <dt i18n="@@intel.competitiveness">Price position</dt>
+          <dd class="intel-figure">
+            <bdi dir="ltr">{{
+              percent(centralAt(competitive.leveledVersusMedian, 'percent'))
+            }}</bdi>
+          </dd>
+          <dd>
+            @if (competitive.compared === 1) {
+              <span i18n="@@intel.competitivenessOne"
+                >Leveled price against the tender median in one compared tender only — not a
+                pattern</span
+              >
+            } @else if (competitive.compared > 1) {
+              <span i18n="@@intel.competitivenessEvidence"
+                >Leveled price against the tender median, over
+                <bdi dir="ltr">{{ competitive.compared }}</bdi> compared tenders · lowest in
+                <bdi dir="ltr">{{ competitive.lowest }}</bdi></span
+              >
+            } @else {
+              <span i18n="@@intel.noComparison">No tender with two comparable bids yet.</span>
+            }
+          </dd>
+        </div>
+      }
+      <div class="prj-card">
+        <dt i18n="@@intel.completed">Completed projects</dt>
+        <dd class="intel-figure">
+          <bdi dir="ltr">{{ view.evidence.completedProjects }}</bdi>
+        </dd>
+        <dd>
+          <app-evidence-strength
+            [strength]="view.evidence.strength"
+            [dated]="view.evidence.dated"
+          />
+        </dd>
+        @if (view.evidence.latestClosedAtUtc) {
+          <dd i18n="@@intel.latestCloseout">
+            Latest closeout
+            <bdi>{{ view.evidence.latestClosedAtUtc | businessDate: 'instant' }}</bdi>
+          </dd>
+        }
+      </div>
+    </dl>
+
+    <details class="intel-why">
+      <summary i18n="@@intel.whyTitle">How are these figures calculated?</summary>
+      <ul>
+        <li i18n="@@intel.whyReliability">
+          Response reliability = bids submitted ÷ valid invitations. An invitation is valid once its
+          bidding has closed, unless it was withdrawn or the tender was cancelled before closing.
+          Invitations still open are shown apart.
+        </li>
+        <li i18n="@@intel.whySpeed">
+          Time to first bid = from the invitation being issued to the firm's first submitted bid;
+          time to first reply also counts an intention to bid or a decline.
+        </li>
+        <li i18n="@@intel.whyAward">
+          Award rate = awards ÷ awarded tenders in which the firm's bid was opened. Tenders still
+          being decided, or cancelled after opening, are not counted as losses. A reserve is not an
+          award.
+        </li>
+        <li i18n="@@intel.whyPrice">
+          Price position = the firm's leveled price against the median leveled price of the same
+          tender's bids in the same currency, as a signed percentage. The median includes this
+          firm's own bid, so in a tender with two bids the two firms sit at equal and opposite
+          positions. No competitor's price is shown and no currency is converted.
+        </li>
+        <li i18n="@@intel.whyStrength">
+          Evidence strength counts finalized closeouts: limited 1–2, moderate 3–5, strong 6 or more.
+          It describes how much evidence exists, not a prediction.
+        </li>
+      </ul>
+    </details>
+
+    <section class="intel-block" aria-labelledby="intel-procurement">
+      <h3 id="intel-procurement" i18n="@@intel.procurementTitle">Procurement history</h3>
+      <dl class="dc-facts">
+        <div>
+          <dt i18n="@@intel.issued">Invitations issued</dt>
+          <dd>
+            <bdi dir="ltr">{{ view.procurement.issued }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@intel.open">Still open</dt>
+          <dd>
+            <bdi dir="ltr">{{ view.procurement.open }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@intel.declined">Declined</dt>
+          <dd>
+            <bdi dir="ltr">{{ view.procurement.declined }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@intel.noResponse">No response</dt>
+          <dd>
+            <bdi dir="ltr">{{ view.procurement.noResponse }}</bdi>
+          </dd>
+        </div>
+        @if (view.procurement.withdrawn) {
+          <div>
+            <dt i18n="@@intel.firmWithdrew">Bid withdrawn by the firm</dt>
+            <dd>
+              <bdi dir="ltr">{{ view.procurement.withdrawn }}</bdi>
+            </dd>
+          </div>
+        }
+        <div>
+          <dt i18n="@@intel.excludedRevoked">Withdrawn (not counted)</dt>
+          <dd>
+            <bdi dir="ltr">{{ view.procurement.revoked }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@intel.excludedCancelled">Cancelled before closing (not counted)</dt>
+          <dd>
+            <bdi dir="ltr">{{ view.procurement.cancelled }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@intel.firstReply">Time to first reply</dt>
+          <dd>
+            <bdi dir="ltr">{{ duration(central(view.procurement.hoursToFirstReply)) }}</bdi>
+            <span class="prj-hint" i18n="@@intel.sample"
+              >(sample <bdi dir="ltr">{{ view.procurement.hoursToFirstReply.count }}</bdi
+              >)</span
+            >
+          </dd>
+        </div>
+        @if (view.procurement.latestInvitationUtc) {
+          <div>
+            <dt i18n="@@intel.period">Invitations from – to</dt>
+            <dd>
+              <bdi>{{ view.procurement.earliestInvitationUtc | businessDate: 'instant' }}</bdi> –
+              <bdi>{{ view.procurement.latestInvitationUtc | businessDate: 'instant' }}</bdi>
+            </dd>
+          </div>
+        }
+      </dl>
+      @if (view.recentParticipation.length === 0) {
+        <p class="prj-hint" i18n="@@intel.noInvitations">This firm has not been invited yet.</p>
+      } @else {
+        <ul class="intel-list" role="list">
+          @for (item of view.recentParticipation; track item.tenderId) {
+            <li>
+              <a [routerLink]="['/tenders', item.tenderId]"
+                ><bdi dir="ltr" class="tnd-code">{{ item.tenderReference }}</bdi></a
+              >
+              <bdi>{{ item.tenderTitle }}</bdi>
+              <span class="prj-chip">{{ outcomeLabel(item.outcome) }}</span>
+              @if (item.awardedToFirm) {
+                <span class="prj-chip" i18n="@@intel.awardedChip">Awarded</span>
+              }
+              <span class="prj-hint"
+                >{{ categoryLabel(item.category) }} ·
+                <bdi>{{ item.issuedAtUtc | businessDate: 'instant' }}</bdi></span
+              >
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="intel-block" aria-labelledby="intel-awards">
+      <h3 id="intel-awards" i18n="@@intel.awardsTitle">Awards and decisions</h3>
+      <p>
+        <span i18n="@@intel.awardCounts"
+          >Awarded: <bdi dir="ltr">{{ view.awards.awards }}</bdi> · awaiting a decision:
+          <bdi dir="ltr">{{ view.awards.awaitingDecision }}</bdi> · cancelled after opening:
+          <bdi dir="ltr">{{ view.awards.openedThenCancelled }}</bdi></span
+        >
+        @if (view.awards.reserves !== null) {
+          ·
+          <span i18n="@@intel.reserveCounts"
+            >kept as reserve: <bdi dir="ltr">{{ view.awards.reserves }}</bdi> · not selected:
+            <bdi dir="ltr">{{ view.awards.rejections }}</bdi></span
+          >
+        }
+        @if (view.awards.awardsDeclined || view.awards.awardsWithdrawn) {
+          ·
+          <span i18n="@@intel.awardsEnded"
+            >awards declined by the firm:
+            <bdi dir="ltr">{{ view.awards.awardsDeclined ?? 0 }}</bdi> · awards withdrawn:
+            <bdi dir="ltr">{{ view.awards.awardsWithdrawn ?? 0 }}</bdi></span
+          >
+        }
+      </p>
+      @if (view.access.decisions && view.awards.items.length > 0) {
+        <ul class="intel-list" role="list">
+          @for (item of view.awards.items; track item.awardId) {
+            <li>
+              <a [routerLink]="['/tenders', item.tenderId, 'decision']"
+                ><bdi dir="ltr" class="tnd-code">{{ item.tenderReference }}</bdi></a
+              >
+              <span class="prj-chip">{{
+                dispositionLabel(item.disposition, item.awardState)
+              }}</span>
+              @if (item.recommendedRank !== null) {
+                <span i18n="@@intel.recommendedRank"
+                  >recommended rank <bdi dir="ltr">{{ item.recommendedRank }}</bdi></span
+                >
+              }
+              @if (item.awardWasOverride) {
+                <span class="tnd-attention" i18n="@@intel.override"
+                  >award departed from the ranking</span
+                >
+              }
+              <span class="prj-hint"
+                >{{ categoryLabel(item.category) }} ·
+                <bdi>{{ item.awardedAtUtc | businessDate: 'instant' }}</bdi></span
+              >
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    @if (view.competitiveness; as competitive) {
+      <section class="intel-block" aria-labelledby="intel-bids">
+        <h3 id="intel-bids" i18n="@@intel.bidsTitle">Bid behaviour</h3>
+        <p class="prj-hint" i18n="@@intel.bidsHint">
+          Commercial evidence: the firm's own prices and where they stood in each tender. Negative =
+          below the tender median.
+        </p>
+        @if (competitive.items.length === 0) {
+          <p i18n="@@intel.noPricedBid">No evaluated bid of this firm yet.</p>
+        } @else {
+          <ul class="intel-list" role="list">
+            @for (item of competitive.items; track item.tenderId) {
+              <li>
+                <bdi dir="ltr" class="tnd-code">{{ item.tenderReference }}</bdi>
+                <span i18n="@@intel.leveledPrice"
+                  >Leveled
+                  <bdi dir="ltr">{{ money(item.leveledTotal) }} {{ item.currency }}</bdi></span
+                >
+                @if (item.comparableBids >= 2) {
+                  <span i18n="@@intel.position"
+                    >position
+                    <bdi dir="ltr">{{ item.position }} / {{ item.comparableBids }}</bdi></span
+                  >
+                  <span i18n="@@intel.versusMedian"
+                    >against median
+                    <bdi dir="ltr">{{ percent(item.leveledVersusMedianPercent) }}</bdi></span
+                  >
+                } @else {
+                  <!-- CF-126 (ADR-128): why the firm was not compared, as it was — never "one bid" for an ineligible or other-currency bid. -->
+                  @switch (item.notComparedReason) {
+                    @case ('Ineligible') {
+                      <span class="prj-hint" i18n="@@intel.notComparedIneligible"
+                        >not compared — ineligible at recommendation</span
+                      >
+                    }
+                    @case ('OtherCurrency') {
+                      <span class="prj-hint" i18n="@@intel.notComparedCurrency"
+                        >not compared — other currency</span
+                      >
+                    }
+                    @default {
+                      <span class="prj-hint" i18n="@@intel.notComparedSingle"
+                        >only one comparable bid</span
+                      >
+                    }
+                  }
+                }
+                <span class="prj-hint">{{ categoryLabel(item.category) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+
+    @if (view.retrospective?.items?.length) {
+      <!-- CF-002 (ADR-126): past outcomes recorded from documents, labelled and kept out of every figure above and below. -->
+      <section
+        class="dash-block"
+        aria-labelledby="retro-evidence-title"
+        data-testid="intel-retrospective"
+      >
+        <h3 id="retro-evidence-title">
+          <span i18n="@@intel.retrospectiveTitle">Past outcomes recorded from documents</span>
+          <span class="prj-chip dc-state dc-state--muted">{{ retrospectiveBadge }}</span>
+        </h3>
+        <p class="prj-hint" i18n="@@intel.retrospectiveHint">
+          Counted apart from closeouts: <bdi dir="ltr">{{ view.retrospective!.count }}</bdi> past
+          outcomes and <bdi dir="ltr">{{ view.evidence.completedProjects }}</bdi> finalized
+          closeouts. No recommendation weighs them.
+        </p>
+        <ul class="intel-list" role="list">
+          @for (item of view.retrospective!.items; track item.recordId) {
+            <li>
+              <a [routerLink]="['/retrospective-outcomes', item.recordId]"
+                ><bdi>{{ item.projectLabel }}</bdi></a
+              >
+              · <bdi>{{ item.packageLabel }}</bdi> · <bdi>{{ item.category }}</bdi> ·
+              {{ outcomeTypeLabel(item.outcomeType) }}
+              @if (item.costVariancePercent) {
+                ·
+                <span i18n="@@intel.costShort"
+                  >cost <bdi dir="ltr">{{ percent(item.costVariancePercent) }}</bdi></span
+                >
+              }
+              ·
+              <span i18n="@@intel.ratingsShort"
+                >quality <bdi dir="ltr">{{ item.qualityRating }}</bdi> · HSE
+                <bdi dir="ltr">{{ item.hseRating }}</bdi></span
+              >
+              <small class="prj-hint tnd-block" i18n="@@intel.retrospectiveProvenance"
+                >Source: <bdi>{{ item.sourceReference }}</bdi> · recorded by
+                <bdi>{{ item.createdByName }}</bdi> · confirmed by
+                <bdi>{{ item.confirmedByName }}</bdi> on
+                <bdi>{{ item.confirmedAtUtc | businessDate: 'instant' }}</bdi></small
+              >
+            </li>
+          }
+        </ul>
+      </section>
+    }
+    @if (view.delivery; as delivery) {
+      <app-intel-delivery
+        [delivery]="delivery"
+        [evidence]="view.evidence"
+        [access]="view.access"
+        [categoryName]="view.categoryKey === null ? null : scopeLabel()"
+      />
+    } @else {
+      <p class="prj-hint" i18n="@@intel.deliveryWithheld">
+        Delivery details (schedule, quality, HSE, variations, claims, disputes) are visible to roles
+        that read performance closeouts.
+      </p>
+    }
+
+    @if (view.similar; as similar) {
+      <app-intel-similar [similar]="similar" [access]="view.access" />
+    }
+  }
+</section>

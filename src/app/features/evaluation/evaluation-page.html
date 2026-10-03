@@ -1,0 +1,1106 @@
+<section class="prj-page ev-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/tenders" i18n="@@nav.tenders">Tenders</a><span aria-hidden="true">/</span>
+    <a [routerLink]="['/tenders', tenderId()]">
+      @if (opening(); as item) {
+        <bdi dir="ltr">{{ item.reference }}</bdi>
+      } @else {
+        <ng-container i18n="@@tenders.crumb">Tender</ng-container>
+      }
+    </a>
+    <span aria-hidden="true">/</span>
+    <span i18n="@@evaluation.crumb">Evaluation</span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  <div role="status" aria-live="polite">
+    @if (notice()) {
+      <p id="evaluation-notice" class="prj-note" tabindex="-1">{{ notice() }}</p>
+    }
+    @if (progressStale()) {
+      <p class="prj-note" i18n="@@evaluation.progressStale">
+        Your change was saved, but the progress summary could not be refreshed. Reload the page to
+        see the latest progress.
+      </p>
+    }
+  </div>
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@evaluation.loading">Loading the evaluation…</p>
+  } @else if (opening(); as item) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ item.reference }}</bdi> ·
+          <ng-container i18n="@@evaluation.eyebrow">Bid opening and evaluation</ng-container>
+        </p>
+        <h1>
+          <bdi>{{ item.title }}</bdi>
+        </h1>
+        <p class="tnd-meta">
+          <span class="prj-chip ev-state ev-state--{{ item.state }}">{{
+            openingStateLabel(item.state)
+          }}</span>
+          @if (overview(); as view) {
+            @if (view.stage !== 'NotOpened') {
+              &nbsp;<span class="prj-chip ev-stage ev-stage--{{ view.stage }}">{{
+                stageLabel(view.stage)
+              }}</span>
+            }
+          }
+        </p>
+      </div>
+    </div>
+    <app-tender-stage-header
+      [tenderId]="tenderId()"
+      page="evaluation"
+      [refresh]="overview()?.evaluation?.version ?? 0"
+    />
+
+    <p class="prj-hint ev-boundary" i18n="@@evaluation.boundary">
+      Evaluation compares and scores the submitted bids. It never selects, ranks for award or awards
+      a bidder: that decision comes later, with its own approvals.
+    </p>
+    @if (negotiationAvailable()) {
+      <p class="prj-actions">
+        <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tenderId(), 'negotiation']">
+          <ng-container i18n="@@evaluation.negotiationLink">Negotiation rounds</ng-container>
+        </a>
+        @if (decisionAvailable()) {
+          <a class="prj-btn prj-btn--ghost" [routerLink]="['/tenders', tenderId(), 'decision']">
+            <ng-container i18n="@@evaluation.decisionLink"
+              >Recommendation and decision</ng-container
+            >
+          </a>
+        }
+      </p>
+    }
+
+    @if (tabs().length > 1) {
+      <div
+        class="ev-tabs"
+        role="tablist"
+        aria-label="Evaluation sections"
+        i18n-aria-label="@@evaluation.sections"
+      >
+        @for (entry of tabs(); track entry; let index = $index) {
+          <button
+            type="button"
+            role="tab"
+            [id]="'evaluation-tab-' + entry"
+            [attr.aria-selected]="tab() === entry"
+            [attr.aria-controls]="'evaluation-panel-' + entry"
+            [attr.tabindex]="tab() === entry ? 0 : -1"
+            [class.is-active]="tab() === entry"
+            (click)="selectTab(entry)"
+            (keydown)="tabKey($event, index)"
+          >
+            {{ tabLabel(entry) }}
+          </button>
+        }
+      </div>
+    }
+
+    @switch (tabs().includes(tab()) ? tab() : 'overview') {
+      @case ('technical') {
+        <div
+          id="evaluation-panel-technical"
+          role="tabpanel"
+          aria-labelledby="evaluation-tab-technical"
+        >
+          <app-evaluation-technical
+            [tenderId]="tenderId()"
+            (changed)="refreshOverview()"
+            (announce)="announce($event)"
+          />
+        </div>
+      }
+      @case ('commercial') {
+        <div
+          id="evaluation-panel-commercial"
+          role="tabpanel"
+          aria-labelledby="evaluation-tab-commercial"
+        >
+          <app-evaluation-commercial
+            [tenderId]="tenderId()"
+            (changed)="refreshOverview()"
+            (announce)="announce($event)"
+          />
+        </div>
+      }
+      @case ('gaps') {
+        <div id="evaluation-panel-gaps" role="tabpanel" aria-labelledby="evaluation-tab-gaps">
+          <app-evaluation-gaps [tenderId]="tenderId()" [overview]="overview()" />
+        </div>
+      }
+      @default {
+        <div
+          [attr.id]="tabs().length > 1 ? 'evaluation-panel-overview' : null"
+          [attr.role]="tabs().length > 1 ? 'tabpanel' : null"
+          [attr.aria-labelledby]="tabs().length > 1 ? 'evaluation-tab-overview' : null"
+        >
+          <!-- ------------------------------------------------ before opening -->
+          @if (item.state !== 'Opened') {
+            <section class="prj-section ev-sealed" aria-labelledby="sealed-title">
+              <h2 id="sealed-title" i18n="@@evaluation.sealedTitle">Submitted bids are sealed</h2>
+              @switch (item.state) {
+                @case ('Open') {
+                  <p i18n="@@evaluation.sealedOpen">
+                    The tender is still open. Bids stay sealed — nobody in your company can read
+                    prices, technical answers or files — until the tender closes and an authorized
+                    buyer opens them.
+                  </p>
+                }
+                @case ('Ready') {
+                  @if (item.closure?.kind === 'Early') {
+                    <p i18n="@@evaluation.readyEarly">
+                      The tender was closed early on <bdi>{{ closedShown() }}</bdi> (scheduled
+                      deadline <bdi>{{ scheduledShown() }}</bdi
+                      >). The submitted bids can now be opened.
+                    </p>
+                  } @else {
+                    <p i18n="@@evaluation.readyDeadline">
+                      The tender closed at its deadline, <bdi>{{ closedShown() }}</bdi
+                      >. The submitted bids can now be opened.
+                    </p>
+                  }
+                }
+                @case ('NoSubmissions') {
+                  <p i18n="@@evaluation.noSubmissions">
+                    The tender closed without any submitted bid. There is nothing to open.
+                  </p>
+                }
+                @case ('Cancelled') {
+                  <p i18n="@@evaluation.cancelled">
+                    The tender is cancelled. Its bids are never opened.
+                  </p>
+                }
+                @default {
+                  <p i18n="@@evaluation.notPublished">The tender has not been published.</p>
+                }
+              }
+              <dl class="prj-summary ev-counts">
+                <div>
+                  <dt i18n="@@control.closeEarlyInvited">Invited firms</dt>
+                  <dd>{{ item.counts.invited }}</dd>
+                </div>
+                <div>
+                  <dt i18n="@@control.closeEarlySubmitted">Submitted</dt>
+                  <dd>{{ item.counts.submitted }}</dd>
+                </div>
+                <div>
+                  <dt i18n="@@control.closeEarlyNotSubmitted">Not submitted</dt>
+                  <dd>{{ item.counts.notSubmitted }}</dd>
+                </div>
+                <div>
+                  <dt i18n="@@evaluation.revisionInForce">Tender revision in force</dt>
+                  <dd>{{ item.currentTenderRevision }}</dd>
+                </div>
+              </dl>
+              @if (item.submittedAnsweringOlderRevision > 0) {
+                <p class="prj-note tnd-attention-box" role="note">
+                  <span i18n="@@evaluation.olderRevisionWarning"
+                    >Submitted bids that answered an older tender revision:
+                    {{ item.submittedAnsweringOlderRevision }}. They are opened as submitted and
+                    marked, never rewritten.</span
+                  >
+                </p>
+              }
+              @if (item.unconfirmedOutsideBids) {
+                <p
+                  class="prj-note tnd-attention-box"
+                  role="note"
+                  i18n="@@evaluation.outsideUnconfirmed"
+                >
+                  {{ item.unconfirmedOutsideBids }} bid(s) recorded outside the portal still need a
+                  second user's confirmation (on the tender page) before the bids can be opened.
+                </p>
+              }
+              @if (item.canOpen) {
+                <div class="prj-actions">
+                  <button class="prj-btn" type="button" (click)="startOpen()">
+                    <ng-container i18n="@@evaluation.openBids"
+                      >Open bids for evaluation</ng-container
+                    >
+                  </button>
+                </div>
+              } @else if (item.state === 'Ready') {
+                <p class="prj-hint" i18n="@@evaluation.openNotPermitted">
+                  Procurement leadership opens the bids. You will see them here once they are
+                  opened, as your role allows.
+                </p>
+              }
+            </section>
+          } @else if (item.opening; as record) {
+            <!-- ------------------------------------------------ the opening record -->
+            <section class="prj-section" aria-labelledby="opening-title">
+              <h2 id="opening-title" i18n="@@evaluation.openingTitle">Opening record</h2>
+              <dl class="prj-summary ev-counts">
+                <div>
+                  <dt i18n="@@evaluation.openedAt">Opened</dt>
+                  <dd>
+                    {{ record.openedAtUtc | businessDate: 'instant' }}
+                    <small class="prj-hint tnd-block" i18n="@@evaluation.openedBy"
+                      >by <bdi>{{ record.openedByName }}</bdi></small
+                    >
+                  </dd>
+                </div>
+                <div>
+                  <dt i18n="@@evaluation.closedHow">Tender closed</dt>
+                  <dd>
+                    <bdi>{{ openingClosedShown() }}</bdi>
+                    <small class="prj-hint tnd-block">
+                      @if (record.closureKind === 'Early') {
+                        <ng-container i18n="@@evaluation.closedEarlyShort"
+                          >closed early by the buyer</ng-container
+                        >
+                      } @else {
+                        <ng-container i18n="@@evaluation.closedDeadlineShort"
+                          >at its deadline</ng-container
+                        >
+                      }
+                    </small>
+                  </dd>
+                </div>
+                <div>
+                  <dt i18n="@@evaluation.population">Bids opened</dt>
+                  <dd>
+                    <span i18n="@@evaluation.populationValue">{record.invitedCount, plural,
+                      =1 {{{ record.submittedCount }} of 1 invited firm}
+                      other {{{ record.submittedCount }} of {{ record.invitedCount }} invited firms}
+                    }</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt i18n="@@evaluation.revisionInForce">Tender revision in force</dt>
+                  <dd>{{ record.tenderRevision }}</dd>
+                </div>
+              </dl>
+              <p class="prj-hint" i18n="@@evaluation.frozenHint">
+                These exact submitted revisions are the evaluation evidence. They were frozen at
+                opening and never change.
+              </p>
+              <div class="prj-table-wrap">
+                <table class="prj-table ev-table">
+                  <caption class="prj-visually-hidden" i18n="@@evaluation.populationCaption">
+                    Opened bids
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col" i18n="@@evaluation.colFirm">Firm</th>
+                      <th scope="col" i18n="@@evaluation.colBid">Bid</th>
+                      <th scope="col" i18n="@@evaluation.colAnswered">Answered revision</th>
+                      <th scope="col" i18n="@@evaluation.colSubmitted">Submitted</th>
+                      <th scope="col" i18n="@@evaluation.colFiles">Files</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (bid of record.bids; track bid.id) {
+                      <tr>
+                        <th scope="row">
+                          <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+                          >{{ ' ' }}
+                          <span class="tnd-block"
+                            ><bdi>{{ bid.subcontractorName }}</bdi></span
+                          >
+                        </th>
+                        <td>
+                          <bdi dir="ltr" class="tnd-code">{{ bid.bidReference }}</bdi>
+                          <small class="prj-hint tnd-block" i18n="@@evaluation.bidRevision"
+                            >submission {{ bid.bidRevisionNumber }}</small
+                          >
+                          @if (bid.outsidePortal) {
+                            <span class="prj-chip tnd-block" i18n="@@evaluation.outsidePortal"
+                              >Recorded outside the portal</span
+                            >
+                          }
+                          @if (bid.withdrawal; as withdrawal) {
+                            <strong class="tnd-attention tnd-block" i18n="@@evaluation.bidWithdrawn"
+                              >Withdrawn by the firm — recorded by
+                              <bdi>{{ withdrawal.recordedByName }}</bdi> on
+                              {{ withdrawal.recordedAtUtc | businessDate: 'instant' }}</strong
+                            >
+                            <small class="prj-hint tnd-block"
+                              ><bdi>{{ withdrawal.reason }}</bdi> ·
+                              <bdi>{{ withdrawal.evidenceReference }}</bdi></small
+                            >
+                          } @else if (canRecordWithdrawal()) {
+                            @if (withdrawingBid() === bid.id) {
+                              <div class="prj-form">
+                                <div class="prj-field">
+                                  <label
+                                    [for]="'wd-reason-' + bid.id"
+                                    i18n="@@evaluation.withdrawalReason"
+                                    >Reason the firm gave</label
+                                  >
+                                  <textarea
+                                    [id]="'wd-reason-' + bid.id"
+                                    name="withdrawalReason"
+                                    rows="2"
+                                    maxlength="1000"
+                                    [(ngModel)]="withdrawalReason"
+                                  ></textarea>
+                                </div>
+                                <div class="prj-field">
+                                  <label
+                                    [for]="'wd-ref-' + bid.id"
+                                    i18n="@@evaluation.withdrawalReference"
+                                    >Evidence reference (for example the firm's letter)</label
+                                  >
+                                  <input
+                                    [id]="'wd-ref-' + bid.id"
+                                    name="withdrawalReference"
+                                    maxlength="200"
+                                    [(ngModel)]="withdrawalReference"
+                                  />
+                                </div>
+                                <div class="prj-actions">
+                                  <button
+                                    class="prj-btn prj-btn--danger"
+                                    type="button"
+                                    [disabled]="
+                                      busy() ||
+                                      withdrawalReason.trim().length < 3 ||
+                                      !withdrawalReference.trim()
+                                    "
+                                    (click)="recordWithdrawal(bid.id)"
+                                    i18n="@@evaluation.recordWithdrawal"
+                                  >
+                                    Record withdrawal
+                                  </button>
+                                  <button
+                                    class="prj-btn prj-btn--ghost"
+                                    type="button"
+                                    (click)="withdrawingBid.set(null)"
+                                    i18n="@@common.cancel"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            } @else {
+                              <button
+                                class="prj-btn prj-btn--ghost"
+                                type="button"
+                                (click)="askWithdrawal(bid.id)"
+                                i18n="@@evaluation.firmWithdrew"
+                              >
+                                The firm withdrew…
+                              </button>
+                            }
+                          }
+                        </td>
+                        <td>
+                          {{ bid.answeredTenderRevision }}
+                          @if (bid.answeredOlderRevision) {
+                            <span class="tnd-attention tnd-block" i18n="@@evaluation.olderRevision"
+                              >Older than the revision in force</span
+                            >
+                          }
+                          @if (bid.outstandingAcknowledgements.length) {
+                            <span class="tnd-attention tnd-block" i18n="@@evaluation.unacknowledged"
+                              >Unacknowledged addenda:
+                              <bdi dir="ltr">{{
+                                bid.outstandingAcknowledgements.join(', ')
+                              }}</bdi></span
+                            >
+                          }
+                        </td>
+                        <td>{{ bid.submittedAtUtc | businessDate: 'instant' }}</td>
+                        <td>
+                          @for (file of bid.files; track file.id) {
+                            <div class="ev-file">
+                              @if ((file.scanState ?? 'Clean') === 'Clean') {
+                                <a [href]="fileUrl(file)" download
+                                  ><bdi>{{ file.fileName }}</bdi></a
+                                >
+                              } @else {
+                                <bdi>{{ file.fileName }}</bdi>
+                                @if (file.scanState === 'Infected') {
+                                  <small
+                                    class="tnd-attention tnd-block"
+                                    i18n="@@evaluation.fileWithheld"
+                                    >Withheld — flagged by the malware scanner. Kept as evidence;
+                                    never served.</small
+                                  >
+                                } @else {
+                                  <small class="prj-hint tnd-block" i18n="@@evaluation.fileScanning"
+                                    >Being scanned for malware — available once clean.</small
+                                  >
+                                }
+                              }
+                              <small class="prj-hint">{{ size(file.sizeBytes) }}</small>
+                              @if (file.roundNumber) {
+                                <small class="tnd-attention tnd-block" i18n="@@evaluation.roundFile"
+                                  >Round {{ file.roundNumber }} response</small
+                                >
+                              }
+                              @if (item.canClassifyFiles) {
+                                <span class="ev-classify">
+                                  <label
+                                    class="prj-visually-hidden"
+                                    [for]="'classify-' + file.id"
+                                    i18n="@@evaluation.classifyLabel"
+                                    >Classification</label
+                                  >
+                                  <select
+                                    [id]="'classify-' + file.id"
+                                    [ngModel]="classificationFor(file)"
+                                    (ngModelChange)="pickClassification(file, $event)"
+                                  >
+                                    @if (file.classification === 'Unclassified') {
+                                      <option value="Unclassified" disabled>
+                                        {{ classificationLabel('Unclassified') }}
+                                      </option>
+                                    }
+                                    <option value="Technical">
+                                      {{ classificationLabel('Technical') }}
+                                    </option>
+                                    <option value="Commercial">
+                                      {{ classificationLabel('Commercial') }}
+                                    </option>
+                                  </select>
+                                  <button
+                                    class="prj-btn prj-btn--ghost prj-btn--small"
+                                    type="button"
+                                    [disabled]="
+                                      busy() || classificationFor(file) === file.classification
+                                    "
+                                    (click)="saveClassification(file)"
+                                    i18n="@@common.save"
+                                  >
+                                    Save
+                                  </button>
+                                </span>
+                              } @else {
+                                <small class="prj-hint tnd-block">{{
+                                  classificationLabel(file.classification)
+                                }}</small>
+                              }
+                            </div>
+                          }
+                          @if (bid.withheldFileCount > 0) {
+                            <small class="prj-hint tnd-block" i18n="@@evaluation.withheldFiles"
+                              >Files restricted to other readers: {{ bid.withheldFileCount }}</small
+                            >
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              @if (item.canClassifyFiles) {
+                <p class="prj-hint" i18n="@@evaluation.classifyHint">
+                  Files start restricted to commercial readers, because a file can contain prices.
+                  Mark a file technical only when it holds no commercial information.
+                </p>
+              }
+              @if (record.absentees.length) {
+                <h3 i18n="@@evaluation.absenteesTitle">Invited firms that did not submit</h3>
+                <ul class="ev-absentees" role="list">
+                  @for (absentee of record.absentees; track absentee.subcontractorCode) {
+                    <li>
+                      <bdi dir="ltr" class="tnd-code">{{ absentee.subcontractorCode }}</bdi
+                      >{{ ' ' }} <bdi>{{ absentee.subcontractorName }}</bdi> —
+                      {{ invitationStatusLabel(absentee.finalStatus) }}
+                      @if (absentee.hadDraft) {
+                        <span class="prj-hint" i18n="@@evaluation.absenteeDraft"
+                          >(a draft was started, never submitted)</span
+                        >
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
+
+          <!-- ------------------------------------------------ CF-043: the evaluation panel -->
+          @if (overview(); as view) {
+            @if (view.panel; as panel) {
+              <section class="prj-section" aria-labelledby="panel-title">
+                <h2 id="panel-title" i18n="@@evaluation.panelTitle">Evaluation panel</h2>
+                <p class="prj-hint" i18n="@@evaluation.panelRules">
+                  Each bid needs {{ panel.minimum }} current submitted scorecard(s). Evaluator
+                  totals more than {{ panel.divergenceThresholdPoints }} points apart are flagged as
+                  divergent; they are never averaged.
+                </p>
+                @if (panel.moderationRequired) {
+                  <p class="prj-hint" i18n="@@evaluation.panelModeration">
+                    A divergent bid needs a moderation note before the evaluation is completed.
+                  </p>
+                }
+                @if (panel.assignedToMe) {
+                  <p class="tnd-attention" i18n="@@evaluation.panelYou">You are on this panel.</p>
+                }
+                @if (panel.assignments.length) {
+                  <div class="prj-table-wrap">
+                    <table class="prj-table">
+                      <thead>
+                        <tr>
+                          <th scope="col" i18n="@@evaluation.colEvaluator">Evaluator</th>
+                          @for (bid of view.bids; track bid.openingBidId) {
+                            <th scope="col">
+                              <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi>
+                            </th>
+                          }
+                          @if (panel.canAssign) {
+                            <th scope="col">
+                              <span class="prj-visually-hidden" i18n="@@common.actions"
+                                >Actions</span
+                              >
+                            </th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (assignment of panel.assignments; track assignment.id) {
+                          <tr>
+                            <th scope="row">
+                              <bdi>{{ assignment.memberName }}</bdi>
+                              <small class="prj-hint tnd-block" i18n="@@evaluation.assignedBy"
+                                >Assigned by <bdi>{{ assignment.assignedByName }}</bdi> ·
+                                {{ assignment.assignedAtUtc | businessDate: 'instant' }}</small
+                              >
+                            </th>
+                            @for (item of assignment.bids; track item.openingBidId) {
+                              <td>{{ evaluatorStatusLabel(item.status) }}</td>
+                            }
+                            @if (panel.canAssign) {
+                              <td>
+                                <button
+                                  class="prj-btn prj-btn--ghost ev-btn-small"
+                                  type="button"
+                                  [disabled]="busy()"
+                                  (click)="unassign(assignment)"
+                                  i18n="@@evaluation.unassign"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            }
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <p class="prj-hint" i18n="@@evaluation.panelEmpty">
+                    No evaluator is assigned yet. Anyone who scores technical evaluations can still
+                    score.
+                  </p>
+                }
+                @if (panel.canAssign && panel.candidates.length) {
+                  <div class="prj-field ev-policy-choice">
+                    <label for="panel-member" i18n="@@evaluation.assignLabel"
+                      >Add an evaluator</label
+                    >
+                    <select id="panel-member" [(ngModel)]="assignChoice" [disabled]="busy()">
+                      <option value="" i18n="@@evaluation.assignChoose">Choose a member</option>
+                      @for (candidate of panel.candidates; track candidate.memberId) {
+                        @if (candidate.seesCommercial) {
+                          <option
+                            [value]="candidate.memberId"
+                            [disabled]="view.evaluation?.blindTechnicalScoring"
+                            i18n="@@evaluation.candidateSeesCommercial"
+                          >
+                            {{ candidate.name }} (also sees prices)
+                          </option>
+                        } @else {
+                          <option [value]="candidate.memberId">{{ candidate.name }}</option>
+                        }
+                      }
+                    </select>
+                  </div>
+                  <div class="prj-actions">
+                    <button
+                      class="prj-btn"
+                      type="button"
+                      [disabled]="busy() || !assignChoice"
+                      (click)="assign()"
+                      i18n="@@evaluation.assign"
+                    >
+                      Add to panel
+                    </button>
+                  </div>
+                }
+              </section>
+            }
+          }
+
+          <!-- ------------------------------------------------ evaluation setup and progress -->
+          @if (overview(); as view) {
+            @if (view.stage === 'NotStarted') {
+              <section class="prj-section" aria-labelledby="setup-title">
+                <h2 id="setup-title" i18n="@@evaluation.setupTitle">Evaluation policy</h2>
+                @if (view.access.managePolicy && !view.tenderCancelled) {
+                  @if (view.policyOptions.length) {
+                    <div class="prj-field ev-policy-choice">
+                      <label for="evaluation-policy" i18n="@@evaluation.choosePolicy"
+                        >Technical scorecard policy</label
+                      >
+                      <select id="evaluation-policy" [(ngModel)]="policyChoice">
+                        @for (option of view.policyOptions; track option.policyId) {
+                          @if (option.declared) {
+                            <option
+                              [value]="option.policyId"
+                              i18n="@@evaluation.policyOptionDeclared"
+                            >
+                              {{ option.name }} (declared at publication, version
+                              {{ option.declaredVersionNumber }})
+                            </option>
+                          } @else {
+                            <option [value]="option.policyId" i18n="@@evaluation.policyOption">
+                              {{ option.name }} (version {{ option.currentVersionNumber }})
+                            </option>
+                          }
+                        }
+                      </select>
+                    </div>
+                    @if (deviates()) {
+                      <div class="prj-field">
+                        <label for="evaluation-deviation" i18n="@@evaluation.deviationReason"
+                          >Why evaluate against other criteria than the tender declared</label
+                        >
+                        <textarea
+                          id="evaluation-deviation"
+                          rows="2"
+                          maxlength="500"
+                          [(ngModel)]="deviationReason"
+                        ></textarea>
+                        <span class="prj-hint" i18n="@@evaluation.deviationHint"
+                          >The bids are already open. The change is recorded with your reason and
+                          flagged on the recommendation and to approvers.</span
+                        >
+                      </div>
+                    }
+                    <div class="prj-field ev-policy-choice">
+                      <label for="evaluation-panel-minimum" i18n="@@evaluation.panelMinimumLabel"
+                        >Scorecards needed per bid (optional)</label
+                      >
+                      <input
+                        id="evaluation-panel-minimum"
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="1"
+                        [(ngModel)]="panelMinimum"
+                        [placeholder]="view.panel?.minimum ?? 1"
+                      />
+                      <span class="prj-hint" i18n="@@evaluation.panelMinimumHint"
+                        >Leave empty to use your company's panel minimum. It is fixed when the
+                        evaluation starts.</span
+                      >
+                    </div>
+                    <p class="prj-hint" i18n="@@evaluation.policyFixedHint">
+                      The version you choose is fixed for this tender once evaluation starts: every
+                      score is judged against the same criteria and weights.
+                    </p>
+                    <div class="prj-actions">
+                      <button
+                        class="prj-btn"
+                        type="button"
+                        [disabled]="busy()"
+                        (click)="startEvaluation()"
+                      >
+                        <ng-container i18n="@@evaluation.start">Start evaluation</ng-container>
+                      </button>
+                    </div>
+                  } @else {
+                    <p i18n="@@evaluation.noPolicies">
+                      There is no active scorecard policy yet.
+                      <a routerLink="/evaluation-policies">Create one</a> first.
+                    </p>
+                  }
+                } @else {
+                  <p class="prj-hint" i18n="@@evaluation.waitingForPolicy">
+                    Evaluation starts when procurement leadership chooses the scorecard policy.
+                  </p>
+                }
+              </section>
+            }
+
+            @if (view.evaluation; as state) {
+              <section class="prj-section" aria-labelledby="progress-title">
+                <h2 id="progress-title" i18n="@@evaluation.progressTitle">Evaluation progress</h2>
+                @if (state.status === 'Completed') {
+                  <p class="prj-note ev-completed" role="note">
+                    <span i18n="@@evaluation.completedBy"
+                      >Completed on {{ state.completedAtUtc | businessDate: 'instant' }} by
+                      <bdi>{{ state.completedByName }}</bdi
+                      >; no bidder has been selected.</span
+                    >
+                    {{ nextStageText() }}
+                  </p>
+                  @if (nextStage() === 'lastStage') {
+                    <app-not-in-plan feature="award" />
+                  }
+                }
+                @if (view.tenderCancelled) {
+                  <p class="prj-note prj-note--error" role="note" i18n="@@evaluation.cancelledNote">
+                    The tender was cancelled after its bids were opened. This evaluation is kept
+                    read-only.
+                  </p>
+                }
+                @if (view.tenderAwarded) {
+                  <p class="prj-note ev-completed" role="note" i18n="@@evaluation.awardedNote">
+                    The tender was awarded. This evaluation is the frozen evidence behind the
+                    decision and stays read-only.
+                  </p>
+                }
+                @if (view.negotiationOpen) {
+                  <p
+                    class="prj-note tnd-attention-box"
+                    role="note"
+                    i18n="@@evaluation.roundOpenNote"
+                  >
+                    A negotiation round is open. Its responses are evaluated after the round closes;
+                    until then the evaluation covers the responses already in force.
+                  </p>
+                } @else if (roundPending()) {
+                  <div class="prj-note tnd-attention-box" role="note">
+                    <p i18n="@@evaluation.roundPendingNote">
+                      Negotiation round {{ view.latestClosedRound }} closed. Its responses are not
+                      part of the evaluation yet: take them in, rescore and relevel what changed,
+                      and complete the evaluation again.
+                    </p>
+                    @if (view.canRefresh && !view.tenderCancelled) {
+                      <button class="prj-btn" type="button" (click)="startRefresh()">
+                        <ng-container i18n="@@evaluation.refreshAction"
+                          >Take in round {{ view.latestClosedRound }} responses</ng-container
+                        >
+                      </button>
+                    } @else {
+                      <p class="prj-hint" i18n="@@evaluation.refreshWaiting">
+                        Procurement leadership takes the round's responses into the evaluation.
+                      </p>
+                    }
+                  </div>
+                }
+                <dl class="prj-summary ev-counts">
+                  <div>
+                    <dt i18n="@@evaluation.policy">Policy</dt>
+                    <dd>
+                      <!-- CF-133 AC5: the exact policy version this evaluation used, for readers of the policies. -->
+                      @if (readsPolicies) {
+                        <a
+                          routerLink="/evaluation-policies"
+                          [queryParams]="{
+                            policy: state.policyId,
+                            version: state.policyVersionNumber,
+                          }"
+                          [title]="openPolicyVersion(state.policyVersionNumber)"
+                          data-testid="policy-version-link"
+                          ><bdi>{{ state.policyName }}</bdi></a
+                        >
+                      } @else {
+                        <bdi>{{ state.policyName }}</bdi>
+                      }
+                      <small class="prj-hint tnd-block" i18n="@@evaluation.policyVersion"
+                        >version {{ state.policyVersionNumber }} · scale 0–{{
+                          state.scaleMaximum
+                        }}</small
+                      >
+                      @if (state.blindTechnicalScoring) {
+                        <small class="prj-hint tnd-block" i18n="@@evaluation.blindScoring"
+                          >Commercial-blind technical scoring</small
+                        >
+                      }
+                      @switch (state.criteriaDeclaration) {
+                        @case ('declared') {
+                          <small class="prj-hint tnd-block" i18n="@@evaluation.criteriaDeclared"
+                            >Declared at publication</small
+                          >
+                        }
+                        @case ('deviated') {
+                          <small
+                            class="tnd-attention tnd-block"
+                            i18n="@@evaluation.criteriaDeviated"
+                            >Not the declared criteria (<bdi>{{ state.declaredPolicyName }}</bdi
+                            >, version {{ state.declaredPolicyVersionNumber }}):
+                            <bdi>{{ state.policyDeviationReason }}</bdi></small
+                          >
+                        }
+                        @default {
+                          <small class="prj-hint tnd-block" i18n="@@evaluation.criteriaNotDeclared"
+                            >No criteria were declared at publication</small
+                          >
+                        }
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt i18n="@@evaluation.leveling">Commercial leveling</dt>
+                    <dd>{{ levelingLabel(state.levelingStatus) }}</dd>
+                  </div>
+                  @if (state.round > 0) {
+                    <div>
+                      <dt i18n="@@evaluation.roundCovered">Responses covered</dt>
+                      <dd>
+                        <span i18n="@@evaluation.roundCoveredValue"
+                          >Up to negotiation round {{ state.round }}</span
+                        >
+                        @if (state.roundRefreshedAtUtc) {
+                          <small class="prj-hint tnd-block"
+                            >{{ state.roundRefreshedAtUtc | businessDate: 'instant' }} ·
+                            <bdi>{{ state.roundRefreshedByName }}</bdi></small
+                          >
+                        }
+                      </dd>
+                    </div>
+                  }
+                  @if (state.reopenReason) {
+                    <div>
+                      <dt i18n="@@evaluation.reopenedLabel">Last reopened</dt>
+                      <dd>
+                        {{ state.reopenedAtUtc | businessDate: 'instant' }} ·
+                        <bdi>{{ state.reopenedByName }}</bdi>
+                        <small class="prj-hint tnd-block"
+                          ><bdi>{{ state.reopenReason }}</bdi></small
+                        >
+                      </dd>
+                    </div>
+                  }
+                </dl>
+
+                <div class="prj-table-wrap">
+                  <table class="prj-table ev-table">
+                    <caption class="prj-visually-hidden" i18n="@@evaluation.progressCaption">
+                      Technical scorecards per bid
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col" i18n="@@evaluation.colFirm">Firm</th>
+                        <th scope="col" i18n="@@evaluation.colScorecards">Submitted scorecards</th>
+                        <th scope="col" i18n="@@evaluation.colDrafts">Drafts</th>
+                        @if (view.access.score) {
+                          <th scope="col" i18n="@@evaluation.colMine">Your scorecard</th>
+                        }
+                        @if (view.access.complete) {
+                          <th scope="col" i18n="@@evaluation.colSpread">Score spread</th>
+                        }
+                        <th scope="col" i18n="@@evaluation.colFlags">Flags</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (bid of view.bids; track bid.openingBidId) {
+                        <tr>
+                          <th scope="row">
+                            <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+                            >{{ ' ' }}
+                            <span class="tnd-block"
+                              ><bdi>{{ bid.subcontractorName }}</bdi></span
+                            >
+                            @if (bid.currentRound > 0) {
+                              <small
+                                class="tnd-attention tnd-block"
+                                i18n="@@evaluation.revisedMarker"
+                                >Revised in round {{ bid.currentRound }} (revision
+                                {{ bid.currentRevisionNumber }})</small
+                              >
+                            }
+                          </th>
+                          <td>{{ bid.submittedScorecards }}</td>
+                          <td>{{ bid.draftScorecards }}</td>
+                          @if (view.access.score) {
+                            <td>{{ scorecardLabel(bid.myScorecardStatus) }}</td>
+                          }
+                          @if (view.access.complete) {
+                            <td>
+                              @if (bid.scoreSpread !== null && bid.scoreSpread !== undefined) {
+                                <bdi dir="ltr">{{ bid.scoreSpread }}</bdi>
+                                @if (bid.divergent) {
+                                  <span class="ev-flag ev-flag--warning">
+                                    <span class="ev-flag__mark" aria-hidden="true">!</span>
+                                    <ng-container i18n="@@evaluation.divergent"
+                                      >Divergent scores</ng-container
+                                    >
+                                  </span>
+                                  @if (bid.moderated) {
+                                    <small class="prj-hint tnd-block" i18n="@@evaluation.moderated"
+                                      >Moderation note recorded</small
+                                    >
+                                  }
+                                }
+                              } @else {
+                                <span class="prj-hint">—</span>
+                              }
+                            </td>
+                          }
+                          <td>
+                            @for (flag of bid.flags; track flag.key) {
+                              <span class="ev-flag ev-flag--{{ flag.severity }}">
+                                <span class="ev-flag__mark" aria-hidden="true">{{
+                                  flag.severity === 'warning' ? '!' : 'i'
+                                }}</span>
+                                {{ flagLabel(flag) }}
+                              </span>
+                            } @empty {
+                              <span class="prj-hint">—</span>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
+                @if (view.completionGaps.length && state.status !== 'Completed') {
+                  <div class="prj-note tnd-attention-box" role="note">
+                    <strong i18n="@@evaluation.stillNeeded">Still needed before completion</strong>
+                    <ul role="list">
+                      @for (gap of view.completionGaps; track $index) {
+                        <li>{{ gapLabel(gap.key) }}</li>
+                      }
+                    </ul>
+                  </div>
+                }
+                @if (view.access.complete && !view.tenderCancelled && !view.tenderAwarded) {
+                  <div class="prj-actions">
+                    @if (state.status === 'Completed') {
+                      <button class="prj-btn prj-btn--ghost" type="button" (click)="startReopen()">
+                        <ng-container i18n="@@evaluation.reopen">Reopen evaluation</ng-container>
+                      </button>
+                    } @else {
+                      <button class="prj-btn" type="button" (click)="startComplete()">
+                        <ng-container i18n="@@evaluation.complete"
+                          >Mark evaluation complete</ng-container
+                        >
+                      </button>
+                    }
+                  </div>
+                }
+              </section>
+            }
+          }
+        </div>
+      }
+    }
+  }
+</section>
+
+@if (confirmingOpen()) {
+  <app-confirm-dialog
+    heading="Open the submitted bids?"
+    i18n-heading="@@evaluation.openHeading"
+    confirmLabel="Open bids"
+    i18n-confirmLabel="@@evaluation.openConfirm"
+    [busy]="busy()"
+    (confirmed)="confirmOpen()"
+    (cancelled)="confirmingOpen.set(false)"
+  >
+    <ul class="ev-open-list" role="list">
+      <li i18n="@@evaluation.openPoint1">
+        The submitted bids become readable by authorized internal evaluators — technical answers by
+        technical evaluators, prices only by commercial reviewers.
+      </li>
+      <li i18n="@@evaluation.openPoint2">
+        The opening is recorded with your name and the time, and the submitted revisions are frozen
+        as evaluation evidence.
+      </li>
+      <li i18n="@@evaluation.openPoint3">
+        After opening, the tender cannot be reopened or extended for these bids.
+      </li>
+      <li i18n="@@evaluation.openPoint4">
+        Opening does not accept, recommend or award any bidder.
+      </li>
+    </ul>
+    @if (opening()?.submittedAnsweringOlderRevision) {
+      <p class="prj-note tnd-attention-box" role="note" i18n="@@evaluation.openOlderWarning">
+        Some bids answered an older tender revision. They will be opened as submitted and marked.
+      </p>
+    }
+    @if (dialogError()) {
+      <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (completing()) {
+  <app-confirm-dialog
+    heading="Mark the evaluation complete?"
+    i18n-heading="@@evaluation.completeHeading"
+    confirmLabel="Mark complete"
+    i18n-confirmLabel="@@evaluation.completeConfirm"
+    [busy]="busy()"
+    (confirmed)="confirmComplete()"
+    (cancelled)="completing.set(false)"
+  >
+    <p i18n="@@evaluation.completeRecordBody">
+      Completion records the evaluation as evidence. It does not select, rank or award a bidder.
+      Scores and leveling become read-only until the evaluation is reopened with a reason.
+    </p>
+    <p>{{ nextStageText() }}</p>
+    @if (draftCount() > 0) {
+      <label class="tnd-choice tnd-close-confirm">
+        <input type="checkbox" [(ngModel)]="excludeDrafts" (change)="dialogError.set('')" />
+        <span i18n="@@evaluation.excludeDrafts">{draftCount(), plural,
+          =1 {Complete without the 1 draft scorecard that was never submitted}
+          other {Complete without the {{ draftCount() }} draft scorecards that were never submitted}
+        }</span>
+      </label>
+    }
+    @if (dialogError()) {
+      <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (refreshing()) {
+  <app-confirm-dialog
+    heading="Take in the round's responses?"
+    i18n-heading="@@evaluation.refreshHeading"
+    confirmLabel="Take in responses"
+    i18n-confirmLabel="@@evaluation.refreshConfirm"
+    [busy]="busy()"
+    (confirmed)="confirmRefresh()"
+    (cancelled)="refreshing.set(false)"
+  >
+    <p i18n="@@evaluation.refreshBody">
+      The responses submitted in round {{ overview()?.latestClosedRound }} become the evaluation
+      evidence; every earlier revision is kept unchanged. Scorecards and leveling of responses that
+      changed no longer count and are marked, the evaluation returns to in progress, and it must be
+      completed again. Nothing is selected or awarded.
+    </p>
+    @if (dialogError()) {
+      <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}
+
+@if (reopening()) {
+  <app-confirm-dialog
+    heading="Reopen the evaluation?"
+    i18n-heading="@@evaluation.reopenHeading"
+    confirmLabel="Reopen"
+    i18n-confirmLabel="@@evaluation.reopenConfirm"
+    [busy]="busy()"
+    (confirmed)="confirmReopen()"
+    (cancelled)="reopening.set(false)"
+  >
+    <p i18n="@@evaluation.reopenBody">
+      Evaluators can change scores and leveling again. The reason is recorded with your name.
+    </p>
+    <div class="prj-field">
+      <label for="evaluation-reopen-reason" i18n="@@tenderField.reason">Reason</label>
+      <textarea
+        id="evaluation-reopen-reason"
+        rows="3"
+        [attr.maxlength]="reasonMax"
+        [(ngModel)]="reopenReason"
+        (input)="dialogError.set('')"
+      ></textarea>
+    </div>
+    @if (dialogError()) {
+      <p class="prj-error-text" role="alert">{{ dialogError() }}</p>
+    }
+  </app-confirm-dialog>
+}

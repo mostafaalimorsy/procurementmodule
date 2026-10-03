@@ -1,0 +1,255 @@
+<div
+  class="mail-status"
+  [class.mail-status--problem]="server()?.testStatus === 'Failed'"
+  role="status"
+>
+  <strong>{{ statusLabel(server()) }}</strong>
+  @if (server()?.lastTestedAtUtc) {
+    <span class="prj-hint" i18n="@@mail.lastTested"
+      >Last tested {{ server()?.lastTestedAtUtc | businessDate: 'instant' }}</span
+    >
+  }
+  @if (server()?.lastTestFailure) {
+    <span class="mail-result--failed">{{ failureLabel(server()?.lastTestFailure) }}</span>
+  }
+</div>
+
+@if (!secretProtectionAvailable()) {
+  <p class="prj-note prj-note--error" role="alert" i18n="@@mail.noSecretProtection">
+    This server has no encryption key for stored passwords, so a password cannot be saved yet. Ask
+    the platform operator to configure one.
+  </p>
+}
+@if (error()) {
+  <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+}
+@if (message()) {
+  <p class="prj-note" role="status">{{ message() }}</p>
+}
+
+<form class="prj-form" (ngSubmit)="save()" aria-labelledby="mail-settings-title">
+  <h2 id="mail-settings-title" i18n="@@mail.settingsTitle">Server settings</h2>
+  <div class="prj-grid">
+    <div class="prj-field">
+      <label for="mail-host" i18n="@@mailField.host">Server host</label>
+      <input
+        id="mail-host"
+        name="host"
+        dir="ltr"
+        autocomplete="off"
+        maxlength="253"
+        required
+        [(ngModel)]="form.host"
+      />
+    </div>
+    <div class="prj-field">
+      <label for="mail-port" i18n="@@mailField.port">Port</label>
+      <input
+        id="mail-port"
+        name="port"
+        dir="ltr"
+        inputmode="numeric"
+        required
+        [(ngModel)]="form.port"
+      />
+    </div>
+    <div class="prj-field prj-span-all">
+      <label for="mail-security" i18n="@@mailField.security">Connection security</label>
+      <select id="mail-security" name="security" [(ngModel)]="form.security">
+        @for (security of securities; track security) {
+          <option [value]="security">{{ securityLabel(security) }}</option>
+        }
+      </select>
+    </div>
+    <div class="prj-field prj-span-all">
+      <label class="mail-choice">
+        <input type="checkbox" name="authenticate" [(ngModel)]="form.authenticate" />
+        <ng-container i18n="@@mail.authenticate"
+          >The server requires a user name and password</ng-container
+        >
+      </label>
+    </div>
+    @if (form.authenticate) {
+      <div class="prj-field">
+        <label for="mail-username" i18n="@@mailField.username">User name</label>
+        <input
+          id="mail-username"
+          name="username"
+          dir="ltr"
+          autocomplete="off"
+          maxlength="254"
+          [(ngModel)]="form.username"
+        />
+      </div>
+    }
+    <div class="prj-field">
+      <label for="mail-from-name" i18n="@@mailField.fromName">Sender name</label>
+      <input id="mail-from-name" name="fromName" maxlength="120" [(ngModel)]="form.fromName" />
+    </div>
+    <div class="prj-field">
+      <label for="mail-from" i18n="@@mailField.fromAddress">Sender address</label>
+      <input
+        id="mail-from"
+        name="fromAddress"
+        type="email"
+        dir="ltr"
+        maxlength="254"
+        required
+        [(ngModel)]="form.fromAddress"
+      />
+    </div>
+    <div class="prj-field">
+      <label for="mail-reply" i18n="@@mailField.replyTo">Reply-to address</label>
+      <input
+        id="mail-reply"
+        name="replyToAddress"
+        type="email"
+        dir="ltr"
+        maxlength="254"
+        aria-describedby="mail-reply-help"
+        [(ngModel)]="form.replyToAddress"
+      />
+      <p id="mail-reply-help" class="prj-hint" i18n="@@mail.replyHelp">
+        Optional. Tender emails reply to the tender's procurement contact when one is set.
+      </p>
+    </div>
+    @if (company()) {
+      <div class="prj-field prj-span-all">
+        <label class="mail-choice">
+          <input
+            type="checkbox"
+            name="requireCompanyServer"
+            aria-describedby="mail-require-help"
+            [(ngModel)]="form.requireCompanyServer"
+          />
+          <ng-container i18n="@@mail.require">Never send through the platform server</ng-container>
+        </label>
+        <p id="mail-require-help" class="prj-hint" i18n="@@mail.requireHelp">
+          When this is on and your server is off or failing its test, tender emails fail instead of
+          going out from the platform's address.
+        </p>
+      </div>
+    }
+  </div>
+  <p class="prj-hint" i18n="@@mail.senderHonesty">
+    Your mail server may refuse or rewrite sender addresses it does not own. A passing test shows
+    that it accepted a message from this sender; it does not guarantee delivery to every inbox.
+  </p>
+  <div class="prj-form-actions">
+    <button class="prj-btn" type="submit" [disabled]="busy()" i18n="@@mail.save">
+      Save settings
+    </button>
+  </div>
+</form>
+
+@if (server(); as current) {
+  @if (current.authenticate) {
+    <form class="prj-form" (ngSubmit)="replacePassword()" aria-labelledby="mail-password-title">
+      <h2 id="mail-password-title" i18n="@@mail.passwordTitle">Password</h2>
+      <p class="prj-hint">
+        @if (current.hasPassword) {
+          <ng-container i18n="@@mail.passwordSet"
+            >A password is stored (encrypted). It cannot be shown; you can replace it.</ng-container
+          >
+        } @else {
+          <ng-container i18n="@@mail.passwordMissing">No password is stored yet.</ng-container>
+        }
+      </p>
+      <div class="prj-grid">
+        <div class="prj-field">
+          <label for="mail-password-user" i18n="@@mailField.username">User name</label>
+          <input
+            id="mail-password-user"
+            name="passwordUser"
+            dir="ltr"
+            autocomplete="off"
+            [(ngModel)]="passwordUser"
+          />
+        </div>
+        <div class="prj-field">
+          <label for="mail-password" i18n="@@mailField.password">Password</label>
+          <input
+            id="mail-password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            [(ngModel)]="password"
+          />
+        </div>
+      </div>
+      <div class="prj-form-actions">
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="submit"
+          [disabled]="busy() || !password || !secretProtectionAvailable()"
+          i18n="@@mail.replacePassword"
+        >
+          Replace password
+        </button>
+      </div>
+    </form>
+  }
+
+  <section class="prj-section" aria-labelledby="mail-test-title">
+    <h2 id="mail-test-title" i18n="@@mail.testTitle">Test and use</h2>
+    @if (testRecipient(); as address) {
+      <p class="prj-hint" i18n="@@mail.testToYou">
+        A test message goes to your own address, <bdi dir="ltr">{{ address }}</bdi
+        >.
+      </p>
+    } @else {
+      <div class="prj-field">
+        <label for="mail-test-recipient" i18n="@@mailField.recipient">Test recipient</label>
+        <input id="mail-test-recipient" type="email" dir="ltr" [(ngModel)]="recipient" />
+      </div>
+    }
+    @if (result(); as outcome) {
+      <p [class.mail-result--failed]="!outcome.passed" role="status">
+        @if (outcome.passed) {
+          <ng-container i18n="@@mail.testPassed"
+            >Test passed: the server accepted a test message from your sender.</ng-container
+          >
+        } @else {
+          <ng-container i18n="@@mail.testFailed">Test failed:</ng-container>&ngsp;{{
+            failureLabel(outcome.failureCategory)
+          }}.
+        }
+      </p>
+    }
+    <div class="prj-actions">
+      <button class="prj-btn prj-btn--ghost" type="button" [disabled]="busy()" (click)="test()">
+        @if (busy()) {
+          <ng-container i18n="@@common.working">Working…</ng-container>
+        } @else {
+          <ng-container i18n="@@mail.test">Test configuration</ng-container>
+        }
+      </button>
+      @if (current.isEnabled) {
+        <button
+          class="prj-btn prj-btn--ghost prj-btn--danger"
+          type="button"
+          [disabled]="busy()"
+          (click)="setEnabled(false)"
+          i18n="@@mail.disable"
+        >
+          Disable
+        </button>
+      } @else {
+        <button
+          class="prj-btn"
+          type="button"
+          [disabled]="busy() || (company() && current.testStatus !== 'Passed')"
+          (click)="setEnabled(true)"
+          i18n="@@mail.enable"
+        >
+          Enable
+        </button>
+      }
+    </div>
+    @if (company() && current.testStatus !== 'Passed' && !current.isEnabled) {
+      <p class="prj-hint" i18n="@@mail.enableNeedsTest">
+        The server can be enabled after a passing test of these settings.
+      </p>
+    }
+  </section>
+}

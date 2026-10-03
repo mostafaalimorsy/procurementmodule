@@ -1,0 +1,364 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/projects" i18n="@@nav.projects">Projects</a><span aria-hidden="true">/</span>
+    <span>
+      @if (project()?.code; as code) {
+        <bdi dir="ltr">{{ code }}</bdi>
+      } @else {
+        <ng-container i18n="@@project.crumb">Project</ng-container>
+      }
+    </span>
+  </nav>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@project.loading">Loading project…</p>
+  } @else if (project(); as project) {
+    <div class="prj-head">
+      <div>
+        <p class="prj-eyebrow">
+          <bdi dir="ltr">{{ project.code }}</bdi>
+        </p>
+        <h1>
+          <bdi>{{ project.name }}</bdi>
+        </h1>
+        <p>
+          <span class="prj-chip prj-chip--{{ project.status }}">{{
+            statusLabel(project.status)
+          }}</span>
+          @if (project.consumesCapacity) {
+            <span class="prj-hint">
+              ·
+              <ng-container i18n="@@project.usingSlot">using one active-project slot</ng-container>
+            </span>
+          }
+        </p>
+      </div>
+      <div class="prj-actions">
+        @if (mayEdit(project) && project.status !== 'Completed' && project.status !== 'Cancelled') {
+          <a
+            class="prj-btn prj-btn--ghost"
+            [routerLink]="['/projects', project.id, 'edit']"
+            i18n="@@project.editDetails"
+            >Edit details</a
+          >
+        }
+        @if (can(permissions.changeStatus)) {
+          @for (next of project.allowedNextStatuses; track next) {
+            <button [class]="actionClass(next)" type="button" (click)="ask(next)">
+              {{ actionLabel(next, project.status) }}
+            </button>
+          }
+        }
+      </div>
+    </div>
+
+    @if (project.allowedNextStatuses.length === 0) {
+      <p class="prj-note" i18n="@@project.finalState">
+        This project is {{ statusLabel(project.status) }} and can no longer change status. Its
+        record stays available for reference.
+      </p>
+    }
+
+    <div class="prj-layout">
+      <div>
+        <dl class="prj-summary">
+          <div>
+            <dt i18n="@@project.client">Client</dt>
+            <dd>
+              <bdi>{{ project.clientName || '—' }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@project.location">Location</dt>
+            <dd>
+              <bdi>{{ project.location || '—' }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@project.currency">Currency</dt>
+            <dd>
+              <bdi dir="ltr">{{ project.currency || '—' }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@project.start">Start</dt>
+            <dd>{{ project.startDate | businessDate }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@project.expectedEnd">Expected end</dt>
+            <dd>{{ project.expectedEndDate | businessDate }}</dd>
+          </div>
+          @if (project.actualEndDate) {
+            <div>
+              <dt i18n="@@project.actualEnd">Actual end</dt>
+              <dd>{{ project.actualEndDate | businessDate }}</dd>
+            </div>
+          }
+        </dl>
+        @if (project.description) {
+          <p style="margin-block-start: 1.5rem">
+            <bdi>{{ project.description }}</bdi>
+          </p>
+        }
+      </div>
+      <aside class="prj-card" aria-labelledby="responsibility-title">
+        <p class="prj-eyebrow" id="responsibility-title">
+          <ng-container i18n="@@project.responsibility">Responsibility</ng-container>
+        </p>
+        <dl>
+          <dt i18n="@@project.manager">Project manager</dt>
+          <dd>
+            @if (project.projectManagerName; as name) {
+              <bdi>{{ name }}</bdi>
+            } @else {
+              <ng-container i18n="@@common.notAssigned">Not assigned</ng-container>
+            }
+          </dd>
+          <dt i18n="@@project.owner">Procurement owner</dt>
+          <dd>
+            @if (project.procurementOwnerName; as name) {
+              <bdi>{{ name }}</bdi>
+            } @else {
+              <ng-container i18n="@@common.notAssigned">Not assigned</ng-container>
+            }
+          </dd>
+          <dt i18n="@@project.updated">Last updated</dt>
+          <dd>{{ project.updatedAtUtc | businessDate: 'instant' }}</dd>
+        </dl>
+      </aside>
+    </div>
+
+    @if (can(permissions.packagesView)) {
+      <section class="prj-section" id="work-packages" aria-labelledby="packages-title">
+        <div class="prj-section-head">
+          <h2 id="packages-title" i18n="@@project.packages">Work packages</h2>
+          <div class="prj-actions">
+            @if (
+              can(permissions.packagesCreate) &&
+              project.status !== 'Completed' &&
+              project.status !== 'Cancelled'
+            ) {
+              <a
+                class="prj-btn"
+                [routerLink]="['/projects', project.id, 'work-packages', 'new']"
+                i18n="@@packages.add"
+                >Add work package</a
+              >
+            }
+          </div>
+        </div>
+
+        @if ((packages()?.totalCount ?? 0) > 0 || packageSearch) {
+          <div class="prj-filters" role="search">
+            <div class="prj-field prj-field--grow">
+              <label for="package-search" i18n="@@packages.search">Search packages</label>
+              <input
+                id="package-search"
+                type="search"
+                autocomplete="off"
+                placeholder="Code, title or trade"
+                i18n-placeholder="@@packages.searchPlaceholder"
+                [(ngModel)]="packageSearch"
+                (ngModelChange)="searchPackages()"
+              />
+            </div>
+          </div>
+        }
+
+        @if (packages(); as list) {
+          @if (list.totalCount === 0) {
+            <div class="prj-empty">
+              @if (packageSearch) {
+                <h2 i18n="@@packages.noMatch">No matching work packages</h2>
+              } @else {
+                <h2 i18n="@@packages.emptyTitle">No work packages yet</h2>
+              }
+              <p i18n="@@packages.emptyHelp">
+                Break the project into the scopes you will procure separately — HVAC installation,
+                electrical works, fire fighting, interior finishes.
+              </p>
+              @if (
+                can(permissions.packagesCreate) &&
+                project.status !== 'Completed' &&
+                project.status !== 'Cancelled'
+              ) {
+                <a
+                  class="prj-btn"
+                  [routerLink]="['/projects', project.id, 'work-packages', 'new']"
+                  i18n="@@packages.addFirst"
+                  >Add the first work package</a
+                >
+              }
+            </div>
+          } @else {
+            <div class="prj-table-wrap">
+              <table class="prj-table">
+                <caption class="prj-visually-hidden" i18n="@@packages.caption">
+                  Work packages in this project
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" i18n="@@project.code">Code</th>
+                    <th scope="col" i18n="@@project.title">Title</th>
+                    <th scope="col" i18n="@@project.trade">Trade</th>
+                    <th scope="col" i18n="@@project.status">Status</th>
+                    <th scope="col" i18n="@@project.planned">Planned</th>
+                    @if (estimatesVisible()) {
+                      <th scope="col" class="prj-numeric">
+                        <ng-container i18n="@@project.estimated">Estimated value</ng-container>
+                      </th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (item of list.items; track item.id) {
+                    <tr>
+                      <td>
+                        <code dir="ltr" class="ltr-token">{{ item.code }}</code>
+                      </td>
+                      <td>
+                        <a [routerLink]="['/work-packages', item.id]"
+                          ><bdi>{{ item.title }}</bdi></a
+                        >
+                      </td>
+                      <td>
+                        <bdi>{{ item.category || '—' }}</bdi>
+                      </td>
+                      <td>
+                        <span class="prj-chip prj-chip--{{ item.status }}">{{
+                          statusLabel(item.status)
+                        }}</span>
+                      </td>
+                      <td>
+                        {{ item.plannedStartDate | businessDate }}
+                        <span class="directional-icon" aria-hidden="true">→</span>
+                        {{ item.plannedEndDate | businessDate }}
+                      </td>
+                      @if (estimatesVisible()) {
+                        <td class="prj-numeric">
+                          <bdi dir="ltr">{{
+                            item.estimatedValue | businessCurrency: item.currency
+                          }}</bdi>
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+                @if (estimatesVisible()) {
+                  <tfoot>
+                    <tr>
+                      <th scope="row" colspan="5" i18n="@@project.total">
+                        Total estimated value on this page
+                      </th>
+                      <td class="prj-numeric">
+                        <bdi dir="ltr">{{
+                          totalEstimated() | businessCurrency: project.currency
+                        }}</bdi>
+                      </td>
+                    </tr>
+                  </tfoot>
+                }
+              </table>
+            </div>
+            @if (list.totalPages > 1) {
+              <nav
+                class="prj-pager"
+                aria-label="Work package pages"
+                i18n-aria-label="@@packages.pages"
+              >
+                <span>
+                  <span i18n="@@common.pageOf"
+                    >Page <bdi dir="ltr">{{ list.page }}</bdi> of
+                    <bdi dir="ltr">{{ list.totalPages }}</bdi></span
+                  >
+                  ·
+                  <span i18n="@@packages.count">{list.totalCount, plural,
+                    =1 {1 work package}
+                    other {{{ list.totalCount }} work packages}
+                  }</span>
+                </span>
+                <span class="prj-actions">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="list.page <= 1"
+                    (click)="goToPackagePage(list.page - 1)"
+                    i18n="@@common.previous"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="list.page >= list.totalPages"
+                    (click)="goToPackagePage(list.page + 1)"
+                    i18n="@@common.next"
+                  >
+                    Next
+                  </button>
+                </span>
+              </nav>
+            }
+          }
+        }
+      </section>
+    }
+
+    @if (pendingStatus(); as next) {
+      <app-confirm-dialog
+        [heading]="actionLabel(next, project.status)"
+        [confirmLabel]="actionLabel(next, project.status)"
+        [cancelLabel]="keepLabel"
+        [danger]="next === 'Cancelled'"
+        [busy]="busy()"
+        (confirmed)="confirm()"
+        (cancelled)="dismiss()"
+      >
+        <p>
+          <bdi dir="ltr">{{ project.code }}</bdi> · <bdi>{{ project.name }}</bdi>
+        </p>
+        <p>{{ statusIntent[next] }}</p>
+        @if ((next === 'Completed' || next === 'Cancelled') && project.draftWorkPackageCount > 0) {
+          <p class="prj-note">
+            <span i18n="@@project.draftWarning">{project.draftWorkPackageCount, plural,
+              =1 {
+                1 unstarted Draft work package remains recorded. After this project closes, it
+                cannot be activated and may only be cancelled.
+              }
+              other {
+                {{ project.draftWorkPackageCount }} unstarted Draft work packages remain recorded.
+                After this project closes, they cannot be activated and may only be cancelled.
+              }
+            }</span>
+          </p>
+        }
+        @if (next === 'Completed') {
+          <div class="prj-field" style="margin-block-end: 1.25rem">
+            <label for="completion" i18n="@@project.actualEndDate">Actual end date</label>
+            <input
+              id="completion"
+              type="date"
+              [(ngModel)]="completionDate"
+              aria-describedby="completion-hint"
+            />
+            <span class="prj-hint" id="completion-hint" i18n="@@project.completionHint"
+              >Leave empty to record today.</span
+            >
+          </div>
+        }
+      </app-confirm-dialog>
+    }
+  }
+</section>

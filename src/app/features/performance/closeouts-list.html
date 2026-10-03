@@ -1,0 +1,150 @@
+<section class="prj-page">
+  <app-closeout-tabs current="closeouts" />
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@closeouts.eyebrow">Performance closeout</p>
+      <h1 i18n="@@closeouts.title">Closeouts</h1>
+      <p i18n="@@closeouts.intro">
+        Record what actually happened on each award — cost, schedule, quality, HSE, variations,
+        claims and disputes — so the next sourcing decision can use your own evidence.
+      </p>
+    </div>
+  </div>
+
+  <form class="prj-filters" role="search" (ngSubmit)="applyFilter()">
+    <div class="prj-field prj-field--grow">
+      <label for="closeout-search" i18n="@@closeouts.search"
+        >Search tender, project, package or subcontractor</label
+      >
+      <input id="closeout-search" name="search" type="search" [(ngModel)]="search" />
+    </div>
+    <div class="prj-field">
+      <label for="closeout-status" i18n="@@closeouts.filterStatus">Closeout status</label>
+      <select id="closeout-status" name="status" [(ngModel)]="status" (change)="applyFilter()">
+        <option value="" i18n="@@sourcing.filterAll">All</option>
+        @for (option of lifecycles; track option) {
+          <option [value]="option">{{ lifecycleLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    <button class="prj-btn prj-btn--ghost" type="submit" i18n="@@common.search">Search</button>
+  </form>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@closeouts.loading">Loading closeouts…</p>
+  } @else if (result(); as page) {
+    @if (page.items.length === 0) {
+      <div class="prj-empty">
+        @if (status || search) {
+          <h2 i18n="@@closeouts.filteredEmptyTitle">No closeout matches this search</h2>
+          <p i18n="@@closeouts.filteredEmptyBody">Change the search or status to see more.</p>
+        } @else {
+          <h2 i18n="@@closeouts.emptyTitle">No award to close out yet</h2>
+          <p i18n="@@closeouts.emptyBody">
+            A closeout starts from an issued award. Awards appear here as soon as they are issued.
+          </p>
+        }
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@closeouts.count">
+        Awards: <bdi dir="ltr">{{ page.totalCount }}</bdi>
+      </p>
+      <ul class="prj-cards pf-list" role="list">
+        @for (item of page.items; track item.awardId) {
+          <li class="prj-card">
+            <p class="tnd-meta">
+              <span
+                class="prj-chip dc-state"
+                [class.dc-state--good]="item.lifecycle === 'Closed'"
+                [class.dc-state--warn]="item.lifecycle === 'Reopened'"
+                [class.dc-state--muted]="item.lifecycle === 'Pending'"
+                >{{ lifecycleLabel(item.lifecycle) }}</span
+              >
+            </p>
+            <h2 class="pf-card-title">
+              <a [routerLink]="['/closeouts', item.awardId]"
+                ><bdi>{{ item.subcontractorName }}</bdi></a
+              >
+            </h2>
+            <dl>
+              <dt i18n="@@closeouts.tender">Tender</dt>
+              <dd>
+                <bdi dir="ltr" class="tnd-code">{{ item.tenderReference }}</bdi>
+              </dd>
+              <dt i18n="@@closeouts.package">Work package</dt>
+              <dd>
+                <bdi dir="ltr" class="tnd-code">{{ item.projectCode }}</bdi>
+                <bdi dir="ltr" class="tnd-code">{{ item.workPackageCode }}</bdi>
+                <bdi>{{ item.workPackageTitle }}</bdi>
+              </dd>
+              <dt i18n="@@closeouts.category">Category</dt>
+              <dd>{{ categoryLabel(item.category) }}</dd>
+              <dt i18n="@@closeouts.awardValue">Award value</dt>
+              <dd>
+                @if (item.awardValue !== null) {
+                  <bdi dir="ltr">{{ money(item.awardValue) }} {{ item.currency }}</bdi>
+                } @else {
+                  <span class="prj-hint" i18n="@@performance.restrictedShort">Restricted</span>
+                }
+              </dd>
+              <dt i18n="@@closeouts.awarded">Awarded</dt>
+              <dd>
+                <bdi>{{ item.awardedAtUtc | businessDate: 'instant' }}</bdi>
+              </dd>
+              <dt i18n="@@closeouts.evidence">Evidence</dt>
+              <dd>
+                @if (item.lifecycle === 'Closed') {
+                  <span i18n="@@closeouts.finalizedOn"
+                    >Finalized <bdi>{{ item.closedAtUtc | businessDate: 'instant' }}</bdi></span
+                  >
+                } @else {
+                  <span i18n="@@closeouts.recorded"
+                    ><bdi dir="ltr">{{ item.recorded }} / {{ item.required }}</bdi> required items
+                    recorded</span
+                  >
+                }
+              </dd>
+            </dl>
+          </li>
+        }
+      </ul>
+      @if (page.totalPages > 1) {
+        <nav class="prj-pager" aria-label="Closeout pages" i18n-aria-label="@@closeouts.pages">
+          <span i18n="@@common.pageOf"
+            >Page <bdi dir="ltr">{{ page.page }}</bdi> of
+            <bdi dir="ltr">{{ page.totalPages }}</bdi></span
+          >
+          <span class="prj-actions">
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page <= 1"
+              (click)="goToPage(page.page - 1)"
+              i18n="@@common.previous"
+            >
+              Previous
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page >= page.totalPages"
+              (click)="goToPage(page.page + 1)"
+              i18n="@@common.next"
+            >
+              Next
+            </button>
+          </span>
+        </nav>
+      }
+    }
+  }
+</section>

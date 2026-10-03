@@ -1,0 +1,1332 @@
+@if (error()) {
+  <p class="prj-note prj-note--error" role="alert">
+    {{ error() }}
+    <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+      Reload
+    </button>
+  </p>
+}
+@if (workspace(); as view) {
+  <div class="ev-toolbar">
+    <div class="prj-field ev-toolbar__field">
+      <label for="leveling-order" i18n="@@evaluation.orderLabel">Order bidders by</label>
+      <select id="leveling-order" [ngModel]="order()" (ngModelChange)="order.set($event)">
+        <option value="position" i18n="@@evaluation.orderPosition">Firm code (neutral)</option>
+        <option value="leveledAscending" i18n="@@evaluation.orderLeveled">
+          Leveled total, lowest first
+        </option>
+      </select>
+    </div>
+    <p class="prj-hint ev-toolbar__currency">
+      <span i18n="@@evaluation.currencyNote"
+        >All amounts in <bdi dir="ltr" class="tnd-code">{{ view.currency }}</bdi
+        >, as submitted. No conversion.</span
+      >
+    </p>
+    @if (view.evaluation; as state) {
+      <p class="ev-toolbar__status">
+        <span i18n="@@evaluation.levelingStatusLabel">Leveling:</span>
+        <strong>
+          @switch (state.levelingStatus) {
+            @case ('Completed') {
+              <ng-container i18n="@@levelingStatus.completed">Completed</ng-container>
+            }
+            @case ('InProgress') {
+              <ng-container i18n="@@levelingStatus.inProgress">In progress</ng-container>
+            }
+            @default {
+              <ng-container i18n="@@levelingStatus.notStarted">Not started</ng-container>
+            }
+          }
+        </strong>
+        @if (view.access.level && state.status === 'InProgress') {
+          @if (state.levelingStatus === 'Completed') {
+            <button
+              class="prj-btn prj-btn--ghost ev-btn-small"
+              type="button"
+              [disabled]="busy()"
+              (click)="reopenLeveling()"
+              i18n="@@evaluation.reopenLeveling"
+            >
+              Reopen leveling
+            </button>
+          } @else {
+            <button
+              class="prj-btn ev-btn-small"
+              type="button"
+              [disabled]="busy()"
+              (click)="completeLeveling()"
+              i18n="@@evaluation.completeLeveling"
+            >
+              Mark leveling complete
+            </button>
+          }
+        }
+      </p>
+    } @else {
+      <p class="prj-hint" i18n="@@evaluation.levelingNoPolicy">
+        You can compare the bids now. Adjustments open once the evaluation has started.
+      </p>
+    }
+  </div>
+
+  <!-- CF-003 (ADR-109): the leveling as an Excel workbook (the commercial workspace is shown only to commercial readers). -->
+  <p class="prj-actions">
+    <a
+      class="prj-btn prj-btn--ghost"
+      [href]="exportUrl()"
+      download
+      i18n="@@evaluation.exportLeveling"
+      >Export leveling (Excel)</a
+    >
+  </p>
+
+  @if (view.estimate) {
+    <!-- Red-team B7 (CF-037 AC3/AC4): the package estimate for its readers only (price-blind readers never receive it): the value
+         now, the value at publication, whether it changed since, and whether the bids compare with it at all. -->
+    <div class="ev-estimate" data-testid="leveling-estimate">
+      <dl class="ev-card__facts">
+        <div>
+          <dt i18n="@@controls.estimate">Package estimate</dt>
+          <dd>
+            <bdi dir="ltr">{{ money(view.estimate) }} {{ view.estimateCurrency }}</bdi>
+            @if (view.estimateAtPublication) {
+              <small class="prj-hint tnd-block" i18n="@@controls.estimateAtPublication"
+                >At publication:
+                <bdi dir="ltr"
+                  >{{ money(view.estimateAtPublication) }} {{ view.estimateCurrency }}</bdi
+                ></small
+              >
+            }
+          </dd>
+        </div>
+      </dl>
+      @if (view.estimateChangedAfterPublication) {
+        <p class="prj-note tnd-attention-box" role="note" i18n="@@controls.estimateChanged">
+          The package estimate was changed after this tender was published. Its history and reasons
+          are on the work package.
+        </p>
+      }
+      @if (view.estimateComparable === false) {
+        <p class="prj-note" role="note" i18n="@@controls.estimateNotComparable">
+          Not comparable: the estimate is in <bdi dir="ltr">{{ view.estimateCurrency }}</bdi
+          >, the bids in <bdi dir="ltr">{{ view.currency }}</bdi
+          >. Nothing is converted.
+        </p>
+      }
+    </div>
+  }
+
+  <!-- ------------------------------------------------ side-by-side matrix (tablet and desktop) -->
+  <section class="ev-matrix-section" aria-labelledby="matrix-title">
+    <h2 id="matrix-title" i18n="@@evaluation.matrixTitle">Side-by-side comparison</h2>
+    @if (view.comparison.medianLeveledTotal) {
+      <p class="prj-hint" i18n="@@evaluation.medianNote">
+        Median leveled total of {{ view.comparison.comparableBids }} bids:
+        <bdi dir="ltr">{{ money(view.comparison.medianLeveledTotal) }}</bdi
+        >. Differences are shown as a percentage of the median; outliers are marked when they exceed
+        the threshold.
+      </p>
+    } @else {
+      <p class="prj-hint" i18n="@@evaluation.medianMissing">
+        Price outliers are marked only when at least {{ view.comparison.minimumBidsForOutliers }}
+        bids can be compared.
+      </p>
+    }
+    <div class="ev-grid-wrap" role="region" tabindex="0" aria-labelledby="matrix-title">
+      <table class="ev-grid">
+        <thead>
+          <tr>
+            <th scope="col" class="ev-grid__corner" i18n="@@evaluation.colItem">Item</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <th scope="col">
+                <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+                >{{ ' ' }}
+                <span class="tnd-block ev-grid__name"
+                  ><bdi>{{ bid.subcontractorName }}</bdi></span
+                >
+                @if (bid.currentRound > 0) {
+                  <small class="tnd-attention tnd-block" i18n="@@evaluation.commercialRevised"
+                    >Round {{ bid.currentRound }} revision</small
+                  >
+                }
+                <button
+                  class="prj-btn prj-btn--ghost ev-btn-small"
+                  type="button"
+                  (click)="openDrawer(bid, $any($event.currentTarget))"
+                >
+                  <ng-container i18n="@@evaluation.details">Details</ng-container>
+                  <span class="prj-visually-hidden"
+                    ><bdi>{{ bid.subcontractorCode }}</bdi></span
+                  >
+                </button>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row" i18n="@@evaluation.rowSubmittedTotal">Submitted total</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td class="ev-num">
+                <bdi dir="ltr">{{ money(bid.submittedTotal) }}</bdi>
+                @if (bid.currencyMismatch) {
+                  <span class="tnd-attention tnd-block"
+                    ><bdi dir="ltr">{{ bid.currency }}</bdi></span
+                  >
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@evaluation.rowAdjustments">Buyer adjustments</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td class="ev-num">
+                <bdi dir="ltr">{{ signed(bid.adjustmentTotal) }}</bdi>
+              </td>
+            }
+          </tr>
+          <tr class="ev-grid__strong">
+            <th scope="row" i18n="@@evaluation.rowLeveledTotal">Leveled total</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td class="ev-num">
+                <bdi dir="ltr">{{ money(bid.leveledTotal) }}</bdi>
+                @if (variance(bid); as difference) {
+                  <span [class]="varianceClass(bid)">
+                    <span i18n="@@evaluation.vsMedian"
+                      ><bdi dir="ltr">{{ difference }}%</bdi> vs median</span
+                    >
+                  </span>
+                }
+                @if (bid.notCarriedCount) {
+                  <small
+                    class="tnd-attention tnd-block"
+                    i18n="@@evaluation.notCarriedShort"
+                    >{bid.notCarriedCount, plural,
+                      =1 {1 adjustment waits for review}
+                      other {{{ bid.notCarriedCount }} adjustments wait for review}
+                    }</small
+                  >
+                }
+              </td>
+            }
+          </tr>
+          @if (comparesWithEstimate(view)) {
+            <tr data-testid="estimate-variance-row">
+              <th scope="row" i18n="@@controls.variance">Leveled total against the estimate</th>
+              @for (bid of bids(); track bid.openingBidId) {
+                <td class="ev-num">
+                  <bdi dir="ltr">{{ percent(bid.estimateVariancePercent) }}</bdi>
+                </td>
+              }
+            </tr>
+          }
+          <tr>
+            <th scope="row" i18n="@@evaluation.rowFlags">Flags</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td>
+                @for (flag of bid.flags; track flag.key) {
+                  <span class="ev-flag ev-flag--{{ flag.severity }}">
+                    <span class="ev-flag__mark" aria-hidden="true">{{
+                      flag.severity === 'warning' ? '!' : 'i'
+                    }}</span>
+                    {{ flagLabel(flag) }}
+                  </span>
+                } @empty {
+                  <span class="prj-hint">—</span>
+                }
+              </td>
+            }
+          </tr>
+          @if (view.pricing; as basis) {
+            <tr>
+              <th scope="row">
+                <ng-container i18n="@@evaluation.rowVatBasis">VAT basis</ng-container>
+                <small class="prj-hint tnd-block" i18n="@@evaluation.tenderBasis"
+                  >tender: {{ vatLabel(basis.treatment) }}
+                  @if (basis.vatRatePercent) {
+                    <bdi dir="ltr">{{ basis.vatRatePercent }}%</bdi>
+                  }
+                </small>
+              </th>
+              @for (bid of bids(); track bid.openingBidId) {
+                <td>
+                  @if (bid.pricing; as answer) {
+                    @if (answer.confirmed) {
+                      <span class="dc-state dc-state--good" i18n="@@evaluation.vatConfirmed"
+                        >Confirms the tender's basis</span
+                      >
+                    } @else {
+                      <span class="ev-flag ev-flag--warning">
+                        <span class="ev-flag__mark" aria-hidden="true">!</span>
+                        {{ vatLabel(answer.treatment) }}
+                        @if (answer.vatRatePercent) {
+                          <bdi dir="ltr">{{ answer.vatRatePercent }}%</bdi>
+                        }
+                      </span>
+                      @if (!bid.vatComparable) {
+                        <small class="tnd-attention tnd-block" i18n="@@evaluation.vatNotComparable"
+                          >Not compared until a VAT-basis adjustment is recorded</small
+                        >
+                      }
+                    }
+                  } @else {
+                    <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                  }
+                </td>
+              }
+            </tr>
+          }
+          @if (view.requestedTerms; as asked) {
+            @for (term of termRows(asked); track term.key) {
+              <tr>
+                <th scope="row">
+                  {{ term.label }}
+                  <small class="prj-hint tnd-block" i18n="@@evaluation.requested"
+                    >requested: <bdi dir="ltr">{{ term.requested }}</bdi></small
+                  >
+                </th>
+                @for (bid of bids(); track bid.openingBidId) {
+                  <td>
+                    @let answer = termAnswer(bid, term.key);
+                    @if (answer !== null) {
+                      <bdi dir="ltr" [class.tnd-attention]="answer !== term.requested">{{
+                        answer
+                      }}</bdi>
+                      @if (answer !== term.requested) {
+                        <small class="tnd-block tnd-attention" i18n="@@evaluation.termDiffers"
+                          >differs from the request</small
+                        >
+                      }
+                    } @else {
+                      <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          }
+          <tr>
+            <th scope="row">
+              <ng-container i18n="@@bidField.validityDays">Bid validity</ng-container>
+              @if (view.requestedValidityDays) {
+                <small
+                  class="prj-hint tnd-block"
+                  i18n="@@evaluation.requestedValidity"
+                  >{view.requestedValidityDays, plural,
+                    =1 {requested 1 day}
+                    other {requested {{ view.requestedValidityDays }} days}
+                  }</small
+                >
+              }
+            </th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td>
+                @if (bid.validUntilUtc) {
+                  <!-- Red-team G050 (CF-039 AC1): valid-until in the tender's time zone, and where the bid stands now. -->
+                  <span i18n="@@controls.validUntil"
+                    ><bdi dir="ltr">{{ bid.validityDays }}</bdi> days, until
+                    {{ bid.validUntilUtc | zonedInstant: view.timeZoneId }}</span
+                  >
+                  @if (bid.validityState === 'Lapsed' || bid.validityState === 'LapsingSoon') {
+                    <span class="ev-flag ev-flag--warning tnd-block">
+                      <span class="ev-flag__mark" aria-hidden="true">!</span>
+                      {{ validityLabel(bid.validityState) }}
+                    </span>
+                  }
+                } @else if (bid.validityDays !== null) {
+                  <span i18n="@@evaluation.days">{bid.validityDays, plural,
+                    =1 {1 day}
+                    other {{{ bid.validityDays }} days}
+                  }</span>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@bidField.paymentTerms">Payment terms</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td class="ev-text">
+                @if (bid.paymentTerms) {
+                  <bdi>{{ bid.paymentTerms }}</bdi>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@bidField.durationDays">Proposed duration</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td>
+                @if (bid.durationDays !== null) {
+                  <span i18n="@@evaluation.days">{bid.durationDays, plural,
+                    =1 {1 day}
+                    other {{{ bid.durationDays }} days}
+                  }</span>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@bidField.warrantyMonths">Warranty</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td>
+                @if (bid.warrantyMonths !== null) {
+                  <span i18n="@@evaluation.months">{bid.warrantyMonths, plural,
+                    =1 {1 month}
+                    other {{{ bid.warrantyMonths }} months}
+                  }</span>
+                } @else {
+                  <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@bidField.exclusions">Exclusions</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td class="ev-text">
+                @for (item of bid.exclusions; track $index) {
+                  <span class="tnd-block"
+                    ><bdi>{{ item }}</bdi></span
+                  >
+                } @empty {
+                  <span class="prj-hint" i18n="@@evaluation.noneStated">None stated</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@bidField.commercialDeviations">Commercial deviations</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td class="ev-text">
+                @for (item of bid.commercialDeviations; track $index) {
+                  <span class="tnd-block"
+                    ><bdi>{{ item }}</bdi></span
+                  >
+                } @empty {
+                  <span class="prj-hint" i18n="@@evaluation.noneStated">None stated</span>
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@evaluation.colAnswered">Answered revision</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td>
+                {{ bid.answeredTenderRevision }}
+                @if (bid.answeredOlderRevision) {
+                  <span class="tnd-attention tnd-block" i18n="@@evaluation.olderRevision"
+                    >Older than the revision in force</span
+                  >
+                }
+              </td>
+            }
+          </tr>
+          <tr>
+            <th scope="row" i18n="@@evaluation.colSubmitted">Submitted</th>
+            @for (bid of bids(); track bid.openingBidId) {
+              <td>
+                {{ bid.submittedAtUtc | businessDate: 'instant' }}
+                <small class="prj-hint tnd-block"
+                  ><bdi dir="ltr">{{ bid.bidReference }}</bdi></small
+                >
+              </td>
+            }
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    @if (validityBasis(); as b) {
+      <p class="prj-hint" i18n="@@controls.basisHint">
+        Validity runs {{ basisLabel(b) }}, as your company's governance settings define it.
+      </p>
+    }
+  </section>
+
+  <!-- ------------------------------------------------ phone: one card per bid -->
+  <section class="ev-cards" aria-labelledby="cards-title">
+    <h2 id="cards-title" i18n="@@evaluation.cardsTitle">Bids</h2>
+    <p class="prj-hint" i18n="@@evaluation.cardsHint">
+      The full side-by-side comparison is designed for a larger screen. Each bid's summary and
+      details are here.
+    </p>
+    <ul role="list">
+      @for (bid of bids(); track bid.openingBidId) {
+        <li class="ev-card">
+          <p>
+            <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+            >{{ ' ' }}
+            <span class="tnd-block"
+              ><bdi>{{ bid.subcontractorName }}</bdi></span
+            >
+            @if (bid.currentRound > 0) {
+              <small class="tnd-attention tnd-block" i18n="@@evaluation.commercialRevised"
+                >Round {{ bid.currentRound }} revision</small
+              >
+            }
+          </p>
+          <dl class="ev-card__facts">
+            <div>
+              <dt i18n="@@evaluation.rowSubmittedTotal">Submitted total</dt>
+              <dd>
+                <!-- CF-098: a total read on its own carries its currency, as everywhere else. -->
+                <bdi dir="ltr">{{ money(bid.submittedTotal) }} {{ bid.currency }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@evaluation.rowLeveledTotal">Leveled total</dt>
+              <dd>
+                <bdi dir="ltr">{{ money(bid.leveledTotal) }} {{ bid.currency }}</bdi>
+                @if (variance(bid); as difference) {
+                  <span [class]="varianceClass(bid)">
+                    <span i18n="@@evaluation.vsMedian"
+                      ><bdi dir="ltr">{{ difference }}%</bdi> vs median</span
+                    >
+                  </span>
+                }
+                @if (bid.notCarriedCount) {
+                  <small
+                    class="tnd-attention tnd-block"
+                    i18n="@@evaluation.notCarriedShort"
+                    >{bid.notCarriedCount, plural,
+                      =1 {1 adjustment waits for review}
+                      other {{{ bid.notCarriedCount }} adjustments wait for review}
+                    }</small
+                  >
+                }
+              </dd>
+            </div>
+            @if (comparesWithEstimate(view)) {
+              <div>
+                <dt i18n="@@controls.variance">Leveled total against the estimate</dt>
+                <dd>
+                  <bdi dir="ltr">{{ percent(bid.estimateVariancePercent) }}</bdi>
+                </dd>
+              </div>
+            }
+            @if (bid.validUntilUtc) {
+              <div>
+                <dt i18n="@@controls.validity">Bid validity</dt>
+                <dd>
+                  <span i18n="@@controls.validUntil"
+                    ><bdi dir="ltr">{{ bid.validityDays }}</bdi> days, until
+                    {{ bid.validUntilUtc | zonedInstant: view.timeZoneId }}</span
+                  >
+                  @if (bid.validityState === 'Lapsed' || bid.validityState === 'LapsingSoon') {
+                    <span class="ev-flag ev-flag--warning tnd-block">
+                      <span class="ev-flag__mark" aria-hidden="true">!</span>
+                      {{ validityLabel(bid.validityState) }}
+                    </span>
+                  }
+                </dd>
+              </div>
+            }
+          </dl>
+          @for (flag of bid.flags; track flag.key) {
+            @if (flag.severity === 'warning') {
+              <p class="ev-flag ev-flag--warning">
+                <span class="ev-flag__mark" aria-hidden="true">!</span>
+                {{ flagLabel(flag) }}
+              </p>
+            }
+          }
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="openDrawer(bid, $any($event.currentTarget))"
+          >
+            <ng-container i18n="@@evaluation.details">Details</ng-container>
+            <span class="prj-visually-hidden"
+              ><bdi>{{ bid.subcontractorCode }}</bdi></span
+            >
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+
+  <!-- ------------------------------------------------ CF-004: price schedule by item key -->
+  @if (scheduleRows().length) {
+    <section class="prj-section ev-lines" aria-labelledby="schedule-title">
+      <h2 id="schedule-title" i18n="@@evaluation.scheduleTitle">Price schedule by item</h2>
+      <p class="prj-hint" i18n="@@evaluation.scheduleHint">
+        Every item is aligned by its code, whatever a bidder wrote. Amounts are exactly quantity ×
+        rate; nothing is rounded. An item a bid never priced (it answered an earlier revision) is
+        missing scope.
+      </p>
+      <div class="ev-grid-wrap" role="region" tabindex="0" aria-labelledby="schedule-title">
+        <table class="ev-grid">
+          <thead>
+            <tr>
+              <th scope="col" class="ev-grid__corner" i18n="@@evaluation.colItem">Item</th>
+              @for (bid of bids(); track bid.openingBidId) {
+                <th scope="col">
+                  <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of scheduleRows(); track row.key) {
+              <tr>
+                <th scope="row">
+                  <bdi dir="ltr" class="tnd-code">{{ row.key }}</bdi
+                  >&ngsp;<bdi>{{ row.description }}</bdi>
+                  <span class="prj-hint tnd-block">
+                    {{ scheduleTypeLabel(row.type) }}
+                    @if (row.quantity) {
+                      · <bdi dir="ltr">{{ exact(row.quantity) }}</bdi
+                      >&ngsp;<bdi>{{ row.unit ?? '' }}</bdi>
+                    }
+                    @if (!row.inForce) {
+                      · <span i18n="@@evaluation.itemRemoved">removed by an addendum</span>
+                    }
+                  </span>
+                </th>
+                @for (bid of bids(); track bid.openingBidId) {
+                  @let item = scheduleCell(row, bid);
+                  <td class="ev-num">
+                    @switch (item?.state) {
+                      @case ('priced') {
+                        @if (item?.amount) {
+                          <bdi dir="ltr">{{ money(item?.amount) }}</bdi>
+                        }
+                        <span class="prj-hint tnd-block" i18n="@@evaluation.itemRate"
+                          >rate <bdi dir="ltr">{{ exact(item?.rate ?? null, 2) }}</bdi></span
+                        >
+                      }
+                      @case ('provisional') {
+                        <bdi dir="ltr">{{ money(item?.amount) }}</bdi>
+                        <span class="prj-hint tnd-block" i18n="@@evaluation.itemProvisional"
+                          >provisional sum</span
+                        >
+                      }
+                      @case ('notPriced') {
+                        <span class="prj-hint" i18n="@@evaluation.itemNotPriced">Not offered</span>
+                      }
+                      @default {
+                        <span
+                          class="ev-variance ev-variance--outlier"
+                          i18n="@@evaluation.itemMissing"
+                          >Missing scope</span
+                        >
+                      }
+                    }
+                    @if (item?.quantityDiffers && item?.quantity) {
+                      <span
+                        class="ev-variance ev-variance--outlier tnd-block"
+                        i18n="@@evaluation.itemOtherQuantity"
+                        >on quantity <bdi dir="ltr">{{ exact(item?.quantity ?? null) }}</bdi></span
+                      >
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  <!-- ------------------------------------------------ line comparison -->
+  <section class="prj-section ev-lines" aria-labelledby="lines-title">
+    <h2 id="lines-title" i18n="@@evaluation.linesTitle">Price breakdown comparison</h2>
+    <p class="prj-hint" i18n="@@evaluation.linesHint">
+      Lines are aligned only when bids use the same description (ignoring case and spacing).
+      Different wording is never guessed to mean the same thing; unaligned lines stay with their bid
+      in its details.
+    </p>
+    <label class="tnd-choice">
+      <input
+        type="checkbox"
+        [ngModel]="onlyDifferingLines()"
+        (ngModelChange)="onlyDifferingLines.set($event)"
+      />
+      <span i18n="@@evaluation.onlyDiffering">Show only lines whose amounts differ</span>
+    </label>
+    @if (alignedLines().length) {
+      <div class="ev-grid-wrap" role="region" tabindex="0" aria-labelledby="lines-title">
+        <table class="ev-grid">
+          <thead>
+            <tr>
+              <th scope="col" class="ev-grid__corner" i18n="@@evaluation.colLine">Line</th>
+              @for (bid of bids(); track bid.openingBidId) {
+                <th scope="col">
+                  <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of alignedLines(); track line.key) {
+              <tr>
+                <th scope="row">
+                  <bdi>{{ line.description }}</bdi>
+                </th>
+                @for (bid of bids(); track bid.openingBidId) {
+                  <td class="ev-num">
+                    @if (cell(line.submittedAmounts, bid); as submitted) {
+                      <bdi dir="ltr">{{ money(submitted) }}</bdi>
+                      @if (cell(line.leveledAmounts, bid); as leveled) {
+                        @if (leveled !== submitted) {
+                          <span
+                            class="ev-variance ev-variance--outlier tnd-block"
+                            i18n="@@evaluation.leveledTo"
+                            >leveled to <bdi dir="ltr">{{ money(leveled) }}</bdi></span
+                          >
+                        }
+                      }
+                    } @else {
+                      <span class="prj-hint" i18n="@@evaluation.notInBid">Not in this bid</span>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@evaluation.noAlignedLines">
+        No line appears in more than one bid.
+      </p>
+    }
+  </section>
+
+  <!-- ------------------------------------------------ scope inclusion / exclusion matrix -->
+  <section class="prj-section ev-lines" aria-labelledby="scope-title">
+    <h2 id="scope-title" i18n="@@evaluation.scopeTitle">Scope exclusions and deviations</h2>
+    <div class="prj-field ev-toolbar__field">
+      <label for="scope-filter" i18n="@@evaluation.scopeFilter">Show</label>
+      <select
+        id="scope-filter"
+        [ngModel]="matrixFilter()"
+        (ngModelChange)="matrixFilter.set($event)"
+      >
+        <option value="all" i18n="@@evaluation.scopeAll">Everything</option>
+        <option value="exclusion" i18n="@@evaluation.scopeExclusions">Exclusions</option>
+        <option value="commercialDeviation" i18n="@@evaluation.scopeCommercial">
+          Commercial deviations
+        </option>
+        <option value="technicalDeviation" i18n="@@evaluation.scopeTechnical">
+          Technical deviations
+        </option>
+      </select>
+    </div>
+    @if (matrix().length) {
+      <div class="ev-grid-wrap" role="region" tabindex="0" aria-labelledby="scope-title">
+        <table class="ev-grid">
+          <thead>
+            <tr>
+              <th scope="col" class="ev-grid__corner" i18n="@@evaluation.colStatement">
+                Statement
+              </th>
+              @for (bid of bids(); track bid.openingBidId) {
+                <th scope="col">
+                  <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of matrix(); track $index) {
+              <tr>
+                <th scope="row">
+                  <small class="prj-hint tnd-block">{{ kindLabel(row.kind) }}</small>
+                  <bdi>{{ row.text }}</bdi>
+                </th>
+                @for (bid of bids(); track bid.openingBidId) {
+                  <td>
+                    @if (stated(row, bid)) {
+                      <span class="ev-stated"
+                        ><span aria-hidden="true">●</span>
+                        <ng-container i18n="@@evaluation.stated">Stated</ng-container></span
+                      >
+                    } @else {
+                      <span class="prj-hint" i18n="@@evaluation.notStated">Not stated</span>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="prj-hint" i18n="@@evaluation.noScopeRows">No exclusion or deviation is stated.</p>
+    }
+  </section>
+
+  @if (view.access.level && view.evaluation?.status === 'InProgress') {
+    <section class="prj-section" aria-labelledby="thresholds-title">
+      <h2 id="thresholds-title" i18n="@@evaluation.thresholdsTitle">Comparison thresholds</h2>
+      <p class="prj-hint" i18n="@@evaluation.thresholdsHint">
+        A bid is marked when its leveled total, or its proposed duration, differs from the median of
+        the bids by more than these percentages. Marks never change a score.
+      </p>
+      <div class="ev-thresholds">
+        <div class="prj-field">
+          <label for="threshold-price" i18n="@@evaluation.thresholdPrice"
+            >Price difference (%)</label
+          >
+          <input
+            id="threshold-price"
+            type="text"
+            inputmode="numeric"
+            dir="ltr"
+            [(ngModel)]="priceThreshold"
+            (input)="thresholdError.set('')"
+          />
+        </div>
+        <div class="prj-field">
+          <label for="threshold-duration" i18n="@@evaluation.thresholdDuration"
+            >Duration difference (%)</label
+          >
+          <input
+            id="threshold-duration"
+            type="text"
+            inputmode="numeric"
+            dir="ltr"
+            [(ngModel)]="durationThreshold"
+            (input)="thresholdError.set('')"
+          />
+        </div>
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          [disabled]="busy()"
+          (click)="saveThresholds()"
+          i18n="@@evaluation.saveThresholds"
+        >
+          Save thresholds
+        </button>
+      </div>
+      @if (thresholdError()) {
+        <p class="prj-error-text" role="alert">{{ thresholdError() }}</p>
+      }
+    </section>
+  }
+
+  <!-- ------------------------------------------------ evidence drawer -->
+  @if (drawer(); as bid) {
+    <div
+      class="prj-dialog ev-drawer"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      appAutofocus
+      appFocusTrap
+      aria-labelledby="drawer-title"
+      (keydown.escape)="busy() || closeDrawer()"
+    >
+      <div>
+        <div class="ev-drawer__head">
+          <h2 id="drawer-title">
+            <bdi dir="ltr" class="tnd-code">{{ bid.subcontractorCode }}</bdi
+            >{{ ' ' }}
+            <bdi>{{ bid.subcontractorName }}</bdi>
+          </h2>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            [disabled]="busy()"
+            (click)="closeDrawer()"
+            i18n="@@common.close"
+          >
+            Close
+          </button>
+        </div>
+        <dl class="ev-card__facts">
+          <div>
+            <dt i18n="@@evaluation.rowSubmittedTotal">Submitted total</dt>
+            <dd>
+              <bdi dir="ltr">{{ money(bid.submittedTotal) }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@evaluation.rowAdjustments">Buyer adjustments</dt>
+            <dd>
+              <bdi dir="ltr">{{ signed(bid.adjustmentTotal) }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@evaluation.rowLeveledTotal">Leveled total</dt>
+            <dd>
+              <strong
+                ><bdi dir="ltr">{{ money(bid.leveledTotal) }}</bdi></strong
+              >
+            </dd>
+          </div>
+        </dl>
+
+        <h3 i18n="@@bidField.lines">Price breakdown</h3>
+        @if (bid.lines.length) {
+          <div class="prj-table-wrap">
+            <table class="prj-table ev-table">
+              <thead>
+                <tr>
+                  <th scope="col" i18n="@@evaluation.colLine">Line</th>
+                  <th scope="col" i18n="@@evaluation.colSubmittedAmount">Submitted</th>
+                  <th scope="col" i18n="@@evaluation.colLeveledAmount">Leveled</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of bid.lines; track line.position) {
+                  <tr>
+                    <th scope="row">
+                      <bdi>{{ line.description }}</bdi>
+                      @if (!line.alignmentKey) {
+                        <small class="prj-hint tnd-block" i18n="@@evaluation.unaligned"
+                          >Not aligned with other bids</small
+                        >
+                      }
+                    </th>
+                    <td class="ev-num">
+                      <bdi dir="ltr">{{ money(line.submittedAmount) }}</bdi>
+                    </td>
+                    <td class="ev-num">
+                      @if (line.leveledAmount) {
+                        <bdi dir="ltr">{{ money(line.leveledAmount) }}</bdi>
+                      } @else {
+                        <span class="prj-hint">—</span>
+                      }
+                      @if (view.canLevel && !hasActiveLineAdjustment(bid, line)) {
+                        <button
+                          class="prj-btn prj-btn--ghost ev-btn-small tnd-block"
+                          type="button"
+                          (click)="pickLine(line)"
+                        >
+                          <ng-container i18n="@@evaluation.levelLine">Level this line</ng-container>
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="prj-hint" i18n="@@evaluation.noBreakdown">Only a total was submitted.</p>
+        }
+
+        @if (view.canLevel && lineTarget !== null) {
+          <fieldset class="ev-form">
+            <legend i18n="@@evaluation.levelLineLegend">Level line {{ lineTarget }}</legend>
+            <div class="prj-field">
+              <label for="line-amount" i18n="@@evaluation.leveledAmount">Leveled amount</label>
+              <input
+                id="line-amount"
+                type="text"
+                inputmode="decimal"
+                dir="ltr"
+                [(ngModel)]="lineAmount"
+                (input)="drawerError.set('')"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="line-category" i18n="@@evaluation.category">Reason category</label>
+              <select id="line-category" [(ngModel)]="lineCategory">
+                @for (category of categories; track category) {
+                  <option [value]="category">{{ categoryLabel(category) }}</option>
+                }
+              </select>
+            </div>
+            <div class="prj-field">
+              <label for="line-reason" i18n="@@evaluation.adjustmentReason">Why</label>
+              <textarea
+                id="line-reason"
+                rows="2"
+                [attr.maxlength]="reasonMax"
+                [(ngModel)]="lineReason"
+                (input)="drawerError.set('')"
+              ></textarea>
+            </div>
+            <div class="prj-actions">
+              <button
+                class="prj-btn"
+                type="button"
+                [disabled]="busy()"
+                (click)="saveLine(bid)"
+                i18n="@@evaluation.recordAdjustment"
+              >
+                Record adjustment
+              </button>
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="busy()"
+                (click)="lineTarget = null"
+                i18n="@@common.cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          </fieldset>
+        }
+
+        @if (view.canLevel) {
+          <fieldset class="ev-form">
+            <legend i18n="@@evaluation.scopeAdjustmentLegend">Whole-bid adjustment</legend>
+            <div class="ev-radio" role="radiogroup" aria-labelledby="scope-direction-label">
+              <span
+                id="scope-direction-label"
+                class="prj-visually-hidden"
+                i18n="@@evaluation.direction"
+                >Direction</span
+              >
+              <label class="tnd-choice">
+                <input
+                  type="radio"
+                  value="Add"
+                  name="scope-direction"
+                  [(ngModel)]="scopeDirection"
+                />
+                <span i18n="@@evaluation.add">Add (for example, scope the bidder excluded)</span>
+              </label>
+              <label class="tnd-choice">
+                <input
+                  type="radio"
+                  value="Deduct"
+                  name="scope-direction"
+                  [(ngModel)]="scopeDirection"
+                />
+                <span i18n="@@evaluation.deduct">Deduct (for example, an item not required)</span>
+              </label>
+            </div>
+            <div class="prj-field">
+              <label for="scope-amount" i18n="@@evaluation.amount">Amount</label>
+              <input
+                id="scope-amount"
+                type="text"
+                inputmode="decimal"
+                dir="ltr"
+                [(ngModel)]="scopeAmount"
+                (input)="drawerError.set('')"
+              />
+            </div>
+            <div class="prj-field">
+              <label for="scope-category" i18n="@@evaluation.category">Reason category</label>
+              <select id="scope-category" [(ngModel)]="scopeCategory">
+                @for (category of categories; track category) {
+                  <option [value]="category">{{ categoryLabel(category) }}</option>
+                }
+              </select>
+            </div>
+            <div class="prj-field">
+              <label for="scope-reason" i18n="@@evaluation.adjustmentReason">Why</label>
+              <textarea
+                id="scope-reason"
+                rows="2"
+                [attr.maxlength]="reasonMax"
+                [(ngModel)]="scopeReason"
+                (input)="drawerError.set('')"
+              ></textarea>
+            </div>
+            <div class="prj-actions">
+              <button
+                class="prj-btn"
+                type="button"
+                [disabled]="busy()"
+                (click)="saveScope(bid)"
+                i18n="@@evaluation.recordAdjustment"
+              >
+                Record adjustment
+              </button>
+            </div>
+          </fieldset>
+        }
+
+        @if (drawerError()) {
+          <p class="prj-error-text" role="alert">{{ drawerError() }}</p>
+        }
+
+        <h3 i18n="@@evaluation.adjustmentsTitle">Adjustments</h3>
+        @if (bid.notCarriedCount) {
+          <p class="ev-flag ev-flag--warning">
+            <span class="ev-flag__mark" aria-hidden="true">!</span>
+            <span i18n="@@evaluation.notCarriedCallout"
+              >Revision {{ bid.currentRevisionNumber }} changed this bid's prices, so adjustments
+              made on an earlier revision no longer count (waiting for review:
+              {{ bid.notCarriedCount }}, <bdi dir="ltr">{{ signed(bid.notCarriedTotal) }}</bdi> on
+              the earlier total). Re-apply each one to the revised response, or confirm it no longer
+              applies. Leveling cannot be completed until then.</span
+            >
+          </p>
+        }
+        @for (adjustment of bid.adjustments; track adjustment.id) {
+          <article class="ev-note" [class.ev-note--withdrawn]="!adjustment.active">
+            <p>
+              <strong
+                ><bdi dir="ltr">{{ signed(adjustment.delta) }}</bdi></strong
+              >
+              · {{ categoryLabel(adjustment.category) }}
+              @if (adjustment.kind === 'Line') {
+                ·
+                <span i18n="@@evaluation.adjustedLine"
+                  >line {{ adjustment.linePosition }}:
+                  <bdi dir="ltr">{{ money(adjustment.originalAmount) }}</bdi> →
+                  <bdi dir="ltr">{{ money(adjustment.leveledAmount) }}</bdi></span
+                >
+              }
+              @if (!adjustment.active) {
+                · <span class="prj-hint" i18n="@@evaluation.withdrawn">Withdrawn</span>
+              }
+              @if (adjustment.carryReviewRequired) {
+                ·
+                <strong class="tnd-attention" i18n="@@evaluation.adjustmentNeedsReview"
+                  >Needs review: recorded on revision {{ adjustment.revisionNumber }}, not counted
+                  in the revised response</strong
+                >
+              } @else if (adjustment.appliesToCurrentResponse === false) {
+                ·
+                <strong class="tnd-attention" i18n="@@evaluation.adjustmentSuperseded"
+                  >Superseded: recorded on revision {{ adjustment.revisionNumber }}, no longer
+                  applies</strong
+                >
+              }
+              @if (adjustment.carriedFromAdjustmentId) {
+                ·
+                <span class="prj-hint" i18n="@@evaluation.adjustmentCarriedFrom"
+                  >Re-applied from an earlier revision</span
+                >
+              }
+            </p>
+            <p class="ev-prose">
+              <bdi>{{ adjustment.reason }}</bdi>
+            </p>
+            <p class="prj-hint">
+              <bdi>{{ adjustment.createdByName }}</bdi> ·
+              {{ adjustment.recordedAtUtc | businessDate: 'instant' }}
+              @if (adjustment.withdrawnAtUtc) {
+                <span class="tnd-block" i18n="@@evaluation.withdrawnBy"
+                  >Withdrawn by <bdi>{{ adjustment.withdrawnByName }}</bdi
+                  >: <bdi>{{ adjustment.withdrawalReason }}</bdi></span
+                >
+              }
+            </p>
+            @if (adjustment.carry; as carry) {
+              <p class="prj-hint">
+                @if (carry.outcome === 'Reapplied') {
+                  <span i18n="@@evaluation.carryReapplied"
+                    >Re-applied to the revised response by <bdi>{{ carry.reviewedByName }}</bdi> ·
+                    {{ carry.reviewedAtUtc | businessDate: 'instant' }}</span
+                  >
+                } @else {
+                  <span i18n="@@evaluation.carryNotApplicable"
+                    >Confirmed not applicable to the revised response by
+                    <bdi>{{ carry.reviewedByName }}</bdi> ·
+                    {{ carry.reviewedAtUtc | businessDate: 'instant' }}:
+                    <bdi>{{ carry.reason }}</bdi></span
+                  >
+                }
+              </p>
+            }
+            @if (adjustment.carryReviewRequired && view.canLevel) {
+              @if (carryTarget === adjustment.id) {
+                <div class="prj-field">
+                  <label [for]="'carry-' + adjustment.id" i18n="@@evaluation.carryReason"
+                    >Why it no longer applies</label
+                  >
+                  <textarea
+                    [id]="'carry-' + adjustment.id"
+                    rows="2"
+                    [attr.maxlength]="reasonMax"
+                    [(ngModel)]="carryReason"
+                    (input)="drawerError.set('')"
+                  ></textarea>
+                </div>
+                <div class="prj-actions">
+                  <button
+                    class="prj-btn"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="carry(adjustment, 'NotApplicable')"
+                    i18n="@@evaluation.carryConfirmNotApplicable"
+                  >
+                    Confirm not applicable
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="carryTarget = null"
+                    i18n="@@common.cancel"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              } @else {
+                <div class="prj-actions">
+                  <button
+                    class="prj-btn ev-btn-small"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="carry(adjustment, 'Reapplied')"
+                    i18n="@@evaluation.carryReapply"
+                  >
+                    Re-apply to revision {{ bid.currentRevisionNumber }}
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost ev-btn-small"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="startNotApplicable(adjustment)"
+                    i18n="@@evaluation.carryNotApplicableStart"
+                  >
+                    It no longer applies
+                  </button>
+                </div>
+              }
+            }
+            @if (adjustment.active && view.canLevel) {
+              @if (withdrawTarget === adjustment.id) {
+                <div class="prj-field">
+                  <label [for]="'withdraw-' + adjustment.id" i18n="@@evaluation.withdrawReason"
+                    >Why withdraw it</label
+                  >
+                  <textarea
+                    [id]="'withdraw-' + adjustment.id"
+                    rows="2"
+                    [attr.maxlength]="reasonMax"
+                    [(ngModel)]="withdrawReason"
+                    (input)="drawerError.set('')"
+                  ></textarea>
+                </div>
+                <div class="prj-actions">
+                  <button
+                    class="prj-btn prj-btn--danger"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="confirmWithdraw(adjustment)"
+                    i18n="@@evaluation.withdraw"
+                  >
+                    Withdraw
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="withdrawTarget = null"
+                    i18n="@@common.cancel"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              } @else {
+                <button
+                  class="prj-btn prj-btn--ghost ev-btn-small"
+                  type="button"
+                  (click)="startWithdraw(adjustment)"
+                  i18n="@@evaluation.withdraw"
+                >
+                  Withdraw
+                </button>
+              }
+            }
+          </article>
+        } @empty {
+          <p class="prj-hint" i18n="@@evaluation.noAdjustments">
+            No adjustment: the leveled total is the submitted total.
+          </p>
+        }
+
+        <h3 i18n="@@evaluation.commercialDetails">Commercial terms</h3>
+        <dl class="ev-response">
+          <div>
+            <dt i18n="@@bidField.paymentTerms">Payment terms</dt>
+            <dd class="ev-prose">
+              @if (bid.paymentTerms) {
+                <bdi>{{ bid.paymentTerms }}</bdi>
+              } @else {
+                <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.commercialNotes">Commercial notes</dt>
+            <dd class="ev-prose">
+              @if (bid.commercialNotes) {
+                <bdi>{{ bid.commercialNotes }}</bdi>
+              } @else {
+                <span class="prj-hint" i18n="@@evaluation.notProvided">Not provided</span>
+              }
+            </dd>
+          </div>
+        </dl>
+
+        <h3 i18n="@@evaluation.bidFiles">Files</h3>
+        <ul class="ev-files" role="list">
+          @for (file of bid.files; track file.id) {
+            <li>
+              <a [href]="fileUrl(file.id)" download
+                ><bdi>{{ file.fileName }}</bdi></a
+              >
+              <small class="prj-hint">{{ size(file.sizeBytes) }}</small>
+            </li>
+          } @empty {
+            <li class="prj-hint" i18n="@@evaluation.noFiles">No files.</li>
+          }
+        </ul>
+
+        <h3 i18n="@@evaluation.commercialNotesTitle">Commercial notes and concerns</h3>
+        <p class="prj-hint" i18n="@@evaluation.notesInternal">
+          Internal to your company. Bidders never see them.
+        </p>
+        @for (note of bid.notes; track note.id) {
+          <article class="ev-note" [class.ev-note--concern]="note.kind === 'Concern'">
+            <p class="prj-hint">
+              @if (note.kind === 'Concern') {
+                <strong i18n="@@evaluation.concern">Concern</strong> ·
+              }
+              <bdi>{{ note.authorName }}</bdi> · {{ note.writtenAtUtc | businessDate: 'instant' }}
+            </p>
+            <p class="ev-prose">
+              <bdi>{{ note.text }}</bdi>
+            </p>
+          </article>
+        } @empty {
+          <p class="prj-hint" i18n="@@evaluation.noNotes">No notes yet.</p>
+        }
+        @if (view.access.level && view.evaluation?.status === 'InProgress') {
+          <div class="prj-field">
+            <label for="commercial-note" i18n="@@evaluation.addNote">Add a note</label>
+            <textarea
+              id="commercial-note"
+              rows="3"
+              [attr.maxlength]="noteMax"
+              [(ngModel)]="noteText"
+            ></textarea>
+          </div>
+          <label class="tnd-choice">
+            <input
+              type="checkbox"
+              [ngModel]="noteKind === 'Concern'"
+              (ngModelChange)="noteKind = $event ? 'Concern' : 'Comment'"
+            />
+            <span i18n="@@evaluation.markConcern"
+              >Mark as a concern (shown with the deviations and gaps)</span
+            >
+          </label>
+          <div class="prj-actions">
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="addNote(bid)"
+              i18n="@@evaluation.saveNote"
+            >
+              Add note
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+}

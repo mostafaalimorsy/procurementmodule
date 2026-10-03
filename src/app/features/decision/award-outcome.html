@@ -1,0 +1,281 @@
+<section class="prj-section" aria-labelledby="award-outcome-title">
+  <h2 id="award-outcome-title" i18n="@@awardOutcome.title">
+    Award {{ award().sequence ?? 1 }}: the subcontractor's answer
+  </h2>
+  <p>
+    <span
+      class="prj-chip dc-state"
+      [class.dc-state--good]="award().state === 'Accepted'"
+      [class.dc-state--warn]="
+        award().state === 'Declined' ||
+        award().state === 'Withdrawn' ||
+        award().state === 'WithdrawalPending'
+      "
+      >{{ stateLabel(award().state) }}</span
+    >
+    · <bdi dir="ltr">{{ award().subcontractorCode }}</bdi> ·
+    <bdi>{{ award().subcontractorName }}</bdi>
+  </p>
+  @if (award().response; as answer) {
+    @if (answer.outcome === 'Accepted') {
+      <p class="prj-hint" i18n="@@awardOutcome.answerAccepted">
+        Accepted on <bdi dir="ltr">{{ answer.respondedOn }}</bdi> · evidence
+        <bdi>{{ answer.evidenceReference }}</bdi> · recorded by
+        <bdi>{{ answer.recordedByName }}</bdi>
+      </p>
+    } @else {
+      <p class="prj-hint" i18n="@@awardOutcome.answerDeclined">
+        Declined on <bdi dir="ltr">{{ answer.respondedOn }}</bdi> · evidence
+        <bdi>{{ answer.evidenceReference }}</bdi> · recorded by
+        <bdi>{{ answer.recordedByName }}</bdi>
+      </p>
+    }
+    @if (answer.reason) {
+      <p class="ev-prose">
+        {{ declineLabel(answer.reasonCategory) }} — <bdi>{{ answer.reason }}</bdi>
+      </p>
+    }
+  }
+  @for (item of award().withdrawals ?? []; track item.id) {
+    <article class="ev-note">
+      <p class="prj-hint" i18n="@@awardOutcome.withdrawalLine">
+        Withdrawal requested by <bdi>{{ item.requestedByName }}</bdi> ·
+        {{ item.requestedAtUtc | businessDate: 'instant' }} ·
+        {{ withdrawalLabel(item.reasonCategory) }}
+      </p>
+      <p class="ev-prose">
+        <bdi>{{ item.reason }}</bdi>
+      </p>
+      @if (item.status !== 'Pending') {
+        @if (item.status === 'Approved') {
+          <p class="prj-hint" i18n="@@awardOutcome.withdrawalApprovedBy">
+            Approved by <bdi>{{ item.decidedByName }}</bdi>
+          </p>
+        } @else {
+          <p class="prj-hint" i18n="@@awardOutcome.withdrawalRejectedBy">
+            Rejected by <bdi>{{ item.decidedByName }}</bdi>
+          </p>
+        }
+        @if (item.decisionComment) {
+          <p class="ev-prose">
+            <bdi>{{ item.decisionComment }}</bdi>
+          </p>
+        }
+      }
+    </article>
+  }
+
+  @if (award().notices?.length) {
+    <h3 i18n="@@awardOutcome.notices">Outcome notices to the firms</h3>
+    <ul role="list">
+      @for (notice of award().notices ?? []; track notice.openingBidId) {
+        <li>
+          <bdi dir="ltr">{{ notice.subcontractorCode }}</bdi> ·
+          @if (notice.kind) {
+            {{ kindLabel(notice.kind) }} · {{ noticeStatusLabel(notice.status ?? '') }}
+          } @else {
+            <span i18n="@@awardOutcome.noticeNone">Not told yet</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  @if (error()) {
+    <p class="prj-error-text" role="alert">{{ error() }}</p>
+  }
+
+  @if (award().actions; as can) {
+    @if (form() === null) {
+      <div class="prj-actions">
+        @if (can.recordResponse) {
+          <button
+            class="prj-btn"
+            type="button"
+            (click)="open('accept')"
+            i18n="@@awardOutcome.recordAccepted"
+          >
+            Record acceptance
+          </button>
+        }
+        @if (can.recordDecline) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="open('decline')"
+            i18n="@@awardOutcome.recordDeclined"
+          >
+            Record a decline
+          </button>
+        }
+        @if (can.requestWithdrawal) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="open('withdraw')"
+            i18n="@@awardOutcome.requestWithdrawal"
+          >
+            Withdraw the award
+          </button>
+        }
+        @if (can.decideWithdrawal && pending()) {
+          <button
+            class="prj-btn"
+            type="button"
+            [disabled]="busy()"
+            (click)="approve()"
+            i18n="@@awardOutcome.approveWithdrawal"
+          >
+            Approve the withdrawal
+          </button>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="open('reject')"
+            i18n="@@awardOutcome.rejectWithdrawal"
+          >
+            Reject the withdrawal
+          </button>
+        }
+        @if (can.releaseNotices) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="open('notices')"
+            i18n="@@awardOutcome.releaseNotices"
+          >
+            Send the held notices now
+          </button>
+        }
+        @if (can.releaseReserves) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="open('reserves')"
+            i18n="@@awardOutcome.releaseReserves"
+          >
+            Tell the reserves they were not selected
+          </button>
+        }
+        @if (can.closeForRetender) {
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="open('retender')"
+            i18n="@@awardOutcome.retender"
+          >
+            Close the tender to re-tender
+          </button>
+        }
+      </div>
+      @if (can.promoteNext) {
+        <p class="prj-hint" i18n="@@awardOutcome.promoteHint">
+          The award is no longer in force. Another bid can be awarded only through a new decision
+          and its approvals (the firm whose award ended cannot be proposed again).
+        </p>
+      }
+    } @else {
+      <form class="prj-form" (ngSubmit)="submit()">
+        @if (form() === 'accept' || form() === 'decline') {
+          <div class="prj-field">
+            <label for="award-responded" i18n="@@awardOutcome.respondedOn"
+              >Date of the answer</label
+            >
+            <input id="award-responded" name="respondedOn" type="date" [(ngModel)]="respondedOn" />
+          </div>
+          <div class="prj-field">
+            <label for="award-evidence" i18n="@@awardOutcome.evidence">Evidence reference</label>
+            <input id="award-evidence" name="evidence" maxlength="200" [(ngModel)]="evidence" />
+          </div>
+        }
+        @if (form() === 'decline') {
+          <div class="prj-field">
+            <label for="award-decline-reason" i18n="@@awardOutcome.declineReason"
+              >Why the subcontractor declined</label
+            >
+            <select id="award-decline-reason" name="declineReason" [(ngModel)]="declineReason">
+              <option value="" i18n="@@common.choose">Choose…</option>
+              @for (reason of declineReasons; track reason) {
+                <option [value]="reason">{{ declineLabel(reason) }}</option>
+              }
+            </select>
+          </div>
+        }
+        @if (form() === 'withdraw') {
+          <div class="prj-field">
+            <label for="award-withdrawal-reason" i18n="@@awardOutcome.withdrawalReason"
+              >Why the award is withdrawn</label
+            >
+            <select
+              id="award-withdrawal-reason"
+              name="withdrawalReason"
+              [(ngModel)]="withdrawalReason"
+            >
+              <option value="" i18n="@@common.choose">Choose…</option>
+              @for (reason of withdrawalReasons; track reason) {
+                <option [value]="reason">{{ withdrawalLabel(reason) }}</option>
+              }
+            </select>
+          </div>
+        }
+        @if (form() === 'notices') {
+          <p i18n="@@awardOutcome.releaseNoticesBody">
+            The firms not selected are told now, before the awarded firm has answered. If it then
+            declines, a firm told "not selected" can still be awarded only through a new decision.
+          </p>
+        }
+        @if (form() === 'reserves') {
+          <p i18n="@@awardOutcome.releaseReservesBody">
+            Each reserve bid is told once that it was not selected. The notice gives no rank, amount
+            or competitor.
+          </p>
+        }
+        @if (form() !== 'accept' && form() !== 'notices' && form() !== 'reserves') {
+          <div class="prj-field">
+            <label for="award-outcome-text" i18n="@@awardOutcome.details">Details</label>
+            <textarea
+              id="award-outcome-text"
+              name="text"
+              rows="3"
+              maxlength="1000"
+              [(ngModel)]="text"
+            ></textarea>
+          </div>
+        }
+        <div class="prj-actions">
+          <button class="prj-btn" type="submit" [disabled]="busy()" i18n="@@common.confirm">
+            Confirm
+          </button>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="form.set(null)"
+            i18n="@@common.cancel"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    }
+  }
+
+  @if (workspace().previousAwards?.length) {
+    <h3 i18n="@@awardOutcome.previous">Earlier awards of this tender</h3>
+    <ul role="list">
+      @for (item of workspace().previousAwards ?? []; track item.id) {
+        <li>
+          <span i18n="@@awardOutcome.previousLine"
+            >Award {{ item.sequence }} · <bdi dir="ltr">{{ item.subcontractorCode }}</bdi> ·
+            {{ stateLabel(item.state) }}</span
+          >
+          @if (item.reason) {
+            — <bdi>{{ item.reason }}</bdi>
+          }
+          <app-verification-details>
+            <bdi dir="ltr" class="pack-hash">{{ item.baselineSha256 }}</bdi>
+          </app-verification-details>
+        </li>
+      }
+    </ul>
+  }
+</section>

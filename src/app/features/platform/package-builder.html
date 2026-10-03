@@ -1,0 +1,242 @@
+<form class="builder" novalidate (ngSubmit)="submit()">
+  @if (base(); as revision) {
+    <p class="builder-note" i18n="@@builder.reviseNote">
+      Saving publishes revision <bdi dir="ltr">{{ revision.number + 1 }}</bdi
+      >. Revision <bdi dir="ltr">{{ revision.number }}</bdi> is never changed, and every company
+      assigned to an earlier revision keeps its terms until you move it.
+    </p>
+    <p class="builder-code">
+      <span class="muted" i18n="@@builder.packageCode">Package code</span>
+      <bdi dir="ltr">{{ packageCode() }}</bdi>
+    </p>
+  } @else {
+    <label
+      ><span i18n="@@builder.packageCode">Package code</span
+      ><input
+        dir="ltr"
+        class="ltr-token"
+        name="code"
+        required
+        maxlength="64"
+        autocomplete="off"
+        placeholder="company-plan"
+        [(ngModel)]="code"
+        [attr.aria-invalid]="attempted && !code.trim() ? 'true' : null"
+        aria-describedby="builder-code-hint"
+    /></label>
+    <small id="builder-code-hint" i18n="@@builder.codeHint"
+      >A permanent identifier: lowercase letters, digits, hyphen or underscore.</small
+    >
+  }
+  <label
+    ><span i18n="@@builder.displayName">Display name</span
+    ><input
+      name="displayName"
+      required
+      maxlength="200"
+      [(ngModel)]="displayName"
+      [attr.aria-invalid]="attempted && !displayName.trim() ? 'true' : null"
+  /></label>
+  <label
+    ><span i18n="@@common.description">Description</span
+    ><textarea name="description" maxlength="2000" [(ngModel)]="description"></textarea>
+  </label>
+
+  <fieldset class="builder-group">
+    <legend i18n="@@builder.capabilities">Capabilities</legend>
+    @for (feature of availableFeatures(); track feature.key) {
+      <label class="check">
+        <input
+          type="checkbox"
+          [name]="'feature-' + feature.key"
+          [checked]="selected().has(feature.key)"
+          (change)="toggleFeature(feature.key, $any($event.target).checked)"
+          [attr.aria-describedby]="
+            prerequisites(feature.key).length ? 'feature-' + feature.key + '-hint' : null
+          "
+          [attr.aria-invalid]="missingPrerequisites(feature.key).length ? 'true' : null"
+        />
+        <span>{{ featureName(feature.key) }}</span>
+        @if (prerequisites(feature.key).length) {
+          <small [id]="'feature-' + feature.key + '-hint'">
+            @if (missingPrerequisites(feature.key).length) {
+              <span class="error" i18n="@@builder.featureMissing"
+                >Also include {{ prerequisiteNames(missingPrerequisites(feature.key)) }}.</span
+              >
+            } @else {
+              <span i18n="@@builder.featureRequires"
+                >Requires {{ prerequisiteNames(prerequisites(feature.key)) }}.</span
+              >
+            }
+          </small>
+        }
+      </label>
+    }
+    @if (carriedFeatures().length) {
+      <p class="carried" data-testid="builder-reserved-features">
+        <ng-container i18n="@@builder.reservedFeatures"
+          >Not carried into the new revision — reserved capabilities that cannot be sold:
+          {{ reservedList() }}</ng-container
+        >
+      </p>
+    }
+  </fieldset>
+
+  <fieldset class="builder-group">
+    <legend i18n="@@builder.capacity">Capacity</legend>
+    @for (limit of visibleLimits(); track limit.key) {
+      <div class="limit">
+        <label [for]="'limit-' + limit.key"
+          >{{ quotaName(limit.key) }}
+          @if (required(limit)) {
+            <span aria-hidden="true">*</span>
+          }
+        </label>
+        <input
+          dir="ltr"
+          type="number"
+          inputmode="numeric"
+          step="1"
+          [min]="limit.minimum"
+          [id]="'limit-' + limit.key"
+          [name]="'limit-' + limit.key"
+          [required]="required(limit)"
+          [ngModel]="values()[limit.key]"
+          (ngModelChange)="setValue(limit.key, $event)"
+          [attr.aria-invalid]="attempted && limitError(limit) ? 'true' : null"
+          [attr.aria-describedby]="'limit-' + limit.key + '-hint'"
+        />
+        @if (quickPicks[limit.key]; as picks) {
+          <div class="quick-picks" role="group" [attr.aria-label]="quotaName(limit.key)">
+            @for (pick of picks; track pick) {
+              <button
+                type="button"
+                class="secondary compact"
+                [attr.aria-pressed]="values()[limit.key] === pick"
+                (click)="setValue(limit.key, pick)"
+              >
+                <bdi dir="ltr">{{ pick }}</bdi>
+              </button>
+            }
+          </div>
+        }
+        <small [id]="'limit-' + limit.key + '-hint'">
+          @switch (attempted ? limitError(limit) : null) {
+            @case ('required') {
+              <span class="error" i18n="@@builder.limitRequired"
+                >Enter the contracted quantity.</span
+              >
+            }
+            @case ('minimum') {
+              <span class="error" i18n="@@builder.limitMinimum"
+                >Use at least <bdi dir="ltr">{{ limit.minimum }}</bdi
+                >.</span
+              >
+            }
+            @case ('whole') {
+              <span class="error" i18n="@@builder.limitWhole">Use a whole number.</span>
+            }
+            @default {
+              @if (limit.requiredWithFeature) {
+                <span i18n="@@builder.limitWithFeature"
+                  >Required because {{ featureName(limit.requiredWithFeature) }} is included.</span
+                >
+              } @else if (limit.requiredForAssignment) {
+                <span i18n="@@builder.limitForAssignment"
+                  >Every company needs at least one seat for its Company Admin.</span
+                >
+              }
+            }
+          }
+        </small>
+      </div>
+    }
+    @for (carried of carriedLimits(); track carried.key) {
+      <label class="check carried">
+        <input
+          type="checkbox"
+          [name]="'carried-limit-' + carried.key"
+          [checked]="!dropped().has(carried.key)"
+          (change)="toggleCarried(carried.key, $any($event.target).checked)"
+          [attr.aria-describedby]="'carried-limit-' + carried.key + '-hint'"
+        />
+        <span
+          >{{ quotaName(carried.key) }}: <bdi dir="ltr">{{ carried.value }}</bdi></span
+        >
+        <small [id]="'carried-limit-' + carried.key + '-hint'" i18n="@@builder.carriedLimit"
+          >Carried over from the current revision. This limit is not measured yet, so it is not
+          enforceable capacity. Clear it to remove it from the new revision.</small
+        >
+      </label>
+    }
+    @for (carried of detachedLimits(); track carried.key) {
+      <label class="check carried">
+        <input
+          type="checkbox"
+          [name]="'carried-limit-' + carried.key"
+          [checked]="!dropped().has(carried.key)"
+          (change)="toggleCarried(carried.key, $any($event.target).checked)"
+          [attr.aria-describedby]="'carried-limit-' + carried.key + '-hint'"
+        />
+        <span
+          >{{ quotaName(carried.key) }}: <bdi dir="ltr">{{ carried.value }}</bdi></span
+        >
+        <small [id]="'carried-limit-' + carried.key + '-hint'" i18n="@@builder.detachedLimit"
+          >Kept from the current revision although {{ featureName(carried.feature) }} is not
+          included, so it grants nothing on its own. Clear it to remove it from the new
+          revision.</small
+        >
+      </label>
+    }
+    <p class="muted" i18n="@@builder.noUnlimited">
+      A capacity that is not listed is not included. There is no unlimited option.
+    </p>
+  </fieldset>
+
+  <!-- CF-060 (ADR-137): a workflow you can start must be one you can finish. -->
+  @if (workflowRefused()) {
+    <p class="error" role="alert" data-testid="workflow-refused" i18n="@@builder.workflowRefused">
+      Tendering needs evaluation: without it, sealed bids could never be opened.
+    </p>
+  } @else if (workflowEnd(); as end) {
+    <label class="checkbox" data-testid="workflow-end">
+      <input
+        type="checkbox"
+        [checked]="acknowledgedEnd() === end"
+        (change)="acknowledge($any($event.target).checked)"
+        [attr.aria-invalid]="attempted && workflowUnacknowledged() ? 'true' : null"
+      />
+      <ng-container i18n="@@builder.workflowEnd"
+        >This plan's workflow ends at {{ featureName(end) }}: customers can work up to that stage
+        and no further. I acknowledge it; customers see it on their workspace.</ng-container
+      >
+    </label>
+  }
+
+  <div class="builder-preview" aria-live="polite">
+    <span class="muted" i18n="@@builder.preview">These terms grant:</span>
+    <app-package-terms [features]="preview().features" [limits]="preview().limits" />
+  </div>
+
+  @if (attempted && invalid()) {
+    <p role="alert" class="error" i18n="@@builder.invalid">
+      Some terms are incomplete. Review the highlighted fields.
+    </p>
+  }
+  <div class="actions">
+    <button type="submit" [disabled]="busy()">
+      @if (busy()) {
+        <ng-container i18n="@@common.saving">Saving…</ng-container>
+      } @else if (base(); as revision) {
+        <ng-container i18n="@@builder.publish"
+          >Publish revision <bdi dir="ltr">{{ revision.number + 1 }}</bdi></ng-container
+        >
+      } @else {
+        <ng-container i18n="@@builder.create">Create package</ng-container>
+      }
+    </button>
+    <button type="button" class="secondary" (click)="cancelled.emit()">
+      <ng-container i18n="@@common.cancel">Cancel</ng-container>
+    </button>
+  </div>
+</form>

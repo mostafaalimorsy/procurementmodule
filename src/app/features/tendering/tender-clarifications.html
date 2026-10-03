@@ -1,0 +1,325 @@
+<section class="prj-section" aria-labelledby="clar-title">
+  <div class="prj-section-head">
+    <h2 id="clar-title" i18n="@@clar.title">Clarifications</h2>
+    <button
+      class="prj-btn prj-btn--ghost"
+      type="button"
+      [disabled]="refreshing()"
+      [attr.aria-busy]="refreshing()"
+      (click)="load(true)"
+      i18n="@@clar.refresh"
+    >
+      Check for new questions
+    </button>
+  </div>
+  <p class="prj-hint" role="status" aria-live="polite">{{ refreshStatus() }}</p>
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (log(); as current) {
+    <dl class="prj-summary tnd-counts">
+      <div>
+        <dt i18n="@@clar.countTotal">Questions</dt>
+        <dd>
+          <bdi dir="ltr">{{ current.total }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@clarificationStatus.open">Awaiting answer</dt>
+        <dd [class.tnd-attention]="current.open > 0">
+          <bdi dir="ltr">{{ current.open }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@clar.countPrivate">Answered privately</dt>
+        <dd>
+          <bdi dir="ltr">{{ current.answeredPrivately }}</bdi>
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@clarificationVisibility.allBidders">Published to all bidders</dt>
+        <dd>
+          <bdi dir="ltr">{{ current.published }}</bdi>
+        </dd>
+      </div>
+    </dl>
+    <p class="prj-hint" i18n="@@clar.help">
+      Invited firms ask through their own secure link. Answer each question for that firm only, or
+      publish it to every invited bidder. Other bidders never see which firm asked; reword the
+      question before publishing if it names the firm. An answer is final.
+    </p>
+
+    @if (current.total > 0) {
+      <div class="prj-field tnd-clar-filter">
+        <label for="clar-filter" i18n="@@clar.filter">Show</label>
+        <select id="clar-filter" [ngModel]="filter()" (ngModelChange)="setFilter($event)">
+          <option value="all" i18n="@@clar.filterAll">All questions</option>
+          <option value="open" i18n="@@clarificationStatus.open">Awaiting answer</option>
+          <option value="private" i18n="@@clar.countPrivate">Answered privately</option>
+          <option value="published" i18n="@@clarificationVisibility.allBidders">
+            Published to all bidders
+          </option>
+        </select>
+      </div>
+    }
+
+    @if (items().length) {
+      <ol class="tnd-clarifications" role="list" aria-labelledby="clar-title">
+        @for (item of items(); track item.id) {
+          <li class="prj-card tnd-clarification" [attr.aria-labelledby]="'clar-' + item.id">
+            <h3 [id]="'clar-' + item.id" class="tnd-clar-head">
+              <bdi dir="ltr" class="tnd-code">{{ item.reference }}</bdi>
+              <span
+                class="prj-chip tnd-clar-state tnd-clar-state--{{ item.visibility ?? item.status }}"
+                >{{
+                  item.visibility ? visibilityLabel(item.visibility) : statusLabel(item.status)
+                }}</span
+              >
+            </h3>
+            <p class="prj-hint" i18n="@@clar.askedBy">
+              Asked by <bdi dir="ltr" class="tnd-code">{{ item.subcontractorCode }}</bdi> –
+              <bdi>{{ item.subcontractorName }}</bdi>
+              (<bdi>{{ item.askedByName }}</bdi
+              >) · {{ item.askedAtUtc | businessDate: 'instant' }} · revision
+              {{ item.tenderRevision }}
+            </p>
+            <p class="tnd-prewrap tnd-question">
+              <bdi>{{ item.question }}</bdi>
+            </p>
+            @if (reworded(item)) {
+              <p class="tnd-prewrap">
+                <strong i18n="@@clar.publishedAs">Published to bidders as:</strong>&ngsp;<bdi>{{
+                  item.publishedQuestion
+                }}</bdi>
+              </p>
+            }
+            @if (item.answer) {
+              <div class="tnd-answer">
+                <strong i18n="@@clar.answer">Answer</strong>
+                <p class="tnd-prewrap">
+                  <bdi>{{ item.answer }}</bdi>
+                </p>
+                <small class="prj-hint" i18n="@@clar.answeredBy"
+                  >Answered by <bdi>{{ item.answeredByName }}</bdi> ·
+                  {{ item.answeredAtUtc | businessDate: 'instant' }}</small
+                >
+                @if (item.publishedAtUtc) {
+                  <small class="prj-hint tnd-block" i18n="@@clar.publishedBy"
+                    >Published to all bidders by <bdi>{{ item.publishedByName }}</bdi> ·
+                    {{ item.publishedAtUtc | businessDate: 'instant' }}</small
+                  >
+                }
+              </div>
+            }
+            @if (canManage() && (item.canAnswer || item.canPublish)) {
+              <div class="prj-actions">
+                @if (item.canAnswer) {
+                  <button class="prj-btn" type="button" (click)="startAnswer(item)">
+                    <ng-container i18n="@@clar.answerAction">Answer</ng-container>
+                    <span class="prj-visually-hidden"
+                      >&ngsp;<bdi dir="ltr">{{ item.reference }}</bdi></span
+                    >
+                  </button>
+                }
+                @if (item.canPublish) {
+                  <button class="prj-btn prj-btn--ghost" type="button" (click)="startPublish(item)">
+                    <ng-container i18n="@@clar.publishAction">Publish to all bidders</ng-container>
+                    <span class="prj-visually-hidden"
+                      >&ngsp;<bdi dir="ltr">{{ item.reference }}</bdi></span
+                    >
+                  </button>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ol>
+    } @else if (current.total === 0) {
+      <p class="prj-hint" i18n="@@clar.empty">No questions yet.</p>
+    } @else {
+      <p class="prj-hint" role="status" i18n="@@clar.emptyFilter">
+        No questions match this filter.
+      </p>
+    }
+  } @else if (!error()) {
+    <p class="prj-note" role="status" i18n="@@clar.loading">Loading clarifications…</p>
+  }
+</section>
+
+@if (selected(); as item) {
+  <div class="prj-dialog" (click)="backdrop($event)">
+    <div
+      class="tnd-dialog"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      appAutofocus
+      appFocusTrap
+      aria-labelledby="clar-dialog-title"
+      (keydown.escape)="close()"
+    >
+      <h2 id="clar-dialog-title">
+        @if (mode() === 'answer') {
+          <ng-container i18n="@@clar.answerTitle">Answer</ng-container>
+        } @else {
+          <ng-container i18n="@@clar.publishTitle">Publish to all bidders</ng-container>
+        }
+        &ngsp;<bdi dir="ltr">{{ item.reference }}</bdi>
+      </h2>
+      <p class="prj-hint" i18n="@@clar.dialogFrom">
+        From <bdi dir="ltr" class="tnd-code">{{ item.subcontractorCode }}</bdi> –
+        <bdi>{{ item.subcontractorName }}</bdi>
+      </p>
+      <blockquote class="tnd-prewrap tnd-quote">
+        <bdi>{{ item.question }}</bdi>
+      </blockquote>
+      @if (item.answer) {
+        <p class="tnd-prewrap">
+          <strong i18n="@@clar.answer">Answer</strong>&ngsp;<bdi>{{ item.answer }}</bdi>
+        </p>
+      }
+      <form class="prj-form" novalidate (ngSubmit)="submit()">
+        @if (mode() === 'answer') {
+          <div class="prj-field">
+            <label for="clar-answer" i18n="@@clar.answerLabel">Answer</label>
+            <textarea
+              id="clar-answer"
+              name="answer"
+              rows="5"
+              [attr.maxlength]="answerMax"
+              [attr.aria-invalid]="answerMissing()"
+              [attr.aria-describedby]="answerMissing() ? 'clar-answer-error' : 'clar-final-hint'"
+              [(ngModel)]="answerText"
+              (input)="answerMissing.set(false)"
+            ></textarea>
+            <small id="clar-final-hint" class="prj-hint" i18n="@@clar.finalHint"
+              >An answer is final. A correction needs an addendum.</small
+            >
+            @if (answerMissing()) {
+              <p
+                id="clar-answer-error"
+                class="prj-error-text"
+                role="alert"
+                i18n="@@clar.answerMissing"
+              >
+                Write the answer.
+              </p>
+            }
+          </div>
+          <fieldset
+            class="prj-fieldset"
+            role="radiogroup"
+            [attr.aria-invalid]="visibilityMissing()"
+            [attr.aria-describedby]="visibilityMissing() ? 'clar-visibility-error' : null"
+          >
+            <legend i18n="@@clar.visibilityLegend">Who receives the answer?</legend>
+            <label class="tnd-choice">
+              <input
+                id="clar-visibility-private"
+                type="radio"
+                name="visibility"
+                [attr.name]="'visibility'"
+                value="Private"
+                [(ngModel)]="visibility"
+                (change)="visibilityMissing.set(false)"
+              />
+              <span>
+                <strong i18n="@@clar.visibilityPrivate">Only the firm that asked</strong>
+                <small class="prj-hint tnd-block" i18n="@@clar.visibilityPrivateHint"
+                  >No other bidder sees the question or the answer. You can publish it later.</small
+                >
+              </span>
+            </label>
+            <label class="tnd-choice">
+              <input
+                type="radio"
+                name="visibility"
+                [attr.name]="'visibility'"
+                value="AllBidders"
+                [(ngModel)]="visibility"
+                (change)="visibilityMissing.set(false)"
+              />
+              <span>
+                <strong i18n="@@clar.visibilityAll">Publish to all invited bidders</strong>
+                <small class="prj-hint tnd-block" i18n="@@clar.visibilityAllHint"
+                  >Every invited firm sees the question and the answer, never who asked. This cannot
+                  be undone.</small
+                >
+              </span>
+            </label>
+            @if (visibilityMissing()) {
+              <p
+                id="clar-visibility-error"
+                class="prj-error-text"
+                role="alert"
+                i18n="@@clar.visibilityMissing"
+              >
+                Choose who receives the answer.
+              </p>
+            }
+          </fieldset>
+        }
+        @if (publishing()) {
+          <div class="prj-field">
+            <label for="clar-published" i18n="@@clar.publishedLabel"
+              >Question as all bidders will read it</label
+            >
+            <textarea
+              id="clar-published"
+              name="publishedQuestion"
+              rows="4"
+              [attr.maxlength]="questionMax"
+              [attr.aria-invalid]="publishedMissing()"
+              [attr.aria-describedby]="
+                publishedMissing()
+                  ? 'clar-published-error clar-published-hint'
+                  : 'clar-published-hint'
+              "
+              [(ngModel)]="publishedQuestion"
+              (input)="publishedMissing.set(false)"
+            ></textarea>
+            @if (publishedMissing()) {
+              <p
+                id="clar-published-error"
+                class="prj-error-text"
+                role="alert"
+                i18n="@@clar.publishedMissing"
+              >
+                Write the question as all bidders will read it.
+              </p>
+            }
+            <small id="clar-published-hint" class="prj-hint" i18n="@@clar.publishedHint"
+              >Remove anything that identifies the firm that asked (its name, people or references).
+              Other bidders never see who asked.</small
+            >
+          </div>
+        }
+        @if (dialogError()) {
+          <p id="clar-dialog-error" class="prj-note prj-note--error" role="alert" tabindex="-1">
+            {{ dialogError() }}
+          </p>
+        }
+        <div class="prj-actions">
+          <button class="prj-btn" type="submit" [disabled]="busy()">
+            @if (busy()) {
+              <ng-container i18n="@@common.working">Working…</ng-container>
+            } @else if (publishing()) {
+              <ng-container i18n="@@clar.submitPublish">Publish to all bidders</ng-container>
+            } @else {
+              <ng-container i18n="@@clar.submitPrivate">Send the answer to this firm</ng-container>
+            }
+          </button>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            [disabled]="busy()"
+            (click)="close()"
+            i18n="@@common.cancel"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

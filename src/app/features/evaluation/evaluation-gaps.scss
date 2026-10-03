@@ -1,0 +1,22 @@
+@use 'evaluation-common';
+
+.ev-findings {
+  margin-block-end: 1rem;
+}
+
+.ev-findings h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0 0.5rem;
+}
+
+.ev-findings ul {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.ev-findings li.ev-note {
+  list-style: none;
+  margin-inline-start: -1.1rem;
+}

@@ -1,0 +1,65 @@
+<nav class="crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+  <a routerLink="/platform/companies" i18n="@@companies.title">Companies</a
+  ><span aria-hidden="true">/</span>
+  @if (store.company(); as item) {
+    <bdi dir="ltr">{{ item.code }}</bdi>
+  }
+</nav>
+@if (store.error()) {
+  <p role="alert" class="error">{{ store.error() }}</p>
+}
+@if (store.notice()) {
+  <p role="status" class="notice">{{ store.notice() }}</p>
+}
+@if (store.loading() && !store.company()) {
+  <p role="status" i18n="@@company.loading">Loading company…</p>
+}
+@if (store.company(); as item) {
+  <header class="detail-head">
+    <p class="eyebrow">
+      <ng-container i18n="@@company.eyebrow">Company</ng-container> ·
+      <bdi dir="ltr">{{ item.code }}</bdi>
+    </p>
+    <h1>
+      <bdi>{{ item.name }}</bdi>
+    </h1>
+    <p>
+      <span class="state-chip" [class.state-chip--suspended]="!item.isActive">
+        @if (item.accessState === 'Purged') {
+          <ng-container i18n="@@companyStatus.purged">Data deleted</ng-container>
+        } @else if (item.accessState === 'ReadOnlyGrace') {
+          <ng-container i18n="@@companyStatus.readOnly">Read-only (grace)</ng-container>
+        } @else if (item.isActive) {
+          <ng-container i18n="@@status.active">Active</ng-container>
+        } @else {
+          <ng-container i18n="@@companyStatus.suspended">Suspended</ng-container>
+        }
+      </span>
+    </p>
+  </header>
+  <nav class="detail-tabs" aria-label="Company sections" i18n-aria-label="@@company.sections">
+    <a
+      routerLink="./"
+      routerLinkActive="is-active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
+      i18n="@@company.tabOverview"
+      >Overview</a
+    >
+    <a
+      routerLink="plan"
+      routerLinkActive="is-active"
+      ariaCurrentWhenActive="page"
+      i18n="@@company.tabPlan"
+      >Plan & usage</a
+    >
+    <a
+      routerLink="access"
+      routerLinkActive="is-active"
+      ariaCurrentWhenActive="page"
+      i18n="@@company.tabAccess"
+      >Access policy</a
+    >
+  </nav>
+  <router-outlet />
+}

@@ -1,0 +1,464 @@
+@let view = workspace();
+<section class="prj-section" aria-labelledby="compute-title">
+  <h2 id="compute-title" i18n="@@recommendation.computeTitle">Compute a recommendation</h2>
+  @if (view.access.compute) {
+    @if (view.readiness.state !== 'Ready') {
+      <p class="prj-note tnd-attention-box" role="note" i18n="@@recommendation.notReady">
+        A recommendation can be computed once the tender is ready. Now:
+        {{ readinessLabel(view.readiness.state) }}.
+      </p>
+    } @else if (!view.policyOptions.length) {
+      <p class="prj-note" role="note">
+        <span i18n="@@recommendation.noPolicy">There is no active recommendation policy.</span>
+        @if (view.access.managePolicy) {
+          {{ ' '
+          }}<a routerLink="/recommendation-policies" i18n="@@recommendation.createPolicy"
+            >Create one first.</a
+          >
+        }
+      </p>
+    } @else {
+      <div class="prj-field dc-policy-pick">
+        <label for="recommendation-policy" i18n="@@recommendation.policy"
+          >Recommendation policy</label
+        >
+        <select
+          id="recommendation-policy"
+          [ngModel]="policyId()"
+          (ngModelChange)="choose($event)"
+          [disabled]="busy()"
+        >
+          @for (option of view.policyOptions; track option.id) {
+            @if (option.declared) {
+              <option [value]="option.id" i18n="@@recommendation.policyOptionDeclared">
+                {{ option.name }} (declared at publication, version
+                {{ option.declaredVersionNumber }})
+              </option>
+            } @else {
+              <option [value]="option.id" i18n="@@recommendation.policyOption">
+                {{ option.name }} (version {{ option.currentVersionNumber }})
+              </option>
+            }
+          }
+        </select>
+      </div>
+      @if (deviates()) {
+        <div class="prj-field">
+          <label for="recommendation-deviation" i18n="@@recommendation.deviationReason"
+            >Why rank with other criteria than the tender declared</label
+          >
+          <textarea
+            id="recommendation-deviation"
+            rows="2"
+            maxlength="1000"
+            [(ngModel)]="deviationReason"
+            [disabled]="busy()"
+          ></textarea>
+          <span class="prj-hint" i18n="@@recommendation.deviationHint"
+            >The bids are already open. The recommendation is flagged "criteria changed after
+            opening" and approvers see your reason.</span
+          >
+        </div>
+      }
+      <p class="prj-hint" i18n="@@recommendation.computeHint">
+        Computing records a new, numbered recommendation from the completed evaluation and the
+        policy version in force. Earlier recommendations are kept.
+      </p>
+      @if (error()) {
+        <p class="prj-error-text" role="alert">{{ error() }}</p>
+      }
+      <div class="prj-actions">
+        <button class="prj-btn" type="button" [disabled]="busy()" (click)="compute()">
+          @if (busy()) {
+            <ng-container i18n="@@common.working">Working…</ng-container>
+          } @else if (recommendation()) {
+            <ng-container i18n="@@recommendation.recompute">Compute again</ng-container>
+          } @else {
+            <ng-container i18n="@@recommendation.compute">Compute recommendation</ng-container>
+          }
+        </button>
+      </div>
+    }
+  } @else {
+    <p class="prj-hint" i18n="@@recommendation.computeNotPermitted">
+      Procurement leadership computes the recommendation. You can read it here.
+    </p>
+  }
+</section>
+
+@if (recommendation(); as rec) {
+  <section class="prj-section" aria-labelledby="recommendation-title">
+    <h2 id="recommendation-title" class="dc-heading">
+      <span i18n="@@recommendation.title">Recommendation {{ rec.number }}</span>
+      <span
+        class="prj-chip dc-state"
+        [class.dc-state--good]="rec.liveState === 'Ready'"
+        [class.dc-state--warn]="rec.liveState !== 'Ready'"
+        >{{ liveStateLabel(rec.liveState, rec.staleReason) }}</span
+      >
+    </h2>
+    @if (!fresh()) {
+      <p class="prj-note prj-note--error" role="note" i18n="@@recommendation.staleNote">
+        This recommendation is not current ({{ staleLabel(rec.staleReason) }}). It is kept as
+        history but cannot support a decision until it is computed again.
+      </p>
+    }
+    <dl class="dc-facts">
+      <div>
+        <dt i18n="@@recommendation.policy">Recommendation policy</dt>
+        <dd>
+          <!-- CF-133 AC5: the exact policy version this recommendation used (the page's readers may open it). -->
+          <a
+            routerLink="/recommendation-policies"
+            [queryParams]="{ policy: rec.policyId, version: rec.policyVersionNumber }"
+            [title]="openPolicyVersion(rec.policyVersionNumber)"
+            data-testid="policy-version-link"
+            ><bdi>{{ rec.policyName }}</bdi></a
+          >
+          <small class="prj-hint tnd-block" i18n="@@recommendation.policyVersion"
+            >version {{ rec.policyVersionNumber }}</small
+          >
+          <app-criteria-flag
+            [declaration]="rec.criteriaDeclaration ?? 'notDeclared'"
+            [declaredPolicyName]="rec.declaredPolicyName ?? null"
+            [declaredPolicyVersionNumber]="rec.declaredPolicyVersionNumber ?? null"
+            [deviationReason]="rec.criteriaDeviationReason ?? null"
+            [evaluationDeviated]="rec.evaluationCriteriaDeviated ?? false"
+          />
+          @if (
+            rec.currentPolicyVersionNumber !== null &&
+            rec.currentPolicyVersionNumber !== rec.policyVersionNumber
+          ) {
+            <small class="tnd-attention tnd-block" i18n="@@recommendation.policyNewer"
+              >The policy is now at version {{ rec.currentPolicyVersionNumber }}.</small
+            >
+          }
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@recommendation.evaluationRound">Evaluation evidence</dt>
+        <dd>
+          @if (rec.evaluationRound > 0) {
+            <span i18n="@@recommendation.roundCovered"
+              >Up to negotiation round {{ rec.evaluationRound }}</span
+            >
+          } @else {
+            <span i18n="@@recommendation.roundOpened">The bids as opened</span>
+          }
+          @if (rec.evaluationCompletedAtUtc) {
+            <small class="prj-hint tnd-block" i18n="@@recommendation.evaluationCompleted"
+              >evaluation completed
+              {{ rec.evaluationCompletedAtUtc | businessDate: 'instant' }}</small
+            >
+          }
+        </dd>
+      </div>
+      <div>
+        <dt i18n="@@recommendation.computedAt">Computed</dt>
+        <dd>
+          {{ rec.computedAtUtc | businessDate: 'instant' }}
+          <small class="prj-hint tnd-block"
+            ><bdi>{{ rec.computedByName }}</bdi></small
+          >
+        </dd>
+      </div>
+      @if (rec.minimumTechnicalScore !== null) {
+        <div>
+          <dt i18n="@@recommendation.passMark">Technical pass mark</dt>
+          <dd>
+            <bdi dir="ltr">{{ rec.minimumTechnicalScore }} / 100</bdi>
+          </dd>
+        </div>
+      }
+      <div>
+        <dt i18n="@@recommendation.appliedWeight">Weight applied</dt>
+        <dd>
+          <bdi dir="ltr">{{ rec.appliedWeightTotal }}%</bdi>
+        </dd>
+      </div>
+    </dl>
+    <app-verification-details>
+      <p>
+        <span i18n="@@recommendation.fingerprint">Evidence fingerprint</span>:
+        <code dir="ltr" class="dc-mono">{{ rec.evidenceFingerprint }}</code>
+      </p>
+    </app-verification-details>
+
+    @if (rec.historyNotInPlan) {
+      <p class="prj-note" role="note" i18n="@@recommendation.historyNotInPlan">
+        Past performance is not in your plan, but this policy weighs it. Review the policy with your
+        Company Admin; the ranking itself is unchanged.
+      </p>
+    }
+    @if (rec.history !== 'NotInPolicy') {
+      <p class="prj-hint" data-testid="history-rule">
+        {{ historyRuleLabel(rec.historyRule, rec.neutralHistoryScore) }}
+      </p>
+    }
+    @switch (rec.history) {
+      @case ('Unavailable') {
+        @if (!rec.historyNotInPlan) {
+          <p
+            class="prj-note tnd-attention-box"
+            role="note"
+            i18n="@@recommendation.historyUnavailable"
+          >
+            Historical performance: unavailable —
+            <bdi dir="ltr">{{ rec.unappliedWeight }}%</bdi> weight not applied, confidence reduced.
+            Nothing is estimated.
+          </p>
+        }
+      }
+      @case ('NotInPolicy') {
+        <p class="prj-hint" i18n="@@recommendation.historyNotInPolicy">
+          Historical performance is not part of this policy.
+        </p>
+      }
+      @default {
+        @if (rec.historyNotInPlan) {
+          <p class="prj-hint" i18n="@@recommendation.historyAppliedNotInPlan">
+            Historical performance is applied from records your plan no longer lets you open.
+          </p>
+        } @else {
+          <p class="prj-hint" i18n="@@recommendation.historyApplied">
+            Historical performance is applied from your company's own records.
+          </p>
+        }
+      }
+    }
+    @if (rec.reducedConfidence && rec.history !== 'Unavailable' && !rec.historyNotInPlan) {
+      <p class="prj-hint" i18n="@@recommendation.reducedConfidence">Confidence reduced.</p>
+    }
+
+    <h3 i18n="@@recommendation.candidatesTitle">Eligible bids by recommendation rank</h3>
+    <p class="prj-hint" i18n="@@recommendation.rankBoundary">
+      The rank is the policy's arithmetic on the evidence shown. It is not a selection: the decision
+      is prepared and approved separately.
+    </p>
+    <ol class="dc-candidates" role="list">
+      @for (candidate of eligible(); track candidate.openingBidId) {
+        <li class="dc-candidate">
+          <div class="dc-candidate__head">
+            <strong class="dc-rank">
+              <span i18n="@@recommendation.rank">Recommendation rank {{ candidate.rank }}</span>
+              @if (candidate.tied) {
+                · <span i18n="@@recommendation.tied">tied</span>
+              }
+            </strong>
+            @if (candidate.rank === 1 && rec.limitedCompetition) {
+              <!-- CF-038 AC1: with fewer compliant bids than the company requires, first place was not tested by a market. -->
+              <span
+                class="prj-chip tnd-attention"
+                data-testid="not-market-tested"
+                [title]="limitedNote"
+                i18n="@@recommendation.notMarketTested"
+                >Not market-tested</span
+              >
+            }
+            <span>
+              <bdi dir="ltr" class="tnd-code">{{ candidate.subcontractorCode }}</bdi
+              >{{ ' ' }}<bdi>{{ candidate.subcontractorName }}</bdi>
+            </span>
+          </div>
+          <dl class="dc-facts">
+            <div>
+              <dt i18n="@@recommendation.totalScore">Total score</dt>
+              <dd>
+                <bdi dir="ltr">{{ number(candidate.total) }} / 100</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@evaluation.rowLeveledTotal">Leveled total</dt>
+              <dd>
+                <bdi dir="ltr">{{ money(candidate.leveledTotal) }} {{ rec.currency }}</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@recommendation.technicalMean">Technical score (mean)</dt>
+              <dd>
+                <bdi dir="ltr">{{ number(candidate.technicalMean) }} / 100</bdi>
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@recommendation.scoredRevision">Scored on</dt>
+              <dd>
+                @if (candidate.round > 0) {
+                  <span i18n="@@recommendation.scoredRevisionRound"
+                    >revision {{ candidate.bidRevisionNumber }} (round {{ candidate.round }})</span
+                  >
+                } @else {
+                  <span i18n="@@recommendation.scoredRevisionOpened"
+                    >revision {{ candidate.bidRevisionNumber }} (as opened)</span
+                  >
+                }
+              </dd>
+            </div>
+          </dl>
+          @if (candidate.flags.length) {
+            <ul class="dc-list" role="list">
+              @for (flag of candidate.flags; track flag) {
+                <li class="ev-flag ev-flag--info">
+                  <span class="ev-flag__mark" aria-hidden="true">i</span>
+                  {{ flagLabel(flag) }}
+                </li>
+              }
+            </ul>
+          }
+          <app-history-evidence
+            [history]="candidate.history"
+            [applied]="rec.history === 'Applied'"
+            [subcontractorId]="candidate.subcontractorId"
+          />
+          @if (candidate.retrospectiveProjects) {
+            <p class="prj-hint" data-testid="retrospective-count">
+              <span class="prj-chip dc-state dc-state--muted">{{ retrospectiveBadge }}</span>
+              <span i18n="@@recommendation.retrospective">{candidate.retrospectiveProjects, plural,
+                =1 {1 past outcome in this category — not weighed by this recommendation}
+                other {
+                  {{ candidate.retrospectiveProjects }} past outcomes in this category — not weighed
+                  by this recommendation
+                }
+              }</span>
+            </p>
+          }
+          <details class="dc-breakdown">
+            <summary i18n="@@recommendation.breakdown">Criteria breakdown</summary>
+            <ng-container
+              *ngTemplateOutlet="
+                criteriaTable;
+                context: { rows: current(candidate), historical: false }
+              "
+            />
+            <ng-container
+              *ngTemplateOutlet="
+                criteriaTable;
+                context: { rows: historical(candidate), historical: true }
+              "
+            />
+          </details>
+        </li>
+      } @empty {
+        <li class="prj-hint" i18n="@@recommendation.noEligible">
+          No bid is eligible under this policy.
+        </li>
+      }
+    </ol>
+
+    @if (ineligible().length) {
+      <h3 i18n="@@recommendation.ineligibleTitle">Not eligible</h3>
+      <ul class="dc-list" role="list">
+        @for (candidate of ineligible(); track candidate.openingBidId) {
+          <li>
+            <bdi dir="ltr" class="tnd-code">{{ candidate.subcontractorCode }}</bdi
+            >{{ ' ' }}<bdi>{{ candidate.subcontractorName }}</bdi> —
+            {{ ineligibleLabel(candidate.ineligibleReason) }}
+          </li>
+        }
+      </ul>
+    }
+  </section>
+} @else {
+  <p class="prj-hint" i18n="@@recommendation.none">No recommendation has been computed yet.</p>
+}
+
+@if (view.recommendationHistory.length > 1) {
+  <section class="prj-section" aria-labelledby="recommendation-history-title">
+    <h2 id="recommendation-history-title" i18n="@@recommendation.historyTitle">
+      Earlier recommendations
+    </h2>
+    <ul class="dc-list" role="list">
+      @for (item of view.recommendationHistory; track item.id) {
+        <li>
+          <span i18n="@@recommendation.historyLine"
+            >Recommendation {{ item.number }} · <bdi>{{ item.policyName }}</bdi> version
+            {{ item.policyVersionNumber }} · {{ item.computedAtUtc | businessDate: 'instant' }} ·
+            <bdi>{{ item.computedByName }}</bdi></span
+          >
+          @if (item.latest) {
+            · <strong i18n="@@recommendation.latest">latest</strong>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+<ng-template #criteriaTable let-rows="rows" let-historical="historical">
+  <h4>
+    @if (historical) {
+      <ng-container i18n="@@recommendation.groupHistorical">Historical performance</ng-container>
+    } @else {
+      <ng-container i18n="@@recommendation.groupCurrent"
+        >Current evidence (this tender)</ng-container
+      >
+    }
+  </h4>
+  @if (rows.length) {
+    <div class="prj-table-wrap">
+      <table class="prj-table ev-table dc-criteria">
+        <caption class="prj-visually-hidden">
+          @if (historical) {
+            <ng-container i18n="@@recommendation.groupHistorical"
+              >Historical performance</ng-container
+            >
+          } @else {
+            <ng-container i18n="@@recommendation.groupCurrent"
+              >Current evidence (this tender)</ng-container
+            >
+          }
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@recommendation.colCriterion">Criterion</th>
+            <th scope="col" class="dc-num" i18n="@@recommendation.colWeight">Weight</th>
+            <th scope="col" class="dc-num" i18n="@@recommendation.colApplied">Applied weight</th>
+            <th scope="col" class="dc-num" i18n="@@recommendation.colInput">Input</th>
+            <th scope="col" class="dc-num" i18n="@@recommendation.colBaseline">Baseline</th>
+            <th scope="col" class="dc-num" i18n="@@recommendation.colScore">Score</th>
+            <th scope="col" class="dc-num" i18n="@@recommendation.colContribution">Contribution</th>
+            <th scope="col" i18n="@@recommendation.colEvidence">Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows; track row.kind) {
+            <tr>
+              <th scope="row">
+                {{ kindLabel(row.kind) }}
+                <small class="prj-hint tnd-block">{{ kindRule(row.kind) }}</small>
+              </th>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ row.weight }}%</bdi>
+              </td>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ row.appliedWeight }}%</bdi>
+              </td>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ input(row, row.input) }}</bdi>
+              </td>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ input(row, row.baseline) }}</bdi>
+              </td>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ number(row.score) }}</bdi>
+              </td>
+              <td class="dc-num">
+                <bdi dir="ltr">{{ number(row.contribution) }}</bdi>
+              </td>
+              <td>
+                @if (row.status === 'Available') {
+                  {{ statusLabel(row.status) }}
+                } @else {
+                  <span class="tnd-attention">{{ statusLabel(row.status) }}</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else if (historical) {
+    <p class="prj-hint" i18n="@@recommendation.historyNotInPolicy">
+      Historical performance is not part of this policy.
+    </p>
+  }
+</ng-template>

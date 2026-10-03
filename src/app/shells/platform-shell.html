@@ -1,0 +1,149 @@
+<div class="shell shell--platform">
+  <a class="skip-link" [attr.href]="skipHref" (click)="skipToContent($event)" i18n="@@shell.skip"
+    >Skip to content</a
+  >
+  <header class="shell-header">
+    <div class="shell-bar">
+      <a
+        class="brand"
+        routerLink="/platform"
+        aria-label="Platform Console home"
+        i18n-aria-label="@@console.homeLabel"
+      >
+        <span class="brand-mark" aria-hidden="true">SI</span>
+        <span class="brand-name"
+          ><span i18n="@@console.product">Subcontractor Intelligence</span><br /><strong
+            i18n="@@console.name"
+            >Platform Console</strong
+          ></span
+        >
+      </a>
+      <span class="context-chip" i18n="@@console.context">Platform Operator</span>
+      @if (session.identity()) {
+        <button
+          type="button"
+          class="menu-toggle"
+          id="platform-menu-toggle"
+          aria-controls="platform-menu"
+          [attr.aria-expanded]="menuOpen()"
+          (click)="toggleMenu()"
+        >
+          <span class="menu-toggle-icon" aria-hidden="true"></span>
+          <span i18n="@@shell.menu">Menu</span>
+        </button>
+      }
+    </div>
+
+    <div
+      class="shell-menu"
+      id="platform-menu"
+      [class.is-open]="menuOpen()"
+      [class.is-static]="!session.identity()"
+    >
+      @if (session.identity()) {
+        <nav
+          class="primary-nav"
+          aria-label="Platform Console"
+          i18n-aria-label="@@console.navigation"
+        >
+          <a
+            routerLink="/platform/companies"
+            [class.is-active]="section() === 'companies'"
+            [attr.aria-current]="section() === 'companies' ? 'page' : null"
+            i18n="@@companies.title"
+            >Companies</a
+          >
+          <a
+            routerLink="/platform/packages"
+            [class.is-active]="section() === 'packages'"
+            [attr.aria-current]="section() === 'packages' ? 'page' : null"
+            i18n="@@packages.title"
+            >Packages</a
+          >
+          <a
+            routerLink="/platform/residency"
+            [class.is-active]="section() === 'residency'"
+            [attr.aria-current]="section() === 'residency' ? 'page' : null"
+            i18n="@@residency.title"
+            >Residency</a
+          >
+          <a
+            routerLink="/platform/operators"
+            [class.is-active]="section() === 'operators'"
+            [attr.aria-current]="section() === 'operators' ? 'page' : null"
+            i18n="@@operators.title"
+            >Operators</a
+          >
+          <a
+            routerLink="/platform/audit"
+            [class.is-active]="section() === 'audit'"
+            [attr.aria-current]="section() === 'audit' ? 'page' : null"
+            i18n="@@platformAudit.navTitle"
+            >Audit</a
+          >
+          <a
+            routerLink="/platform/keys"
+            [class.is-active]="section() === 'keys'"
+            [attr.aria-current]="section() === 'keys' ? 'page' : null"
+            i18n="@@secretKeys.title"
+            >Keys</a
+          >
+          <a
+            routerLink="/platform/email"
+            [class.is-active]="section() === 'email'"
+            [attr.aria-current]="section() === 'email' ? 'page' : null"
+            i18n="@@platformEmail.title"
+            >Email</a
+          >
+        </nav>
+      }
+      <div class="shell-utilities">
+        <app-language-selector />
+        @if (session.identity(); as identity) {
+          <div
+            class="account"
+            role="group"
+            aria-label="Operator account"
+            i18n-aria-label="@@console.account"
+          >
+            <span class="account-identity">
+              <bdi class="account-name" dir="ltr">{{ identity.email }}</bdi>
+              <small i18n="@@console.context">Platform Operator</small>
+            </span>
+            <button type="button" class="shell-signout" (click)="logout()" i18n="@@shell.logout">
+              Sign out
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    @if (logoutFailed()) {
+      <p role="alert" class="shell-alert">
+        <span i18n="@@platformNav.logoutFailed"
+          >Sign out could not be confirmed. Please retry before leaving this device.</span
+        >
+        <button
+          type="button"
+          class="shell-signout"
+          (click)="logout()"
+          i18n="@@console.retrySignOut"
+        >
+          Retry sign out
+        </button>
+      </p>
+    }
+    @if (signingOut()) {
+      <p class="session-transition" role="status" i18n="@@shell.signingOut">
+        Signing out securely…
+      </p>
+    } @else {
+      <router-outlet />
+    }
+  </main>
+  <footer class="shell-footer" i18n="@@console.footer">
+    Platform Console · Subcontractor Bid + Performance Intelligence
+  </footer>
+</div>

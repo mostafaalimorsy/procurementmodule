@@ -1,0 +1,62 @@
+@use 'decision-common';
+
+// ---- preparing the decision --------------------------------------------------------------
+
+.dc-form {
+  display: grid;
+  gap: 0.25rem;
+  max-inline-size: 48rem;
+}
+
+.dc-money-input {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.dc-money-input input {
+  max-inline-size: 16rem;
+}
+
+.dc-currency {
+  font-family: var(--font-label);
+  font-weight: 600;
+}
+
+.dc-other {
+  display: grid;
+  gap: 0.25rem 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  padding-block: 0.75rem;
+  border-block-end: 1px solid var(--color-border);
+}
+
+@media (min-width: 48rem) {
+  .dc-other {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+}
+
+.dc-other__firm {
+  margin: 0;
+}
+
+.dc-other__choice {
+  display: grid;
+}
+
+.dc-other__detail {
+  margin: 0;
+}
+
+.dc-route {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+}
+
+.dc-route h3 {
+  margin-block-start: 0;
+}

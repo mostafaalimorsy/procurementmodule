@@ -1,0 +1,297 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/" i18n="@@nav.overview">Overview</a><span aria-hidden="true">/</span
+    ><span i18n="@@nav.subcontractors">Subcontractors</span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@directory.eyebrow">Subcontractor directory</p>
+      <h1 i18n="@@nav.subcontractors">Subcontractors</h1>
+      <p i18n="@@directory.intro">
+        Your company's own record of the firms you subcontract to: who they are, what trades they
+        perform and who to talk to.
+      </p>
+    </div>
+    <div class="prj-actions">
+      @if (can(permissions.manageTrades)) {
+        <a
+          class="prj-btn prj-btn--ghost"
+          routerLink="/subcontractors/trades"
+          i18n="@@directory.manageTrades"
+          >Manage trades</a
+        >
+      }
+      @if (can('Compliance.ManageTypes')) {
+        <a
+          class="prj-btn prj-btn--ghost"
+          routerLink="/subcontractors/compliance-types"
+          i18n="@@directory.manageCompliance"
+          >Compliance documents</a
+        >
+      }
+      @if (can(permissions.import)) {
+        <a
+          class="prj-btn prj-btn--ghost"
+          routerLink="/subcontractors/import"
+          i18n="@@directory.import"
+          >Import</a
+        >
+      }
+      @if (can(permissions.create)) {
+        <a class="prj-btn" routerLink="/subcontractors/new" i18n="@@directory.new"
+          >Add subcontractor</a
+        >
+      }
+    </div>
+  </div>
+
+  <form class="prj-filters" role="search" (ngSubmit)="applyFilters()">
+    <div class="prj-field prj-field--grow">
+      <label for="directory-search" i18n="@@common.search">Search</label>
+      <input
+        id="directory-search"
+        name="search"
+        type="search"
+        autocomplete="off"
+        placeholder="Code, name or registration number"
+        i18n-placeholder="@@directory.searchPlaceholder"
+        [(ngModel)]="search"
+        (ngModelChange)="searchChanged()"
+      />
+    </div>
+    <div class="prj-field">
+      <label for="directory-status" i18n="@@project.status">Status</label>
+      <select
+        id="directory-status"
+        name="status"
+        [(ngModel)]="status"
+        (ngModelChange)="applyFilters()"
+      >
+        <option value="" i18n="@@projects.allStatuses">All statuses</option>
+        @for (option of statuses; track option) {
+          <option [value]="option">{{ statusLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    <div class="prj-field">
+      <label for="directory-trade" i18n="@@directoryField.trade">Trade</label>
+      <select
+        id="directory-trade"
+        name="trade"
+        [(ngModel)]="tradeId"
+        (ngModelChange)="applyFilters()"
+      >
+        <option value="" i18n="@@directory.allTrades">All trades</option>
+        @for (trade of trades(); track trade.id) {
+          <option [value]="trade.id">
+            {{ trade.name }}
+            @if (!trade.isActive) {
+              &ngsp;<ng-container i18n="@@directory.retiredSuffix">(retired)</ng-container>
+            }
+          </option>
+        }
+      </select>
+    </div>
+    @if (hasFilters) {
+      <button
+        class="prj-btn prj-btn--ghost"
+        type="button"
+        (click)="clearFilters()"
+        i18n="@@projects.clearFilters"
+      >
+        Clear filters
+      </button>
+    }
+  </form>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="reload()" i18n="@@common.retry">
+        Try again
+      </button>
+    </p>
+  }
+
+  <div aria-live="polite" aria-atomic="true">
+    @if (loading()) {
+      <p class="prj-visually-hidden" i18n="@@directory.loading">Loading subcontractors</p>
+      <div class="prj-table-wrap" aria-hidden="true">
+        <div style="display: grid; gap: 0.75rem; padding: 1rem">
+          @for (row of [1, 2, 3, 4, 5]; track row) {
+            <p class="prj-skeleton"></p>
+          }
+        </div>
+      </div>
+    } @else if (result(); as page) {
+      @if (page.totalCount === 0) {
+        <div class="prj-empty">
+          @if (hasFilters) {
+            <h2 i18n="@@directory.noMatchTitle">No subcontractors match those filters</h2>
+            <p i18n="@@directory.noMatchHelp">
+              Try a different search term, or clear the filters to see the whole directory.
+            </p>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="clearFilters()"
+              i18n="@@projects.clearFilters"
+            >
+              Clear filters
+            </button>
+          } @else {
+            <h2 i18n="@@directory.emptyTitle">No subcontractors yet</h2>
+            <p i18n="@@directory.emptyHelp">
+              Add the firms you work with, one at a time or from a spreadsheet, so their details
+              stop living in personal files and inboxes.
+            </p>
+            @if (can(permissions.create)) {
+              <a class="prj-btn" routerLink="/subcontractors/new" i18n="@@directory.addFirst"
+                >Add the first subcontractor</a
+              >
+            } @else {
+              <p i18n="@@directory.askToAdd">
+                Ask a Procurement Officer, Procurement Manager or Company Admin to add
+                subcontractors.
+              </p>
+            }
+          }
+        </div>
+      } @else {
+        <p class="prj-visually-hidden">
+          <span i18n="@@directory.found">{page.totalCount, plural,
+            =1 {1 subcontractor found}
+            other {{{ page.totalCount }} subcontractors found}
+          }</span>
+        </p>
+        <div class="prj-table-wrap">
+          <table class="prj-table">
+            <caption class="prj-visually-hidden" i18n="@@directory.caption">
+              Subcontractors, sortable by code, legal name and last update
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" [attr.aria-sort]="sortState('Code')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('Code')"
+                  >
+                    <ng-container i18n="@@directoryField.code">Code</ng-container>
+                  </button>
+                </th>
+                <th scope="col" [attr.aria-sort]="sortState('LegalName')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('LegalName')"
+                  >
+                    <ng-container i18n="@@directory.colSubcontractor">Subcontractor</ng-container>
+                  </button>
+                </th>
+                <th scope="col" i18n="@@directoryField.trades">Trades</th>
+                <th scope="col" i18n="@@directory.colLocation">Location</th>
+                <th scope="col" i18n="@@directory.primaryContact">Primary contact</th>
+                <th scope="col" i18n="@@project.status">Status</th>
+                <th scope="col" [attr.aria-sort]="sortState('UpdatedAt')">
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="sortByField('UpdatedAt')"
+                  >
+                    <ng-container i18n="@@directory.colUpdated">Updated</ng-container>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of page.items; track item.id) {
+                <tr>
+                  <td>
+                    <code dir="ltr" class="ltr-token">{{ item.code }}</code>
+                  </td>
+                  <td>
+                    <a [routerLink]="['/subcontractors', item.id]"
+                      ><bdi>{{ item.legalName }}</bdi></a
+                    >
+                    @if (item.tradingName) {
+                      <div class="prj-hint">
+                        <bdi>{{ item.tradingName }}</bdi>
+                      </div>
+                    }
+                    @if (item.history; as history) {
+                      <app-directory-history [history]="history" />
+                    }
+                  </td>
+                  <td>
+                    @for (trade of item.trades; track trade.id) {
+                      <span class="prj-chip" [class.prj-chip--Cancelled]="!trade.isActive"
+                        ><bdi>{{ trade.name }}</bdi></span
+                      >
+                      &ngsp;
+                    } @empty {
+                      —
+                    }
+                  </td>
+                  <td>
+                    {{ location(item) || '—' }}
+                  </td>
+                  <td>
+                    <bdi>{{ item.primaryContactName || '—' }}</bdi>
+                  </td>
+                  <td>
+                    <span class="prj-chip prj-chip--{{ item.status }}">{{
+                      statusLabel(item.status)
+                    }}</span>
+                  </td>
+                  <td>{{ item.updatedAtUtc | businessDate: 'instant' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (page.totalPages > 1) {
+          <nav
+            class="prj-pager"
+            aria-label="Subcontractor pages"
+            i18n-aria-label="@@directory.pages"
+          >
+            <span>
+              <span i18n="@@common.pageOf"
+                >Page <bdi dir="ltr">{{ page.page }}</bdi> of
+                <bdi dir="ltr">{{ page.totalPages }}</bdi></span
+              >
+              ·
+              <span i18n="@@directory.count">{page.totalCount, plural,
+                =1 {1 subcontractor}
+                other {{{ page.totalCount }} subcontractors}
+              }</span>
+            </span>
+            <span class="prj-actions">
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="page.page <= 1"
+                (click)="goToPage(page.page - 1)"
+                i18n="@@common.previous"
+              >
+                Previous
+              </button>
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="page.page >= page.totalPages"
+                (click)="goToPage(page.page + 1)"
+                i18n="@@common.next"
+              >
+                Next
+              </button>
+            </span>
+          </nav>
+        }
+      }
+    }
+  </div>
+</section>

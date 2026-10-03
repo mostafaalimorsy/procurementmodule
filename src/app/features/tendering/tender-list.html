@@ -1,0 +1,174 @@
+<section class="prj-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@tenders.eyebrow">Tendering &amp; invitations</p>
+      <h1 i18n="@@tenders.listTitle">Tenders</h1>
+      <p i18n="@@tenders.listIntro">
+        RFQs and RFPs sent to approved shortlists. A tender starts from a work package whose
+        shortlist is approved in Sourcing.
+      </p>
+    </div>
+    <div class="prj-actions">
+      <a class="prj-btn prj-btn--ghost" routerLink="/sourcing" i18n="@@tenders.fromShortlist"
+        >Start from an approved shortlist</a
+      >
+      <a
+        class="prj-btn prj-btn--ghost"
+        routerLink="/tenders/templates"
+        i18n="@@tenders.templatesLink"
+        >Templates</a
+      >
+    </div>
+  </div>
+
+  <form class="prj-filters" role="search" (ngSubmit)="applyFilter()">
+    <div class="prj-field prj-field--grow">
+      <label for="tender-search" i18n="@@tenders.search">Search reference or title</label>
+      <input id="tender-search" name="search" type="search" [(ngModel)]="search" />
+    </div>
+    <div class="prj-field">
+      <label for="tender-stage" i18n="@@tenders.filterStage">Stage</label>
+      <select id="tender-stage" name="stage" [(ngModel)]="stage" (change)="applyFilter()">
+        <option value="" i18n="@@sourcing.filterAll">All</option>
+        @for (option of stages; track option) {
+          <option [value]="option">{{ stepLabel(option) }}</option>
+        }
+      </select>
+    </div>
+    <button class="prj-btn prj-btn--ghost" type="submit" i18n="@@common.search">Search</button>
+  </form>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+
+  @if (loading()) {
+    <p class="prj-note" i18n="@@tenders.loadingList">Loading tenders…</p>
+  } @else if (result(); as page) {
+    @if (page.items.length === 0) {
+      <div class="prj-empty">
+        @if (stage || search) {
+          <h2 i18n="@@tenders.filteredEmptyTitle">No tender matches this search</h2>
+          <p i18n="@@tenders.filteredEmptyStage">Change the search or stage to see more.</p>
+        } @else {
+          <h2 i18n="@@tenders.emptyTitle">No tender yet</h2>
+          <p i18n="@@tenders.emptyBody">
+            Approve a shortlist in Sourcing, then create an RFQ or RFP from it for the approved
+            subcontractors.
+          </p>
+          <a class="prj-btn" routerLink="/sourcing" i18n="@@tenders.goToSourcing">Go to sourcing</a>
+        }
+      </div>
+    } @else {
+      <div class="prj-table-wrap" role="region" aria-labelledby="tenders-caption" tabindex="0">
+        <table class="prj-table tnd-table">
+          <caption id="tenders-caption" class="prj-visually-hidden" i18n="@@tenders.caption">
+            Tenders
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@tenders.colReference">Reference</th>
+              <th scope="col" i18n="@@tenders.colTender">Tender</th>
+              <th scope="col" i18n="@@tenders.colStatus">Status</th>
+              <th scope="col" i18n="@@tenders.colDeadlineTenderTime">Deadline (tender time)</th>
+              <th scope="col" i18n="@@tenders.colInvitations">Invitations</th>
+              <th scope="col" i18n="@@project.updated">Last updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of page.items; track item.id) {
+              <tr>
+                <td>
+                  <a [routerLink]="['/tenders', item.id]"
+                    ><bdi dir="ltr">{{ item.reference }}</bdi></a
+                  >
+                </td>
+                <td>
+                  <bdi>{{ item.title }}</bdi>
+                  <span class="prj-hint tnd-block">
+                    {{ typeLabel(item.type) }} ·
+                    <bdi dir="ltr">{{ item.workPackage.projectCode }}</bdi> /
+                    <bdi dir="ltr">{{ item.workPackage.code }}</bdi>
+                  </span>
+                </td>
+                <td>
+                  <span class="prj-chip tnd-status tnd-status--{{ item.status }}">{{
+                    item.lifecycle || item.stage
+                      ? stepLabel(item.lifecycle || item.stage)
+                      : statusLabel(item.status)
+                  }}</span>
+                  @if (item.publishRequestedAtUtc && item.status === 'Draft') {
+                    <span class="prj-chip tnd-block" i18n="@@tenders.readyChip"
+                      >Ready to publish</span
+                    >
+                  }
+                  @if (item.deadlineState && item.stage === 'OpenForBids') {
+                    <span class="prj-hint tnd-block">{{ deadlineLabel(item.deadlineState) }}</span>
+                  }
+                </td>
+                <!-- Red-team B-098-1 (CF-098): the deadline in the tender's own zone, as on the tender page and in the emails; the UTC instant on hover. -->
+                <td
+                  [attr.title]="
+                    item.submissionDeadlineUtc
+                      ? (item.submissionDeadlineUtc | businessDate: 'instant')
+                      : null
+                  "
+                >
+                  {{ deadline(item) }}
+                </td>
+                <td>
+                  <span i18n="@@tenders.rowCounts"
+                    >Invited: {{ item.invitationCount }} · Intend to bid, not yet submitted:
+                    {{ item.intendsToBidCount }} · Declined: {{ item.declinedCount }}</span
+                  >
+                  @if (item.failedDeliveryCount > 0) {
+                    <span class="tnd-attention tnd-block"
+                      ><span aria-hidden="true">⚠</span>&ngsp;<ng-container
+                        i18n="@@tenders.rowFailed"
+                        >Failed emails: {{ item.failedDeliveryCount }}</ng-container
+                      ></span
+                    >
+                  }
+                </td>
+                <td>{{ item.updatedAtUtc | businessDate: 'instant' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (page.totalPages > 1) {
+        <nav class="prj-pager" aria-label="Tender pages" i18n-aria-label="@@tenders.pages">
+          <span i18n="@@common.pageOf"
+            >Page <bdi dir="ltr">{{ page.page }}</bdi> of
+            <bdi dir="ltr">{{ page.totalPages }}</bdi></span
+          >
+          <span class="prj-actions">
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page <= 1"
+              (click)="goToPage(page.page - 1)"
+              i18n="@@common.previous"
+            >
+              Previous
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="page.page >= page.totalPages"
+              (click)="goToPage(page.page + 1)"
+              i18n="@@common.next"
+            >
+              Next
+            </button>
+          </span>
+        </nav>
+      }
+    }
+  }
+</section>

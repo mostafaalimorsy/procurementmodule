@@ -1,0 +1,316 @@
+<div class="pack">
+  @if (error()) {
+    <p class="prj-error-text" role="alert">{{ error() }}</p>
+  } @else if (pack(); as item) {
+    <div class="pack-actions" data-print="hide">
+      <a
+        class="prj-btn prj-btn--ghost"
+        [routerLink]="['/tenders', tenderId, 'decision']"
+        i18n="@@pack.back"
+        >Back to the decision</a
+      >
+      <button class="prj-btn" type="button" (click)="print()" i18n="@@pack.print">
+        Print or save as PDF
+      </button>
+    </div>
+    @if (watermark(item.state); as mark) {
+      <p class="pack-watermark" role="note">{{ mark }}</p>
+    }
+
+    <header class="pack-header">
+      <p class="pack-company">
+        <bdi>{{ item.header.companyName }}</bdi>
+      </p>
+      <h1>
+        <span i18n="@@pack.title">Decision and award pack</span> ·
+        <bdi dir="ltr">{{ item.header.tenderReference }}</bdi>
+      </h1>
+      <p>
+        <bdi>{{ item.header.tenderTitle }}</bdi>
+      </p>
+      <dl class="pack-facts">
+        <div>
+          <dt i18n="@@pack.state">State</dt>
+          <dd>{{ stateLabel(item.state) }}</dd>
+        </div>
+        <div>
+          <dt i18n="@@pack.tenderRevision">Tender revision</dt>
+          <dd>
+            <bdi dir="ltr">{{ item.header.tenderRevision }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@pack.generated">Generated</dt>
+          <dd>
+            <bdi>{{ item.header.generatedByName }}</bdi> ·
+            {{ item.header.generatedAtUtc | businessDate: 'instant' }}
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@pack.decisionVersion">Decision version</dt>
+          <dd>
+            <bdi dir="ltr" class="pack-hash">{{ item.header.decisionVersion ?? '—' }}</bdi>
+          </dd>
+        </div>
+        <div>
+          <dt i18n="@@pack.openingFingerprint">Opening evidence (SHA-256)</dt>
+          <dd>
+            <bdi dir="ltr" class="pack-hash">{{ item.header.openingFingerprint }}</bdi>
+          </dd>
+        </div>
+        @if (item.header.recommendationFingerprint) {
+          <div>
+            <dt i18n="@@pack.recommendationFingerprint">Recommendation evidence (SHA-256)</dt>
+            <dd>
+              <bdi dir="ltr" class="pack-hash">{{ item.header.recommendationFingerprint }}</bdi>
+            </dd>
+          </div>
+        }
+        @if (item.header.baselineFingerprint) {
+          <div>
+            <dt i18n="@@pack.baselineFingerprint">Award baseline (SHA-256)</dt>
+            <dd>
+              <bdi dir="ltr" class="pack-hash">{{ item.header.baselineFingerprint }}</bdi>
+            </dd>
+          </div>
+        }
+      </dl>
+    </header>
+    <!-- Red-team G073 (CF-057 AC5): the file of record says the shortlist went through the low-value fast path. -->
+    <app-shortlist-basis [basis]="item.decision.shortlistBasis" />
+
+    <section aria-labelledby="pack-bids">
+      <h2 id="pack-bids" i18n="@@pack.bidsOpened">Bids opened</h2>
+      <table class="pack-table">
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@pack.colPosition">#</th>
+            <th scope="col" i18n="@@pack.colFirm">Firm</th>
+            <th scope="col" i18n="@@pack.colBid">Bid reference</th>
+            <th scope="col" i18n="@@pack.colRevision">Revision opened / in force</th>
+            <th scope="col" i18n="@@pack.colFingerprint">Content (SHA-256)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (bid of item.openedBids; track bid.position) {
+            <tr>
+              <td>
+                <bdi dir="ltr">{{ bid.position }}</bdi>
+              </td>
+              <td>
+                <bdi dir="ltr">{{ bid.subcontractorCode }}</bdi> ·
+                <bdi>{{ bid.subcontractorName }}</bdi>
+                @if (bid.withdrawnAfterOpening) {
+                  <small class="tnd-block" i18n="@@pack.withdrawn">Withdrawn after opening</small>
+                }
+              </td>
+              <td>
+                <bdi dir="ltr">{{ bid.bidReference }}</bdi>
+              </td>
+              <td>
+                <bdi dir="ltr">{{ bid.revisionNumber }} / {{ bid.currentRevisionNumber }}</bdi>
+              </td>
+              <td>
+                <bdi dir="ltr" class="pack-hash">{{ bid.contentSha256 }}</bdi>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    @if (item.decision.recommendation; as rec) {
+      <section aria-labelledby="pack-recommendation">
+        <h2 id="pack-recommendation" i18n="@@pack.recommendation">
+          Recommendation {{ rec.number }}
+        </h2>
+        <p>
+          <bdi>{{ rec.policyName }}</bdi> ·
+          <span i18n="@@pack.policyVersion">version {{ rec.policyVersionNumber }}</span>
+        </p>
+        <app-criteria-flag
+          [declaration]="rec.criteriaDeclaration ?? 'notDeclared'"
+          [declaredPolicyName]="rec.declaredPolicyName ?? null"
+          [declaredPolicyVersionNumber]="rec.declaredPolicyVersionNumber ?? null"
+          [deviationReason]="rec.criteriaDeviationReason ?? null"
+          [evaluationDeviated]="rec.evaluationCriteriaDeviated ?? false"
+        />
+        <table class="pack-table">
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@pack.colRank">Rank</th>
+              <th scope="col" i18n="@@pack.colFirm">Firm</th>
+              <th scope="col" i18n="@@pack.colLeveled">Leveled total</th>
+              <th scope="col" i18n="@@pack.colScore">Total score</th>
+              <th scope="col" i18n="@@pack.colFlags">Flags</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (candidate of rec.candidates; track candidate.openingBidId) {
+              <tr>
+                <td>
+                  <bdi dir="ltr">{{ candidate.rank ?? '—' }}</bdi>
+                </td>
+                <td>
+                  <bdi dir="ltr">{{ candidate.subcontractorCode }}</bdi> ·
+                  <bdi>{{ candidate.subcontractorName }}</bdi>
+                </td>
+                <td>
+                  <bdi dir="ltr">{{ money(candidate.leveledTotal, rec.currency) }}</bdi>
+                </td>
+                <td>
+                  <bdi dir="ltr">{{ candidate.total ?? '—' }}</bdi>
+                </td>
+                <td>
+                  @for (flag of candidate.flags; track flag) {
+                    <span class="tnd-block">{{ flagLabel(flag) }}</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+
+    @if (item.decision.currentSubmission; as decision) {
+      <section aria-labelledby="pack-decision">
+        <h2 id="pack-decision" i18n="@@pack.decision">Decision (version {{ decision.number }})</h2>
+        <dl class="pack-facts">
+          <div>
+            <dt i18n="@@pack.proposed">Proposed firm</dt>
+            <dd>
+              <bdi dir="ltr">{{ decision.subcontractorCode }}</bdi> ·
+              <bdi>{{ decision.subcontractorName }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@pack.awardValue">Award value</dt>
+            <dd>
+              <bdi dir="ltr">{{ money(decision.awardValue, decision.currency) }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@pack.outcome">Outcome</dt>
+            <dd>{{ outcomeLabel(decision.outcome) }}</dd>
+          </div>
+          @if (decision.isOverride) {
+            <div>
+              <dt i18n="@@pack.override">Override of the recommendation</dt>
+              <dd>
+                <bdi>{{ decision.overrideReason }}</bdi>
+              </dd>
+            </div>
+          }
+          @if (decision.valueReason) {
+            <div>
+              <dt i18n="@@pack.valueReason">Value adjustment reason</dt>
+              <dd>
+                <bdi>{{ decision.valueReason }}</bdi>
+              </dd>
+            </div>
+          }
+          @if (decision.rationale) {
+            <div>
+              <dt i18n="@@pack.rationale">Rationale</dt>
+              <dd>
+                <bdi>{{ decision.rationale }}</bdi>
+              </dd>
+            </div>
+          }
+        </dl>
+        <h3 i18n="@@pack.dispositions">Every bid</h3>
+        <ul role="list">
+          @for (item of decision.dispositions; track item.openingBidId) {
+            <li>
+              <bdi dir="ltr">{{ item.subcontractorCode }}</bdi> ·
+              {{ dispositionLabel(item.disposition, item.reserveRank) }}
+              @if (item.reason) {
+                · <bdi>{{ item.reason }}</bdi>
+              }
+            </li>
+          }
+        </ul>
+        <h3 i18n="@@pack.approvalTrail">Approval trail</h3>
+        <table class="pack-table">
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@pack.colStep">Step</th>
+              <th scope="col" i18n="@@pack.colRole">Role</th>
+              <th scope="col" i18n="@@pack.colAction">Action</th>
+              <th scope="col" i18n="@@pack.colBy">By</th>
+              <th scope="col" i18n="@@pack.colAt">When</th>
+              <th scope="col" i18n="@@pack.colComment">Comment</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (action of decision.actions; track action.id) {
+              <tr>
+                <td>
+                  <bdi dir="ltr">{{ action.step ?? '—' }}</bdi>
+                </td>
+                <td>{{ action.actorRoles }}</td>
+                <td>{{ actionLabel(action.kind) }}</td>
+                <td>
+                  <bdi>{{ action.actorName }}</bdi>
+                </td>
+                <td>{{ action.actedAtUtc | businessDate: 'instant' }}</td>
+                <td>
+                  <bdi>{{ action.comment ?? '' }}</bdi>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" i18n="@@pack.noApprovals">No approval action yet.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+
+    @if (item.decision.award; as award) {
+      <section aria-labelledby="pack-award">
+        <h2 id="pack-award" i18n="@@pack.award">Award baseline</h2>
+        <dl class="pack-facts">
+          <div>
+            <dt i18n="@@pack.awardedFirm">Awarded firm</dt>
+            <dd>
+              <bdi dir="ltr">{{ award.subcontractorCode }}</bdi> ·
+              <bdi>{{ award.subcontractorName }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@pack.awardValue">Award value</dt>
+            <dd>
+              <bdi dir="ltr">{{ money(award.awardValue, award.currency) }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@pack.awardedAt">Awarded</dt>
+            <dd>
+              <bdi>{{ award.awardedByName }}</bdi> ·
+              {{ award.awardedAtUtc | businessDate: 'instant' }}
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@pack.duration">Proposed duration (days)</dt>
+            <dd>
+              <bdi dir="ltr">{{ award.baseline.durationDays ?? '—' }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@pack.bidRevision">Bid revision</dt>
+            <dd>
+              <bdi dir="ltr"
+                >{{ award.baseline.bidReference }} · {{ award.baseline.bidRevisionNumber }}</bdi
+              >
+            </dd>
+          </div>
+        </dl>
+      </section>
+    }
+  } @else {
+    <p class="prj-hint" i18n="@@common.loading">Loading…</p>
+  }
+</div>

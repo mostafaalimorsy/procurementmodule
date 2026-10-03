@@ -1,0 +1,93 @@
+@use 'decision-common';
+
+// ---- split view: policy list and detail (also used by the approval matrix) ---------------
+
+.dc-split {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 64rem) {
+  .dc-split {
+    grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.dc-list-nav ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-list-nav__item {
+  inline-size: 100%;
+  min-block-size: var(--touch-target);
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-inline-start: 3px solid transparent;
+  border-radius: 3px;
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.dc-list-nav__item.is-active {
+  border-inline-start-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.dc-list-nav__item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.dc-detail {
+  min-inline-size: 0;
+}
+
+.dc-short {
+  max-inline-size: 22rem;
+}
+
+.dc-criteria-form {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  min-inline-size: 0;
+}
+
+.dc-criterion {
+  display: grid;
+  gap: 0.25rem 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  padding-block-end: 0.75rem;
+  border-block-end: 1px solid var(--color-border);
+  margin-block-end: 0.75rem;
+}
+
+@media (min-width: 48rem) {
+  .dc-criterion {
+    grid-template-columns: minmax(0, 2fr) minmax(6rem, 0.7fr) auto;
+    align-items: start;
+  }
+}
+
+.dc-criterion .prj-field {
+  margin: 0;
+}
+
+.dc-criterion__actions {
+  align-self: end;
+}
+
+.ev-total {
+  margin-block: 0.75rem;
+  font-weight: 600;
+}

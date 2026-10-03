@@ -1,0 +1,530 @@
+<section class="prj-page">
+  <nav class="prj-crumbs" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+    <a routerLink="/subcontractors" i18n="@@nav.subcontractors">Subcontractors</a
+    ><span aria-hidden="true">/</span><span i18n="@@import.crumb">Import</span>
+  </nav>
+
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@directory.eyebrow">Subcontractor directory</p>
+      <h1 i18n="@@import.title">Import subcontractors</h1>
+      <p i18n="@@import.intro">
+        Add many subcontractors at once from a spreadsheet. The file is checked first and nothing is
+        saved until you confirm. Codes already in your directory are skipped unless you choose to
+        add the details they lack; nothing is ever overwritten.
+      </p>
+    </div>
+    <div class="prj-actions">
+      <a class="prj-btn prj-btn--ghost" [href]="templateUrl" download i18n="@@import.template"
+        >Download CSV template</a
+      >
+    </div>
+  </div>
+
+  @if (step() === 'done' && result(); as done) {
+    <section class="prj-section" aria-labelledby="import-done-heading">
+      <h2 id="import-done-heading" class="imp-heading" i18n="@@import.doneTitle">
+        Import complete
+      </h2>
+      @if (done.counts.update) {
+        <p class="prj-note" role="status" i18n="@@import.doneNoteUpdated">
+          The new subcontractors are in your directory, and existing firms received only the details
+          they lacked.
+        </p>
+      } @else {
+        <p class="prj-note" role="status" i18n="@@import.doneNote">
+          The new subcontractors are in your directory. Existing records were not changed.
+        </p>
+      }
+      <dl class="prj-summary imp-summary">
+        <div>
+          <dt i18n="@@import.countAdded">Added</dt>
+          <dd>{{ done.counts.create | businessNumber }}</dd>
+        </div>
+        @if (done.counts.update) {
+          <div>
+            <dt i18n="@@import.countUpdated">Existing firms completed</dt>
+            <dd>{{ done.counts.update | businessNumber }}</dd>
+          </div>
+        }
+        @if (done.rejected?.length) {
+          <div>
+            <dt i18n="@@import.countRejected">Not imported</dt>
+            <dd>{{ done.rejected?.length | businessNumber }}</dd>
+          </div>
+        }
+        <div>
+          <dt i18n="@@import.countSkipped">Skipped, already in directory</dt>
+          <dd>{{ done.counts.unchanged + done.counts.differs | businessNumber }}</dd>
+        </div>
+      </dl>
+      @if (done.rejected?.length) {
+        <p class="prj-note prj-note--error" i18n="@@import.rejectedNote">
+          Some rows were not imported. Download them as a correction sheet, fix them and import the
+          sheet again.
+        </p>
+        <ul class="tnd-docs" role="list">
+          @for (row of done.rejected; track row.row) {
+            <li>
+              <ng-container i18n="@@import.rejectedRow">Row {{ row.row }}</ng-container>
+              @if (row.code) {
+                · <bdi dir="ltr">{{ row.code }}</bdi>
+              }
+              @for (issue of row.issues; track $index) {
+                @if (issue.severity === 'Error') {
+                  <span class="prj-hint tnd-block">{{ issueText(issue) }}</span>
+                }
+              }
+            </li>
+          }
+        </ul>
+      }
+      <div class="prj-actions imp-actions">
+        @if (done.rejected?.length) {
+          <button
+            class="prj-btn"
+            type="button"
+            [disabled]="downloading()"
+            (click)="downloadCorrections()"
+            i18n="@@import.downloadCorrections"
+          >
+            Download correction sheet
+          </button>
+        }
+        <a class="prj-btn" routerLink="/subcontractors" i18n="@@import.viewDirectory"
+          >View directory</a
+        >
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          (click)="startOver()"
+          i18n="@@import.another"
+        >
+          Import another file
+        </button>
+      </div>
+    </section>
+  } @else {
+    <section class="prj-section" aria-labelledby="import-file-heading">
+      <h2 id="import-file-heading" class="imp-heading" i18n="@@import.chooseTitle">
+        1. Choose a file
+      </h2>
+      <form class="imp-choose" novalidate (ngSubmit)="check()">
+        <div class="prj-field prj-field--grow">
+          <label for="import-file" i18n="@@import.file">File</label>
+          <input
+            #fileInput
+            id="import-file"
+            name="file"
+            type="file"
+            accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            aria-describedby="import-file-hint"
+            [attr.aria-invalid]="error() && !preview() ? 'true' : null"
+            (change)="choose($event)"
+          />
+          <span id="import-file-hint" class="prj-hint" i18n="@@import.fileHint"
+            >A CSV file saved as UTF-8 (up to {{ maxCsvMegabytes | businessNumber }} MB) or an Excel
+            <bdi dir="ltr">.xlsx</bdi> workbook (up to {{ maxMegabytes | businessNumber }} MB), with
+            at most {{ maxRows | businessNumber }} rows.</span
+          >
+        </div>
+        <fieldset class="prj-fieldset imp-options">
+          <legend i18n="@@import.optionsLegend">How to import</legend>
+          <label class="tnd-choice">
+            <input
+              type="radio"
+              name="mode"
+              [value]="true"
+              [(ngModel)]="validRows"
+              (ngModelChange)="optionsChanged()"
+            />
+            <ng-container i18n="@@import.modeValidRows"
+              >Import the valid rows; return the others for correction</ng-container
+            >
+          </label>
+          <label class="tnd-choice">
+            <input
+              type="radio"
+              name="mode"
+              [value]="false"
+              [(ngModel)]="validRows"
+              (ngModelChange)="optionsChanged()"
+            />
+            <ng-container i18n="@@import.modeAllOrNothing"
+              >Import nothing if any row has an error</ng-container
+            >
+          </label>
+          <label class="tnd-choice">
+            <input
+              type="checkbox"
+              name="updateExisting"
+              [(ngModel)]="updateExisting"
+              (ngModelChange)="optionsChanged()"
+            />
+            <ng-container i18n="@@import.updateExisting"
+              >Add missing details, trades and contacts to firms already in the directory (nothing
+              is overwritten; codes never change)</ng-container
+            >
+          </label>
+          <p class="prj-hint" i18n="@@import.contactsHint">
+            To add more contacts for one firm, repeat its code on further rows with only the contact
+            columns filled in.
+          </p>
+        </fieldset>
+        <div class="prj-actions">
+          <button class="prj-btn" type="submit" [disabled]="!canCheck">
+            @if (step() === 'checking') {
+              <ng-container i18n="@@import.checking">Checking…</ng-container>
+            } @else {
+              <ng-container i18n="@@import.check">Check file</ng-container>
+            }
+          </button>
+          @if (file()) {
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              (click)="startOver(fileInput)"
+              i18n="@@import.clear"
+            >
+              Choose another file
+            </button>
+          }
+        </div>
+      </form>
+
+      <details class="imp-guide">
+        <summary i18n="@@import.guideTitle">What the file must contain</summary>
+        <p i18n="@@import.guideIntro">
+          The first row names the columns. Only <bdi dir="ltr"><code>code</code></bdi> and
+          <bdi dir="ltr"><code>legal_name</code></bdi> are required; any other column may be left
+          out. Columns with other names are ignored.
+        </p>
+        <p i18n="@@import.guideExcel">
+          In an Excel workbook only the first sheet is read, and each cell is imported as the text
+          it holds. Formulas and macros are not accepted: paste values only, and format registration
+          numbers as text so Excel keeps every digit.
+        </p>
+        <div class="prj-table-wrap">
+          <table class="prj-table">
+            <caption class="prj-visually-hidden" i18n="@@import.guideCaption">
+              Columns the import recognises
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@import.guideColumn">Column</th>
+                <th scope="col" i18n="@@import.guideMeaning">What it holds</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>code</code></bdi>
+                </td>
+                <td i18n="@@import.guideCode">
+                  Required. Your permanent code for the firm. A code already in your directory is
+                  skipped, or only completed when you choose to add missing details. Repeat a code
+                  on further rows to add more contacts.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>legal_name</code></bdi>
+                </td>
+                <td i18n="@@import.guideLegalName">Required. The firm's registered name.</td>
+              </tr>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>commercial_registration</code></bdi
+                  >,
+                  <bdi dir="ltr"><code>tax_registration</code></bdi>
+                </td>
+                <td i18n="@@import.guideRegistration">
+                  Registration numbers. Spaces and dashes are ignored; each number may belong to one
+                  subcontractor only.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>country</code></bdi>
+                </td>
+                <td i18n="@@import.guideCountry">
+                  A two-letter ISO country code, for example <bdi dir="ltr">EG</bdi>.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>trades</code></bdi>
+                </td>
+                <td i18n="@@import.guideTrades">
+                  Your trade codes separated by semicolons, for example
+                  <bdi dir="ltr">HVAC;ELEC</bdi>. Trades must already exist and be active.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>contact_name</code></bdi
+                  >, <bdi dir="ltr"><code>contact_email</code></bdi
+                  >,
+                  <bdi dir="ltr"><code>contact_phone</code></bdi>
+                </td>
+                <td i18n="@@import.guideContact">
+                  A contact for the firm; the first one is the primary contact.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <bdi dir="ltr"><code>trading_name</code></bdi
+                  >, <bdi dir="ltr"><code>city</code></bdi
+                  >, <bdi dir="ltr"><code>notes</code></bdi>
+                </td>
+                <td i18n="@@import.guideOther">Optional details, as on the subcontractor form.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    @if (error()) {
+      <div class="prj-note prj-note--error" role="alert">
+        <p class="imp-flush">{{ error() }}</p>
+        @if (recheck()) {
+          <button
+            class="prj-btn prj-btn--ghost imp-inline"
+            type="button"
+            (click)="check()"
+            i18n="@@import.recheck"
+          >
+            Check the file again
+          </button>
+        }
+      </div>
+    }
+
+    @if (preview(); as preview) {
+      <section class="prj-section" aria-labelledby="import-review-heading">
+        <h2 id="import-review-heading" class="imp-heading" i18n="@@import.reviewTitle">
+          2. Review before importing
+        </h2>
+        <dl class="prj-summary imp-summary">
+          <div>
+            <dt i18n="@@import.countRows">Rows in file</dt>
+            <dd>{{ preview.counts.rows | businessNumber }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@import.countCreate">Will be added</dt>
+            <dd>{{ preview.counts.create | businessNumber }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@import.countExisting">Already in directory</dt>
+            <dd>{{ preview.counts.unchanged + preview.counts.differs | businessNumber }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@import.countDiffers">Of which differ</dt>
+            <dd>{{ preview.counts.differs | businessNumber }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@import.countDuplicates">Possible duplicates</dt>
+            <dd>{{ duplicates() | businessNumber }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@import.countErrors">Rows with errors</dt>
+            <dd [class.imp-bad]="preview.counts.errors > 0">
+              {{ preview.counts.errors | businessNumber }}
+            </dd>
+          </div>
+        </dl>
+
+        <p class="imp-capacity">
+          <ng-container i18n="@@import.placesNeeded"
+            >Directory places needed:
+            {{ preview.capacity.required | businessNumber }}.</ng-container
+          >
+          @if (remaining() !== null) {
+            {{ ' ' }}
+            <ng-container i18n="@@import.placesLeft"
+              >Places left in your plan: {{ remaining() | businessNumber }}.</ng-container
+            >
+          }
+        </p>
+
+        @if (preview.fileIssues.length) {
+          <ul class="imp-issues imp-file-issues">
+            @for (issue of preview.fileIssues; track $index) {
+              <li>{{ issueText(issue) }}</li>
+            }
+          </ul>
+        }
+
+        @switch (blocker()) {
+          @case ('errors') {
+            <p class="prj-note prj-note--error" id="import-blocker" i18n="@@import.blockedErrors">
+              Nothing can be imported while any row has an error. Correct the file, then check it
+              again.
+            </p>
+          }
+          @case ('capacity') {
+            <p class="prj-note prj-note--error" id="import-blocker" i18n="@@import.blockedCapacity">
+              This file would add more subcontractors than your plan allows. Import fewer rows or
+              ask your platform operator to change the plan.
+            </p>
+          }
+          @case ('nothing') {
+            <p class="prj-note" id="import-blocker" i18n="@@import.blockedNothing">
+              No row in this file adds a new subcontractor.
+            </p>
+          }
+        }
+
+        <div class="prj-actions imp-actions">
+          <button
+            class="prj-btn"
+            type="button"
+            [disabled]="!preview.canConfirm || step() === 'confirming'"
+            [attr.aria-describedby]="blocker() ? 'import-blocker' : null"
+            (click)="askConfirm()"
+            i18n="@@import.confirm"
+          >
+            Import subcontractors
+          </button>
+        </div>
+
+        <div
+          class="imp-filters"
+          role="group"
+          aria-label="Show rows"
+          i18n-aria-label="@@import.show"
+        >
+          @for (option of filters(); track option.value) {
+            <button
+              type="button"
+              class="prj-btn prj-btn--ghost imp-filter"
+              [attr.aria-pressed]="filter() === option.value"
+              (click)="setFilter(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+
+        @if (filtered().length) {
+          <div class="prj-table-wrap">
+            <table class="prj-table imp-table">
+              <caption class="prj-visually-hidden" i18n="@@import.rowsCaption">
+                What the import will do with each row
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="prj-numeric" i18n="@@import.colRow">Row</th>
+                  <th scope="col" i18n="@@directory.colCode">Code</th>
+                  <th scope="col" i18n="@@directoryField.legalName">Legal name</th>
+                  <th scope="col" i18n="@@import.colResult">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of visible(); track row.row) {
+                  <tr [class.imp-has-details]="row.issues.length || row.differingFields.length">
+                    <td class="prj-numeric">{{ row.row | businessNumber }}</td>
+                    <td>
+                      @if (row.code) {
+                        <bdi dir="ltr"
+                          ><code>{{ row.code }}</code></bdi
+                        >
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td>
+                      <bdi>{{ row.legalName || '—' }}</bdi>
+                    </td>
+                    <td>
+                      <span class="prj-chip imp-kind imp-kind--{{ kind(row) }}">{{
+                        kindLabel(kind(row))
+                      }}</span>
+                    </td>
+                  </tr>
+                  <!-- Details span the whole row, so they stay readable on a phone. -->
+                  @if (row.issues.length || row.differingFields.length) {
+                    <tr class="imp-details">
+                      <td colspan="4">
+                        @if (row.issues.length) {
+                          <ul class="imp-issues">
+                            @for (issue of row.issues; track $index) {
+                              <li [class.imp-bad]="issue.severity === 'Error'">
+                                @if (issue.column) {
+                                  <bdi dir="ltr"
+                                    ><code>{{ issue.column }}</code></bdi
+                                  ><span aria-hidden="true">: </span>
+                                }
+                                {{ issueText(issue) }}
+                              </li>
+                            }
+                          </ul>
+                        }
+                        @if (row.addedFields?.length) {
+                          <p class="imp-flush prj-hint" i18n="@@import.addedIn">
+                            Will add {{ added(row) }} to the existing record.
+                          </p>
+                        }
+                        @if (row.differingFields.length) {
+                          <p class="imp-flush prj-hint" i18n="@@import.differsIn">
+                            The directory holds different {{ differing(row) }}. It will not be
+                            changed.
+                          </p>
+                        }
+                      </td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (pages() > 1) {
+            <nav class="prj-pager" aria-label="Rows" i18n-aria-label="@@import.pager">
+              <span i18n="@@import.pageOf"
+                >Page {{ page() | businessNumber }} of {{ pages() | businessNumber }}</span
+              >
+              <div class="prj-actions">
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="page() === 1"
+                  (click)="page.set(page() - 1)"
+                  i18n="@@common.previous"
+                >
+                  Previous
+                </button>
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  [disabled]="page() === pages()"
+                  (click)="page.set(page() + 1)"
+                  i18n="@@common.next"
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
+          }
+        } @else {
+          <p class="prj-hint" i18n="@@import.noRowsInFilter">No rows match this view.</p>
+        }
+      </section>
+    }
+  }
+
+  @if (confirmOpen() && preview(); as preview) {
+    <app-confirm-dialog
+      [heading]="confirmHeading"
+      [confirmLabel]="confirmLabel"
+      [busy]="step() === 'confirming'"
+      (confirmed)="confirm()"
+      (cancelled)="confirmOpen.set(false)"
+    >
+      <p i18n="@@import.confirmBody">
+        New subcontractors to add: {{ preview.capacity.required | businessNumber }}. Rows already in
+        the directory are skipped. The file is checked again as it is imported.
+      </p>
+    </app-confirm-dialog>
+  }
+</section>

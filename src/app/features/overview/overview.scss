@@ -1,0 +1,142 @@
+.eyebrow {
+  color: var(--color-accent);
+  letter-spacing: 0.13em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-block-end: 1.5rem;
+}
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  max-inline-size: 54rem;
+  margin: 0;
+}
+.intro {
+  margin-block: 1.5rem 3rem;
+  color: var(--color-muted);
+  max-inline-size: 38rem;
+  font-size: 1.05rem;
+}
+h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+.workspace-note {
+  display: flex;
+  gap: 1.5rem;
+  border-block-start: 2px solid var(--color-ink);
+  padding-block: 1.6rem 2.5rem;
+  max-inline-size: 52rem;
+}
+/* Number and separator follow the reading direction, so the slash always points at the step. */
+.section-number {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 1ch;
+  color: var(--color-accent);
+  font-family: var(--font-code);
+  white-space: nowrap;
+}
+.workspace-note p {
+  max-inline-size: 36rem;
+  color: var(--color-muted);
+  margin-block: 0.7rem 0;
+}
+.workspace-action {
+  display: inline-block;
+  margin-block-start: 0.4rem;
+  color: var(--color-accent);
+  font-weight: 650;
+}
+.route-notice {
+  max-inline-size: 52rem;
+  margin-block: 0 1.5rem;
+  padding: 0.9rem 1rem;
+  border-inline-start: 3px solid var(--color-accent);
+  background: var(--color-surface);
+}
+.connectivity {
+  max-inline-size: 52rem;
+  border: 1px solid var(--color-border);
+  padding: clamp(1rem, 3vw, 1.6rem);
+  background: var(--color-surface);
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+button {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.65rem 1rem;
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  min-block-size: 2.75rem;
+}
+button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+button:disabled {
+  cursor: wait;
+  color: var(--color-muted);
+}
+dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-block: 1.5rem 0;
+  gap: 1.5rem;
+}
+dl > div {
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--color-border);
+}
+dt {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-block-end: 0.5rem;
+}
+dd {
+  margin: 0;
+}
+.connection-help {
+  margin-block: 1.5rem 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+@media (max-width: 30rem) {
+  dl {
+    grid-template-columns: 1fr;
+  }
+  .workspace-note {
+    gap: 1rem;
+  }
+}
+
+/* CF-100 (ADR-160): the collapsed service check — its heading is the disclosure's label. */
+.connectivity > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.connectivity > summary::-webkit-details-marker {
+  display: none;
+}
+
+.connectivity > summary h2 {
+  display: inline;
+}
+
+.connectivity > summary h2::after {
+  content: ' ▾';
+  font-size: 0.75em;
+}

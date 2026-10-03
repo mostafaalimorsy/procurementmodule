@@ -1,0 +1,72 @@
+import { Bid, BidderInvitation, EMPTY_BID } from './bidder.api';
+
+/** Shared by the English and Arabic workspace specs. */
+export function invitationView(overrides: Partial<BidderInvitation> = {}): BidderInvitation {
+  return {
+    buyerCompanyName: 'Delta Construction',
+    reference: 'TND-2026-0001',
+    type: 'Rfq',
+    title: 'HVAC installation',
+    projectName: 'Tower One',
+    workPackageCode: 'HVAC-01',
+    workPackageTitle: 'HVAC works',
+    scopeInstructions: 'Supply and install.',
+    currency: 'QAR',
+    bidValidityDays: 90,
+    technicalProposalRequired: true,
+    durationRequired: true,
+    pricing: null,
+    terms: null,
+    requiredDocuments: ['Priced BOQ'],
+    submissionInstructions: null,
+    submissionDeadline: {
+      utc: '2099-10-15T11:00:00Z',
+      local: '2099-10-15T14:00',
+      offset: '+03:00',
+    },
+    questionsDeadline: null,
+    timeZoneId: 'Asia/Qatar',
+    contactName: 'Maha Manager',
+    contactEmail: 'maha@delta.example',
+    contactPhone: null,
+    documents: [],
+    revision: 1,
+    publishedAtUtc: '2026-10-01T09:00:00Z',
+    state: 'Open',
+    subcontractorName: 'Acme Mechanical',
+    recipientName: 'Rana Estimator',
+    invitationStatus: 'BidStarted',
+    declineReason: null,
+    canRespond: true,
+    buyerPreview: false,
+    bid: null,
+    hasBuyerLogo: false,
+    canBid: true,
+    ...overrides,
+  };
+}
+
+export function bidView(overrides: Partial<Bid> = {}): Bid {
+  return {
+    reference: 'BID-7K4Q-M2XD',
+    status: 'Draft',
+    currency: 'QAR',
+    currencyDecimals: 2,
+    tenderRevision: 1,
+    draft: EMPTY_BID,
+    draftVersion: 'v1',
+    startedAtUtc: '2026-10-02T08:00:00Z',
+    draftSavedAtUtc: null,
+    attachments: [],
+    gaps: [{ key: 'totalAmount', index: null }],
+    canEdit: true,
+    receipt: null,
+    submitted: null,
+    submittedAttachments: [],
+    maxAttachments: 20,
+    maxAttachmentBytes: 26214400,
+    maxTotalAttachmentBytes: 209715200,
+    allowedExtensions: ['.pdf', '.docx', '.xlsx', '.png', '.jpg'],
+    ...overrides,
+  };
+}

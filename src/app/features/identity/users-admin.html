@@ -1,0 +1,511 @@
+<nav class="breadcrumb" aria-label="Breadcrumb" i18n-aria-label="@@a11y.breadcrumb">
+  <a routerLink="/" i18n="@@nav.workspace">Workspace</a><span aria-hidden="true">/</span
+  ><span i18n="@@users.crumb">Users</span>
+</nav>
+
+<header class="page-heading">
+  <div>
+    <p class="eyebrow" i18n="@@users.eyebrow">Company administration</p>
+    <h1 i18n="@@users.title">People & access</h1>
+    <p i18n="@@users.intro">
+      Invite internal users, assign predefined roles, and control account access.
+    </p>
+  </div>
+  <div class="scope-note">
+    <span i18n="@@users.scope">Company scope</span>
+    <strong>
+      @if (session.identity()?.companyName; as companyName) {
+        <bdi>{{ companyName }}</bdi>
+      } @else {
+        <ng-container i18n="@@users.currentCompany">Current company</ng-container>
+      }
+    </strong>
+  </div>
+</header>
+
+@if (error()) {
+  <p role="alert" class="message error">{{ error() }}</p>
+}
+@if (notice()) {
+  <p role="status" class="message notice">{{ notice() }}</p>
+}
+
+@if (can(permissions.usersInvite)) {
+  <section class="invite-panel" aria-labelledby="invite-title">
+    <div>
+      <p class="section-index" aria-hidden="true">
+        <bdi dir="ltr">01</bdi> / <span i18n="@@users.inviteIndex">INVITE</span>
+      </p>
+      <h2 id="invite-title" i18n="@@users.inviteTitle">Add an internal user</h2>
+      <p class="invite-help" i18n="@@users.inviteHelpAllowList">
+        The email must match one of your company’s allowed domains or named addresses. The user
+        receives a one-time link and sets their own password.
+      </p>
+      @if (allowList(); as list) {
+        <!-- Red-team B-115-2 (CF-115 AC6): the allow-list, read only — no control changes it here. -->
+        <section class="allow-list" aria-labelledby="allow-list-title" data-testid="allow-list">
+          <h3 id="allow-list-title" i18n="@@users.allowList">Your company’s allow-list</h3>
+          <dl class="prj-summary">
+            <div>
+              <dt i18n="@@users.allowListDomains">Allowed domains</dt>
+              <dd>
+                @if (list.domains.length) {
+                  <ul role="list">
+                    @for (domain of list.domains; track domain) {
+                      <li>
+                        <bdi dir="ltr">{{ domain }}</bdi>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <span i18n="@@users.allowListNone">None</span>
+                }
+              </dd>
+            </div>
+            <div>
+              <dt i18n="@@users.allowListAddresses">Named addresses</dt>
+              <dd>
+                @if (list.addresses.length) {
+                  <ul role="list">
+                    @for (address of list.addresses; track address) {
+                      <li>
+                        <bdi dir="ltr">{{ address }}</bdi>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <span i18n="@@users.allowListNone">None</span>
+                }
+              </dd>
+            </div>
+          </dl>
+          <p class="prj-hint" i18n="@@users.allowListOwner">
+            Only the platform operator changes this list — ask your account contact.
+          </p>
+        </section>
+      }
+    </div>
+    <form (ngSubmit)="invite()" #inviteForm="ngForm">
+      <label for="invite-name" i18n="@@users.fullName">Full name</label>
+      <input
+        id="invite-name"
+        name="displayName"
+        autocomplete="name"
+        required
+        [(ngModel)]="displayName"
+      />
+      <label for="invite-email" i18n="@@users.companyEmail">Company email</label>
+      <input
+        dir="ltr"
+        class="ltr-token"
+        id="invite-email"
+        name="email"
+        type="email"
+        autocomplete="email"
+        inputmode="email"
+        required
+        [(ngModel)]="email"
+      />
+      <label for="invite-role" i18n="@@users.role">Predefined role</label>
+      <select id="invite-role" name="role" required [(ngModel)]="role">
+        @for (option of roles; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+      @if (atSeatCapacity()) {
+        <p role="status" class="message notice" i18n="@@users.noSeats">
+          Your package has no seats available. Suspend a user or ask your platform operator to
+          change the package before inviting another person.
+        </p>
+      }
+      <button class="primary" [disabled]="inviteForm.invalid || !!busyAction() || atSeatCapacity()">
+        @if (isBusy('invite')) {
+          <span i18n="@@users.sending">Sending…</span>
+        } @else {
+          <span i18n="@@users.sendInvitation">Send secure invitation</span>
+        }
+      </button>
+    </form>
+  </section>
+}
+
+@if (security(); as policy) {
+  <section class="security-panel" aria-labelledby="security-title" data-testid="sign-in-security">
+    <div class="security-intro">
+      <h2 id="security-title" i18n="@@users.securityTitle">Sign-in security</h2>
+      <p i18n="@@users.securityIntro">
+        These roles sign in with a password and an authenticator app. The Company Admin always does.
+        A user in one of them sets up the authenticator at their next sign-in.
+      </p>
+    </div>
+    <form class="security-form" (ngSubmit)="saveSecurity()">
+      <div class="security-settings">
+        <fieldset class="security-group">
+          <legend i18n="@@users.securityLegend">Roles that sign in with an authenticator</legend>
+          <div class="security-roles">
+            @for (role of roles; track role.value) {
+              <label class="security-role">
+                <input
+                  type="checkbox"
+                  [name]="'mfa-' + role.value"
+                  [checked]="
+                    securityRoles().includes(role.value) ||
+                    policy.alwaysRequired.includes(role.value)
+                  "
+                  [disabled]="
+                    policy.alwaysRequired.includes(role.value) || !can(permissions.usersChangeRole)
+                  "
+                  (change)="toggleSecurityRole(role.value, $any($event.target).checked)"
+                />
+                <span
+                  >{{ role.label }}
+                  @if (policy.alwaysRequired.includes(role.value)) {
+                    <small class="prj-hint" i18n="@@users.securityAlways">Always required</small>
+                  }
+                </span>
+              </label>
+            }
+          </div>
+        </fieldset>
+        <fieldset class="security-group">
+          <legend i18n="@@users.securityTimeoutLegend">Session timeout</legend>
+          <label for="idle-minutes" i18n="@@users.idleTimeoutLabel"
+            >Sign out after this many minutes without activity</label
+          >
+          <input
+            id="idle-minutes"
+            name="idleMinutes"
+            type="number"
+            inputmode="numeric"
+            min="15"
+            max="480"
+            aria-describedby="idle-minutes-help"
+            [disabled]="!can(permissions.usersChangeRole)"
+            [(ngModel)]="idleMinutes"
+          />
+          <p id="idle-minutes-help" class="prj-hint" i18n="@@users.idleTimeoutHelp">
+            Between <bdi dir="ltr">15</bdi> and <bdi dir="ltr">480</bdi> minutes. A session with no
+            activity for this long is signed out; no session lasts more than 8 hours after sign-in.
+          </p>
+        </fieldset>
+      </div>
+      @if (can(permissions.usersChangeRole)) {
+        <div class="security-actions">
+          <button
+            id="security-save"
+            type="submit"
+            class="primary"
+            [disabled]="!!busyAction()"
+            i18n="@@users.securitySave"
+          >
+            Save sign-in security
+          </button>
+        </div>
+      }
+    </form>
+  </section>
+}
+
+<section class="users-section" aria-labelledby="users-title" [attr.aria-busy]="loading()">
+  <div class="section-heading">
+    <div>
+      <p class="section-index" aria-hidden="true">
+        <bdi dir="ltr">02</bdi> / <span i18n="@@users.directoryIndex">DIRECTORY</span>
+      </p>
+      <h2 id="users-title" i18n="@@users.directoryTitle">Internal users</h2>
+    </div>
+    <span class="count" i18n="@@users.count">{users().length, plural,
+      =0 {No accounts}
+      =1 {1 account}
+      other {{{ users().length }} accounts}
+    }</span>
+  </div>
+
+  @if (loading()) {
+    <p class="empty" i18n="@@users.loading">Loading users…</p>
+  } @else if (!users().length) {
+    <p class="empty" i18n="@@users.empty">No internal users are available.</p>
+  } @else {
+    <div class="table-scroll">
+      <table>
+        <caption class="visually-hidden" i18n="@@users.caption">
+          Internal users with their status, role and available actions
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" i18n="@@users.colUser">User</th>
+            <th scope="col" i18n="@@users.colStatus">Status</th>
+            <th scope="col" i18n="@@users.colRole">Role</th>
+            <th scope="col">
+              <span class="visually-hidden" i18n="@@users.colActions">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr>
+              <td [attr.data-label]="labels.user">
+                <strong
+                  ><bdi>{{ user.displayName }}</bdi></strong
+                >
+                <small
+                  ><bdi dir="ltr">{{ user.email }}</bdi></small
+                >
+                @if (user.mfaEnrolled) {
+                  <small class="mfa-chip" data-testid="mfa-enrolled" i18n="@@users.mfaEnrolled"
+                    >Authenticator set up</small
+                  >
+                }
+                @if (isSelf(user)) {
+                  <small class="mfa-chip" data-testid="self-row" i18n="@@users.you"
+                    >You — another Company Admin changes your role or access</small
+                  >
+                }
+              </td>
+              <td [attr.data-label]="labels.status">
+                <span
+                  class="status"
+                  [class.invited]="user.status === 'Invited'"
+                  [class.suspended]="user.status === 'Suspended'"
+                  [class.reset]="user.passwordResetRequired"
+                  >{{ statusLabel(user) }}</span
+                >
+                <!-- CF-114 (ADR-157): an invitation says how long its link opens, and an expired one says so. -->
+                @if (invitationExpired(user)) {
+                  <small
+                    class="invitation-expired tnd-block"
+                    data-testid="invitation-expired"
+                    i18n="@@users.invitationExpired"
+                    >Invitation link expired — resend the invitation</small
+                  >
+                } @else if (user.status === 'Invited' && user.invitationExpiresAtUtc) {
+                  <small
+                    class="tnd-block"
+                    data-testid="invitation-valid"
+                    i18n="@@users.invitationValid"
+                    >Link opens until
+                    <bdi>{{ user.invitationExpiresAtUtc | businessDate: 'instant' }}</bdi></small
+                  >
+                }
+                @if (user.status === 'Invited' && user.invitationEmail; as mail) {
+                  <small
+                    class="invitation-mail tnd-block"
+                    [class.invitation-mail--failed]="mail.status === 'Failed'"
+                    [attr.role]="mail.status === 'Failed' ? 'status' : null"
+                    >{{ mailLabel(mail) }}</small
+                  >
+                }
+              </td>
+              <td [attr.data-label]="labels.role">
+                @if (can(permissions.usersChangeRole) && !isSelf(user)) {
+                  <div class="role-control">
+                    <label class="visually-hidden" [for]="'role-' + user.id" i18n="@@users.roleFor"
+                      >Role for <bdi dir="ltr">{{ user.email }}</bdi></label
+                    >
+                    <select
+                      [id]="'role-' + user.id"
+                      [name]="'role-' + user.id"
+                      [(ngModel)]="roleDraft[user.id]"
+                      [disabled]="!!busyAction()"
+                    >
+                      @for (option of roles; track option.value) {
+                        <option [value]="option.value">{{ option.label }}</option>
+                      }
+                    </select>
+                    <fieldset class="extra-roles">
+                      <legend i18n="@@users.alsoHolds">Also holds</legend>
+                      @for (option of additionalOptions(user); track option.value) {
+                        <label class="extra-role">
+                          <input
+                            type="checkbox"
+                            [attr.name]="'extra-' + user.id + '-' + option.value"
+                            [checked]="holdsExtra(user, option.value)"
+                            [disabled]="!!busyAction() || extraLimitReached(user, option.value)"
+                            (change)="toggleExtra(user, option.value, $any($event.target).checked)"
+                          />
+                          {{ option.label }}
+                        </label>
+                      }
+                    </fieldset>
+                    <button
+                      class="compact"
+                      type="button"
+                      [disabled]="!rolesChanged(user) || !!busyAction()"
+                      (click)="saveRole(user)"
+                    >
+                      @if (isBusy('role', user.id)) {
+                        <span i18n="@@common.saving">Saving…</span>
+                      } @else {
+                        <span i18n="@@common.save">Save</span>
+                      }
+                    </button>
+                  </div>
+                } @else {
+                  {{ roleLabel(user.role) }}
+                  @for (extra of user.additionalRoles; track extra) {
+                    <span class="extra-role-chip">+ {{ roleLabel(extra) }}</span>
+                  }
+                }
+              </td>
+              <td [attr.data-label]="labels.actions">
+                <!-- CF-088: no action is offered on one's own row — the server refuses every one of them (user.self_change_forbidden). -->
+                @if (!isSelf(user)) {
+                  <div class="row-actions">
+                    @if (user.status === 'Invited' && can(permissions.usersInvite)) {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="!!busyAction()"
+                        (click)="resendInvitation(user)"
+                      >
+                        @if (isBusy('resend', user.id)) {
+                          <span i18n="@@users.resending">Resending…</span>
+                        } @else {
+                          <span i18n="@@users.resend">Resend invitation</span>
+                        }
+                      </button>
+                      <button
+                        type="button"
+                        class="text-button warning"
+                        [disabled]="!!busyAction()"
+                        (click)="revokeInvitation(user)"
+                      >
+                        @if (isBusy('revoke', user.id)) {
+                          <span i18n="@@users.revoking">Revoking…</span>
+                        } @else {
+                          <span i18n="@@users.revoke">Revoke invitation</span>
+                        }
+                      </button>
+                    }
+                    @if (user.status === 'Active' && can(permissions.usersSuspend)) {
+                      <button
+                        type="button"
+                        class="text-button warning"
+                        [disabled]="!!busyAction()"
+                        (click)="ask('suspend', user)"
+                        i18n="@@users.suspend"
+                      >
+                        Suspend
+                      </button>
+                    }
+                    @if (user.status === 'Suspended' && can(permissions.usersSuspend)) {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="!!busyAction()"
+                        (click)="reactivate(user)"
+                        i18n="@@users.reactivate"
+                      >
+                        Reactivate
+                      </button>
+                    }
+                    <!-- CF-071 (ADR-134): erasure on request, two steps — the account and its audit subject are pseudonymised for good. -->
+                    @if (
+                      user.status === 'Suspended' &&
+                      can(permissions.companyManageData) &&
+                      !erased(user)
+                    ) {
+                      @if (erasing() === user.id) {
+                        <button
+                          type="button"
+                          class="text-button danger"
+                          [disabled]="!!busyAction()"
+                          (click)="erase(user)"
+                          i18n="@@users.confirmErase"
+                        >
+                          Confirm: erase permanently
+                        </button>
+                        <button
+                          type="button"
+                          class="text-button"
+                          (click)="erasing.set(null)"
+                          i18n="@@common.cancel"
+                        >
+                          Cancel
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="text-button"
+                          [disabled]="!!busyAction()"
+                          (click)="erasing.set(user.id)"
+                          i18n="@@users.erase"
+                        >
+                          Erase personal data
+                        </button>
+                      }
+                    }
+                    @if (
+                      user.mfaEnrolled &&
+                      user.status === 'Active' &&
+                      can(permissions.usersResetPassword)
+                    ) {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="!!busyAction()"
+                        (click)="ask('mfa', user)"
+                        i18n="@@users.resetMfa"
+                      >
+                        Reset authenticator
+                      </button>
+                    }
+                    @if (user.status === 'Active' && can(permissions.usersResetPassword)) {
+                      <button
+                        type="button"
+                        class="text-button"
+                        [disabled]="!!busyAction()"
+                        (click)="ask('reset', user)"
+                      >
+                        @if (isBusy('reset', user.id)) {
+                          <span i18n="@@users.issuing">Issuing…</span>
+                        } @else {
+                          <span i18n="@@users.forceReset">Force password reset</span>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+<app-company-plan-panel [plan]="plan()" />
+
+@if (pending(); as action) {
+  <app-confirm-dialog
+    [heading]="pendingHeading(action.kind)"
+    [confirmLabel]="pendingHeading(action.kind)"
+    [danger]="action.kind === 'suspend'"
+    [busy]="!!busyAction()"
+    (confirmed)="confirmPending()"
+    (cancelled)="pending.set(null)"
+  >
+    <p>
+      <bdi>{{ action.user.displayName }}</bdi> · <bdi dir="ltr">{{ action.user.email }}</bdi>
+    </p>
+    @switch (action.kind) {
+      @case ('suspend') {
+        <p i18n="@@users.suspendIntent">
+          They lose access at once and every session they have ends. You can reactivate them later.
+        </p>
+      }
+      @case ('reset') {
+        <p i18n="@@users.resetIntent">
+          Every session they have ends. They are emailed a link and must set a new password before
+          they can sign in again.
+        </p>
+      }
+      @case ('mfa') {
+        <p i18n="@@users.mfaIntent">
+          Every session they have ends. They set up a new authenticator at their next sign-in.
+        </p>
+      }
+    }
+  </app-confirm-dialog>
+}

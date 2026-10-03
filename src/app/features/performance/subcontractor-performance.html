@@ -1,0 +1,207 @@
+<section class="prj-section" aria-labelledby="performance-title">
+  <h2 id="performance-title" i18n="@@history.title">Project performance</h2>
+  <p class="prj-hint" i18n="@@history.private">
+    Private to your company: finalized closeouts only, by category. Never shared with the
+    subcontractor or another company.
+  </p>
+  @if (loading()) {
+    <p class="prj-hint" i18n="@@history.loading">Loading performance history…</p>
+  } @else if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  } @else if (history(); as view) {
+    @if (view.categories.length === 0) {
+      <p i18n="@@history.empty">
+        No completed project yet. History appears here once a closeout of this firm is finalized.
+      </p>
+    }
+    @if (!view.commercialVisible) {
+      <p class="prj-hint" role="note" i18n="@@history.commercialRestricted">
+        Award values, final costs and cost variances are shown to commercial roles only.
+      </p>
+    }
+    @if (view.inCorrection > 0 || view.inProgress > 0) {
+      <p class="prj-hint" i18n="@@history.excluded">
+        Not counted — closeouts in progress: <bdi dir="ltr">{{ view.inProgress }}</bdi> · reopened
+        for correction: <bdi dir="ltr">{{ view.inCorrection }}</bdi>
+      </p>
+    }
+    @for (category of view.categories; track category.category) {
+      <article class="pf-category" [attr.aria-labelledby]="'category-' + $index">
+        <h3 [id]="'category-' + $index">{{ categoryLabel(category.category) }}</h3>
+        <p class="pf-sample">
+          <strong
+            ><span i18n="@@history.sample">{category.sampleSize, plural,
+              =1 {1 completed project}
+              other {{{category.sampleSize}} completed projects}
+            }</span></strong
+          >
+          ·
+          <span i18n="@@history.recency"
+            >most recent closeout
+            <bdi>{{ category.latestClosedAtUtc | businessDate: 'instant' }}</bdi></span
+          >
+          @if (category.sampleSize > 1) {
+            ·
+            <span i18n="@@history.period"
+              >observed since
+              <bdi>{{ category.earliestClosedAtUtc | businessDate: 'instant' }}</bdi></span
+            >
+          }
+        </p>
+        @if (category.sampleSize < 3) {
+          <p class="prj-hint" i18n="@@history.smallSample">
+            A small sample: treat it as an early signal, not a trend.
+          </p>
+        }
+        <dl class="dc-facts">
+          <div>
+            <dt i18n="@@history.quality">Quality (mean, internal 1–5)</dt>
+            <dd>
+              <bdi dir="ltr">{{ category.qualityMean }} / 5</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@history.hse">HSE (mean, internal 1–5)</dt>
+            <dd>
+              <bdi dir="ltr">{{ category.hseMean }} / 5</bdi>
+            </dd>
+          </div>
+          @if (view.commercialVisible) {
+            <div>
+              <dt i18n="@@history.cost">Final cost vs award value</dt>
+              <dd>
+                <bdi dir="ltr">{{ range(category.costVarianceMin, category.costVarianceMax) }}</bdi>
+              </dd>
+            </div>
+          }
+          <div>
+            <dt i18n="@@history.schedule">Duration vs awarded</dt>
+            <dd>
+              <bdi dir="ltr">{{
+                range(category.scheduleVarianceMin, category.scheduleVarianceMax)
+              }}</bdi>
+              <small class="tnd-block" i18n="@@history.onTime"
+                >within: <bdi dir="ltr">{{ category.withinDuration }}</bdi> · late:
+                <bdi dir="ltr">{{ category.late }}</bdi> · no baseline:
+                <bdi dir="ltr">{{ category.noDurationBaseline }}</bdi></small
+              >
+              @if (category.excludedFromVariance) {
+                <!-- CF-048: projects that did not complete are never in the ranges or the counts above. -->
+                <small class="tnd-block" i18n="@@history.excludedFromVariance"
+                  >not completed (left out):
+                  <bdi dir="ltr">{{ category.excludedFromVariance }}</bdi></small
+                >
+              }
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@history.issues">Variations · claims · disputes</dt>
+            <dd>
+              <bdi dir="ltr"
+                >{{ category.variations }} · {{ category.claims }} · {{ category.disputes }}</bdi
+              >
+              @if (category.unresolvedDisputes > 0) {
+                <small class="tnd-block tnd-attention" i18n="@@history.unresolvedDisputes"
+                  >unresolved disputes:
+                  <bdi dir="ltr">{{ category.unresolvedDisputes }}</bdi></small
+                >
+              }
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@history.rehire">Would work again</dt>
+            <dd i18n="@@history.rehireCounts">
+              yes: <bdi dir="ltr">{{ category.wouldWorkAgainYes }}</bdi> · conditional:
+              <bdi dir="ltr">{{ category.wouldWorkAgainConditional }}</bdi> · no:
+              <bdi dir="ltr">{{ category.wouldWorkAgainNo }}</bdi>
+            </dd>
+          </div>
+        </dl>
+        <details class="pf-projects">
+          <summary i18n="@@history.projects">Completed projects</summary>
+          <ul class="prj-cards pf-outcomes" role="list">
+            @for (outcome of category.outcomes; track outcome.awardId) {
+              <li class="prj-card">
+                <h4>
+                  <a [routerLink]="['/closeouts', outcome.awardId]"
+                    ><bdi dir="ltr" class="tnd-code">{{ outcome.tenderReference }}</bdi></a
+                  >
+                  <bdi>{{ outcome.workPackageTitle }}</bdi>
+                </h4>
+                <dl>
+                  <dt i18n="@@history.awardedClosed">Awarded · closed</dt>
+                  <dd>
+                    <bdi>{{ outcome.awardedAtUtc | businessDate: 'instant' }}</bdi> ·
+                    <bdi>{{ outcome.closedAtUtc | businessDate: 'instant' }}</bdi>
+                  </dd>
+                  @if (view.commercialVisible) {
+                    <dt i18n="@@closeouts.awardValue">Award value</dt>
+                    <dd>
+                      <bdi dir="ltr">{{ money(outcome.awardValue) }} {{ outcome.currency }}</bdi>
+                    </dd>
+                    <dt i18n="@@closeout.actualFinalCost">Actual final cost</dt>
+                    <dd>
+                      <bdi dir="ltr"
+                        >{{ money(outcome.actualFinalCost) }} {{ outcome.currency }}</bdi
+                      >
+                      (<bdi dir="ltr">{{ percent(outcome.costVariancePercent) }}</bdi
+                      >)
+                    </dd>
+                  }
+                  @if (outcome.variationCause) {
+                    <!-- CF-025: the recorded cause for everyone; its share and the residual for commercial readers only. -->
+                    <dt i18n="@@history.variationCause">Variations</dt>
+                    <dd>
+                      <app-variance-cause
+                        [cause]="outcome.variationCause"
+                        [share]="outcome.variationSharePercent"
+                        [residual]="outcome.residualCostVariancePercent"
+                      />
+                    </dd>
+                  }
+                  <dt i18n="@@history.durationPlannedActual">Duration awarded · actual</dt>
+                  <dd>
+                    <bdi dir="ltr"
+                      >{{ outcome.plannedDurationDays ?? '—' }} ·
+                      {{ outcome.actualDurationDays }}</bdi
+                    >
+                    (<bdi dir="ltr">{{ percent(outcome.scheduleVariancePercent) }}</bdi
+                    >)
+                  </dd>
+                  <dt i18n="@@closeout.ratings">Quality / HSE</dt>
+                  <dd>
+                    <bdi dir="ltr">{{ outcome.qualityRating }} / {{ outcome.hseRating }}</bdi>
+                  </dd>
+                  <dt i18n="@@history.issues">Variations · claims · disputes</dt>
+                  <dd>
+                    <bdi dir="ltr"
+                      >{{ outcome.variationCount }} · {{ outcome.claimCount }} ·
+                      {{ outcome.disputeCount }}</bdi
+                    >
+                  </dd>
+                  <dt i18n="@@closeout.rehireShort">Would work again</dt>
+                  <dd>{{ rehireLabel(outcome.wouldWorkAgain) }}</dd>
+                  <dt i18n="@@closeout.outcomeShort">Outcome</dt>
+                  <dd>
+                    {{ outcomeLabel(outcome.outcomeType) }}
+                    @if (outcome.earlyWorksDeclared) {
+                      · <span i18n="@@closeout.earlyWorksDeclared">Early works declared</span>
+                    }
+                    @for (warning of outcome.timingWarnings ?? []; track warning) {
+                      · <span>{{ timingLabel(warning) }}</span>
+                    }
+                  </dd>
+                </dl>
+              </li>
+            }
+          </ul>
+        </details>
+      </article>
+    }
+  }
+</section>

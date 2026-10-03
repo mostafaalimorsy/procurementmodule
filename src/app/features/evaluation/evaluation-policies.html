@@ -1,0 +1,427 @@
+<section class="prj-page ev-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@policy.eyebrow">Evaluation</p>
+      <h1 i18n="@@policy.title">Scorecard policies</h1>
+      <p class="prj-hint" i18n="@@policy.intro">
+        The criteria and weights technical evaluators score against. Weights are your company's
+        choice; they add up to 100. A version used by an evaluation never changes.
+      </p>
+    </div>
+    @if (canManage()) {
+      <div class="prj-actions">
+        <button class="prj-btn" type="button" (click)="startNew()" i18n="@@policy.new">
+          New policy
+        </button>
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          (click)="startExample()"
+          i18n="@@policy.startExample"
+        >
+          Start from an example
+        </button>
+      </div>
+    }
+  </div>
+  @if (!canManage()) {
+    <p class="prj-note" data-testid="policy-read-only" i18n="@@policy.readOnly">
+      You can read these policies. A Procurement Manager or Company Admin changes them.
+    </p>
+  }
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="prj-note" role="status">{{ notice() }}</p>
+  }
+
+  <div class="ev-split">
+    <nav class="ev-bidlist" aria-label="Policies" i18n-aria-label="@@policy.list">
+      @if (policies(); as list) {
+        <ul role="list">
+          @for (policy of list; track policy.id) {
+            <li>
+              <button
+                type="button"
+                class="ev-bidlist__item"
+                [class.is-active]="selected()?.id === policy.id"
+                [attr.aria-current]="selected()?.id === policy.id ? 'true' : null"
+                (click)="open(policy.id)"
+              >
+                <bdi>{{ policy.name }}</bdi>
+                <small class="prj-hint tnd-block">
+                  <span i18n="@@policy.summary"
+                    >version {{ policy.currentVersionNumber }} · criteria:
+                    {{ policy.criteriaCount }} · scale 0–{{ policy.scaleMaximum }}</span
+                  >
+                  @if (policy.status === 'Inactive') {
+                    · <span i18n="@@policy.inactive">Inactive</span>
+                  }
+                </small>
+              </button>
+            </li>
+          } @empty {
+            <li class="prj-hint" i18n="@@policy.none">No policy yet.</li>
+          }
+        </ul>
+      } @else {
+        <p class="prj-hint" i18n="@@common.loading">Loading…</p>
+      }
+    </nav>
+
+    <div class="ev-detail">
+      @if (editing()) {
+        <form class="ev-policy-form" (ngSubmit)="save()">
+          <h2>
+            @if (selected()) {
+              <ng-container i18n="@@policy.editTitle">Edit policy</ng-container>
+            } @else {
+              <ng-container i18n="@@policy.newTitle">New policy</ng-container>
+            }
+          </h2>
+          @if (form.initialStatus === 'Inactive' && !selected()) {
+            <p
+              class="prj-note"
+              role="note"
+              data-testid="policy-example-note"
+              i18n="@@policy.exampleNote"
+            >
+              An example, saved as inactive: no evaluation can use it until someone reviews the
+              criteria and weights and activates it.
+            </p>
+          }
+          @if (selected()?.current?.lockedAtUtc) {
+            <p class="prj-note" role="note" i18n="@@policy.lockedNote">
+              The current version was used by an evaluation. Saving creates a new version; the used
+              version stays exactly as it was.
+            </p>
+          }
+          <div class="prj-field">
+            <label for="policy-name" i18n="@@policy.name">Name</label>
+            <input
+              id="policy-name"
+              name="name"
+              [attr.maxlength]="nameMax"
+              [(ngModel)]="form.name"
+            />
+          </div>
+          <div class="prj-field">
+            <label for="policy-description" i18n="@@policy.description">Description</label>
+            <textarea
+              id="policy-description"
+              name="description"
+              rows="2"
+              [attr.maxlength]="descriptionMax"
+              [(ngModel)]="form.description"
+            ></textarea>
+          </div>
+          <div class="prj-field">
+            <label for="policy-scale" i18n="@@policy.scale">Score scale</label>
+            <select id="policy-scale" name="scale" [(ngModel)]="form.scaleMaximum">
+              @for (scale of scales; track scale) {
+                <option [ngValue]="scale" i18n="@@policy.scaleOption">0–{{ scale }}</option>
+              }
+            </select>
+          </div>
+          <label class="tnd-choice tnd-close-confirm">
+            <input type="checkbox" name="blind" [(ngModel)]="form.blindTechnicalScoring" />
+            <span i18n="@@policy.blind"
+              >Commercial-blind technical scoring: only evaluators who cannot see prices may
+              score</span
+            >
+          </label>
+
+          <fieldset class="ev-form">
+            <legend i18n="@@policy.criteria">Criteria</legend>
+            @for (criterion of form.criteria; track $index; let index = $index) {
+              <fieldset class="ev-criterion">
+                <legend class="ev-criterion__legend" i18n="@@policy.criterionNumber">
+                  Criterion {{ index + 1 }}
+                </legend>
+                <div class="prj-field">
+                  <label [for]="'criterion-name-' + index" i18n="@@policy.criterionName"
+                    >Criterion</label
+                  >
+                  <input
+                    [id]="'criterion-name-' + index"
+                    [name]="'criterion-name-' + index"
+                    [attr.maxlength]="criterionNameMax"
+                    [(ngModel)]="criterion.name"
+                  />
+                </div>
+                <div class="prj-field">
+                  <label [for]="'criterion-category-' + index" i18n="@@policy.category"
+                    >Category</label
+                  >
+                  <select
+                    [id]="'criterion-category-' + index"
+                    [name]="'criterion-category-' + index"
+                    [(ngModel)]="criterion.category"
+                  >
+                    @for (category of categories; track category) {
+                      <option [value]="category">{{ categoryLabel(category) }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="prj-field ev-criterion__weight">
+                  <label [for]="'criterion-weight-' + index" i18n="@@policy.weight"
+                    >Weight (%)</label
+                  >
+                  <input
+                    [id]="'criterion-weight-' + index"
+                    [name]="'criterion-weight-' + index"
+                    type="text"
+                    inputmode="decimal"
+                    dir="ltr"
+                    [(ngModel)]="criterion.weight"
+                  />
+                </div>
+                <div class="prj-field ev-criterion__guidance">
+                  <label [for]="'criterion-guidance-' + index" i18n="@@policy.guidance"
+                    >Guidance for evaluators</label
+                  >
+                  <input
+                    [id]="'criterion-guidance-' + index"
+                    [name]="'criterion-guidance-' + index"
+                    [attr.maxlength]="guidanceMax"
+                    [(ngModel)]="criterion.guidance"
+                  />
+                </div>
+                <label class="tnd-choice">
+                  <input
+                    type="checkbox"
+                    [name]="'criterion-comment-' + index"
+                    [(ngModel)]="criterion.commentRequired"
+                  />
+                  <span i18n="@@policy.commentRequired">Comment required</span>
+                </label>
+                <label class="tnd-choice">
+                  <input
+                    type="checkbox"
+                    [name]="'criterion-evidence-' + index"
+                    [(ngModel)]="criterion.evidenceRequired"
+                  />
+                  <span i18n="@@policy.evidenceRequired">Evidence reference required</span>
+                </label>
+                <div class="ev-criterion__actions">
+                  <button
+                    class="prj-btn prj-btn--ghost ev-btn-small"
+                    type="button"
+                    [id]="'criterion-up-' + index"
+                    [disabled]="index === 0"
+                    (click)="move(index, -1)"
+                  >
+                    <ng-container i18n="@@policy.moveUp">Move up</ng-container>
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost ev-btn-small"
+                    type="button"
+                    [id]="'criterion-down-' + index"
+                    [disabled]="index === form.criteria.length - 1"
+                    (click)="move(index, 1)"
+                  >
+                    <ng-container i18n="@@policy.moveDown">Move down</ng-container>
+                  </button>
+                  <button
+                    class="prj-btn prj-btn--ghost prj-btn--danger ev-btn-small"
+                    type="button"
+                    (click)="removeCriterion(index)"
+                  >
+                    <ng-container i18n="@@policy.remove">Remove</ng-container>
+                  </button>
+                </div>
+              </fieldset>
+            }
+            <button
+              id="criterion-add"
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="form.criteria.length >= criteriaMax"
+              (click)="addCriterion()"
+              i18n="@@policy.addCriterion"
+            >
+              Add criterion
+            </button>
+            <p class="ev-total" role="status">
+              <span i18n="@@policy.total"
+                >Total weight: <bdi dir="ltr">{{ totalText() }}</bdi> / 100</span
+              >
+            </p>
+          </fieldset>
+          @if (formError()) {
+            <p class="prj-error-text" role="alert">{{ formError() }}</p>
+          }
+          <div class="prj-actions">
+            <button class="prj-btn" type="submit" [disabled]="busy()" i18n="@@common.save">
+              Save
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="cancelEdit()"
+              i18n="@@common.cancel"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      } @else if (selected(); as policy) {
+        <h2>
+          <bdi>{{ policy.name }}</bdi>
+        </h2>
+        @if (policy.description) {
+          <p class="prj-hint">
+            <bdi>{{ policy.description }}</bdi>
+          </p>
+        }
+        <p class="prj-hint">
+          <span i18n="@@policy.currentVersion"
+            >Version {{ policy.currentVersionNumber }} · scale 0–{{
+              policy.current.scaleMaximum
+            }}</span
+          >
+          @if (policy.current.blindTechnicalScoring) {
+            · <span i18n="@@evaluation.blindScoring">Commercial-blind technical scoring</span>
+          }
+          @if (policy.current.lockedAtUtc) {
+            · <span i18n="@@policy.usedVersion">used by an evaluation (locked)</span>
+          }
+          @if (policy.status === 'Inactive') {
+            · <span i18n="@@policy.inactive">Inactive</span>
+          }
+        </p>
+        @if (usedVersion(policy); as used) {
+          <!-- CF-133 AC5: the exact version an evaluation used, read only. -->
+          <section
+            class="prj-note ev-used-version"
+            id="policy-used-version"
+            tabindex="-1"
+            aria-labelledby="policy-used-version-title"
+            data-testid="policy-used-version"
+          >
+            <h3 id="policy-used-version-title" i18n="@@policy.versionUsedEvaluation">
+              Version {{ used.number }} — used by this evaluation
+            </h3>
+            <p class="prj-hint">
+              <span i18n="@@policy.versionLine"
+                >Version {{ used.number }} · {{ used.createdAtUtc | businessDate: 'instant' }} ·
+                <bdi>{{ used.createdByName }}</bdi></span
+              >
+              ·
+              <span
+                >0–<bdi dir="ltr">{{ used.scaleMaximum }}</bdi></span
+              >
+              @if (used.blindTechnicalScoring) {
+                · <span i18n="@@evaluation.blindScoring">Commercial-blind technical scoring</span>
+              }
+            </p>
+            <ul role="list">
+              @for (criterion of used.criteria; track criterion.id) {
+                <li>
+                  <bdi>{{ criterion.name }}</bdi> — {{ categoryLabel(criterion.category) }} ·
+                  <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+        <div class="prj-table-wrap">
+          <table class="prj-table ev-table">
+            <caption class="prj-visually-hidden" i18n="@@policy.criteria">
+              Criteria
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col" i18n="@@policy.criterionName">Criterion</th>
+                <th scope="col" i18n="@@policy.category">Category</th>
+                <th scope="col" i18n="@@policy.weight">Weight (%)</th>
+                <th scope="col" i18n="@@policy.requirements">Requirements</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (criterion of policy.current.criteria; track criterion.id) {
+                <tr>
+                  <th scope="row">
+                    <bdi>{{ criterion.name }}</bdi>
+                  </th>
+                  <td>{{ categoryLabel(criterion.category) }}</td>
+                  <td>
+                    <bdi dir="ltr">{{ criterion.weight }}</bdi>
+                  </td>
+                  <td>
+                    @if (criterion.commentRequired) {
+                      <span class="tnd-block" i18n="@@policy.commentRequired"
+                        >Comment required</span
+                      >
+                    }
+                    @if (criterion.evidenceRequired) {
+                      <span class="tnd-block" i18n="@@policy.evidenceRequired"
+                        >Evidence reference required</span
+                      >
+                    }
+                    @if (!criterion.commentRequired && !criterion.evidenceRequired) {
+                      <span class="prj-hint">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (canManage()) {
+          <div class="prj-actions">
+            <button class="prj-btn" type="button" (click)="startEdit(policy)" i18n="@@policy.edit">
+              Edit
+            </button>
+            <button
+              class="prj-btn prj-btn--ghost"
+              type="button"
+              [disabled]="busy()"
+              (click)="toggleStatus(policy)"
+            >
+              @if (policy.status === 'Active') {
+                <ng-container i18n="@@policy.deactivate">Make inactive</ng-container>
+              } @else {
+                <ng-container i18n="@@policy.activate">Activate</ng-container>
+              }
+            </button>
+          </div>
+        }
+        @if (policy.versions.length > 1) {
+          <h3 i18n="@@policy.history">Version history</h3>
+          <ul role="list" class="ev-history">
+            @for (version of policy.versions; track version.id) {
+              <li>
+                <details>
+                  <summary>
+                    <span i18n="@@policy.versionLine"
+                      >Version {{ version.number }} ·
+                      {{ version.createdAtUtc | businessDate: 'instant' }} ·
+                      <bdi>{{ version.createdByName }}</bdi></span
+                    >
+                    @if (version.lockedAtUtc) {
+                      · <span i18n="@@policy.usedVersion">used by an evaluation (locked)</span>
+                    }
+                  </summary>
+                  <ul role="list">
+                    @for (criterion of version.criteria; track criterion.id) {
+                      <li>
+                        <bdi>{{ criterion.name }}</bdi> — {{ categoryLabel(criterion.category) }} ·
+                        <bdi dir="ltr">{{ criterion.weight }}%</bdi>
+                      </li>
+                    }
+                  </ul>
+                </details>
+              </li>
+            }
+          </ul>
+        }
+      } @else {
+        <p class="prj-hint" i18n="@@policy.pick">Choose a policy, or create a new one.</p>
+      }
+    </div>
+  </div>
+</section>

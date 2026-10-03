@@ -1,0 +1,16 @@
+.ce-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.ce-facts dt {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.ce-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

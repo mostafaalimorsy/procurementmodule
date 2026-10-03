@@ -1,0 +1,121 @@
+<section class="prj-section" aria-labelledby="candidate-evidence-title">
+  <h2 id="candidate-evidence-title" i18n="@@intel.candidatesTitle">
+    Your history with these candidates
+  </h2>
+  @if (evidence(); as view) {
+    <p class="prj-hint" i18n="@@intel.candidatesHint">
+      Evidence in this package's category only (<bdi>{{ categoryLabel(view.category) }}</bdi
+      >), from your own finalized closeouts and invitations. It informs your decision — it does not
+      shortlist or rank anyone.
+    </p>
+    @if (view.truncated) {
+      <p class="prj-hint" i18n="@@intel.candidatesTruncated">
+        Only each firm's 200 most recent invitations are counted here.
+      </p>
+    }
+    @if (view.categoryMissing) {
+      <p class="prj-note" i18n="@@intel.candidatesNoCategory">
+        This work package has no category: history is shown for packages without one, and no project
+        can be judged similar.
+      </p>
+    }
+  }
+  @if (loading()) {
+    <p class="prj-hint" role="status" i18n="@@intel.candidatesLoading">
+      Loading candidate evidence…
+    </p>
+  } @else if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  } @else if (evidence(); as view) {
+    <ul class="prj-cards" role="list">
+      @for (candidate of candidates(); track candidate.subcontractorId) {
+        @if (of(candidate.subcontractorId); as item) {
+          <li class="prj-card">
+            <p class="prj-eyebrow">
+              <bdi dir="ltr">{{ candidate.code }}</bdi>
+            </p>
+            <h3 [id]="'candidate-' + candidate.subcontractorId">
+              <bdi>{{ candidate.legalName }}</bdi>
+            </h3>
+            <p>
+              <app-evidence-strength [strength]="item.strength" [dated]="item.dated" />
+            </p>
+            <dl class="ce-facts">
+              <dt i18n="@@intel.completed">Completed projects</dt>
+              <dd>
+                <bdi dir="ltr">{{ item.completedProjects }}</bdi>
+                @if (item.latestClosedAtUtc) {
+                  <span class="prj-hint" i18n="@@intel.latestShort"
+                    >· latest
+                    <bdi>{{ item.latestClosedAtUtc | businessDate: 'instant' }}</bdi></span
+                  >
+                }
+              </dd>
+              <!-- CF-029 (ADR-128): one category count, with how many of those projects were of comparable value or the same project. -->
+              @if (item.completedProjects > 0) {
+                <dd
+                  class="prj-hint"
+                  data-testid="candidate-similar"
+                  i18n="@@intel.similarBreakdown"
+                >
+                  of which comparable value
+                  <bdi dir="ltr">{{ item.similarComparableValueProjects ?? 0 }}</bdi> · same project
+                  <bdi dir="ltr">{{ item.similarSameProject ?? 0 }}</bdi>
+                </dd>
+              }
+              @if (item.retrospectiveProjects) {
+                <dt i18n="@@intel.retrospectiveShort">Past outcomes</dt>
+                <dd data-testid="candidate-retrospective">
+                  <bdi dir="ltr">{{ item.retrospectiveProjects }}</bdi>
+                  <span class="prj-chip dc-state dc-state--muted">{{ retrospectiveBadge }}</span>
+                </dd>
+              }
+              <dt i18n="@@intel.reliability">Response reliability</dt>
+              <dd>
+                <bdi dir="ltr">{{ rate(item.reliabilityPercent) }}</bdi>
+                <!-- CF-030 (ADR-128): an honest decline is told apart from silence; the rate is unchanged. -->
+                <span
+                  class="prj-hint tnd-block"
+                  data-testid="candidate-responses"
+                  [attr.title]="responsesDefinition"
+                  i18n="@@intel.responsesSplit"
+                  >submitted <bdi dir="ltr">{{ item.submitted }}</bdi> · declined
+                  <bdi dir="ltr">{{ item.declined ?? 0 }}</bdi> · no response
+                  <bdi dir="ltr">{{ item.noResponse ?? 0 }}</bdi> (of
+                  <bdi dir="ltr">{{ item.validInvitations }}</bdi> valid)</span
+                >
+              </dd>
+              @if (item.wouldWorkAgainYes !== null && item.completedProjects > 0) {
+                <dt i18n="@@intel.rehire">Would work again</dt>
+                <dd i18n="@@intel.rehirePattern">
+                  yes <bdi dir="ltr">{{ item.wouldWorkAgainYes }}</bdi> · conditional
+                  <bdi dir="ltr">{{ item.wouldWorkAgainConditional }}</bdi> · no
+                  <bdi dir="ltr">{{ item.wouldWorkAgainNo }}</bdi>
+                </dd>
+                <dt i18n="@@intel.onTime">On time</dt>
+                <dd>
+                  <bdi dir="ltr"
+                    >{{ item.onTime }} / {{ (item.onTime ?? 0) + (item.late ?? 0) }}</bdi
+                  >
+                </dd>
+              }
+            </dl>
+            <a
+              class="prj-btn prj-btn--ghost"
+              [routerLink]="['/subcontractors', candidate.subcontractorId]"
+              [queryParams]="{ workPackage: view.workPackageId, category: view.category }"
+              [attr.aria-describedby]="'candidate-' + candidate.subcontractorId"
+              i18n="@@intel.viewEvidence"
+              >View evidence</a
+            >
+          </li>
+        }
+      }
+    </ul>
+  }
+</section>

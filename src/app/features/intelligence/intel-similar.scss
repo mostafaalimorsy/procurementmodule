@@ -1,0 +1,7 @@
+@use 'intelligence-common';
+
+.intel-reasons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}

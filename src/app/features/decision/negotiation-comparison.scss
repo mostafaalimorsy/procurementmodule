@@ -1,0 +1,37 @@
+@use 'decision-common';
+
+// ---- original vs revised vs final ---------------------------------------------------------
+
+.dc-bid-pick {
+  max-inline-size: 28rem;
+}
+
+// Wide matrices scroll inside their container; the first column names the row.
+.dc-matrix th[scope='row'] {
+  min-inline-size: 9rem;
+}
+
+.dc-matrix td {
+  min-inline-size: 8rem;
+  vertical-align: top;
+}
+
+.dc-value {
+  display: block;
+  max-block-size: 12rem;
+  overflow-y: auto;
+}
+
+// A change is written out; the mark only repeats it.
+.dc-changed {
+  color: var(--color-warning);
+}
+
+.dc-changed::before {
+  content: '▲ ';
+  font-size: 0.7em;
+}
+
+.dc-final {
+  color: var(--color-accent);
+}

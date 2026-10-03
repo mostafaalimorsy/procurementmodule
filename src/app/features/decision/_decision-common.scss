@@ -1,0 +1,76 @@
+// Shared by every Part 10 screen (negotiation, comparison, decision, policies, approval matrix). The evaluation partial brings
+// the tender utility classes (component styles are scoped), so identifiers, flags and warnings look the same everywhere.
+@use '../evaluation/evaluation-common';
+
+// A state in words with a mark, never colour alone.
+.dc-state {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.dc-state::before {
+  content: '';
+  flex: none;
+  inline-size: 0.55rem;
+  block-size: 0.55rem;
+  border: 2px solid currentcolor;
+  border-radius: 50%;
+}
+
+.dc-state--good {
+  color: var(--color-accent);
+}
+
+.dc-state--good::before {
+  background: currentcolor;
+}
+
+.dc-state--warn {
+  color: var(--color-warning);
+}
+
+.dc-state--muted {
+  color: var(--color-muted);
+}
+
+// Facts laid out as a responsive grid of term/definition pairs.
+.dc-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 1rem;
+}
+
+.dc-facts dt {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.dc-facts dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.dc-num {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.dc-mono {
+  font-family: var(--font-label);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.dc-list {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.dc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 0 1rem;
+}

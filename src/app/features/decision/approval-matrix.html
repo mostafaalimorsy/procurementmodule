@@ -1,0 +1,289 @@
+<section class="prj-page dc-page">
+  <div class="prj-head">
+    <div>
+      <p class="prj-eyebrow" i18n="@@rpolicy.eyebrow">Recommendation and award</p>
+      <h1 i18n="@@matrix.title">Approval matrix</h1>
+      <p class="prj-hint" i18n="@@matrix.intro">
+        Which approvals an award decision needs. The first active rule that matches, by priority
+        (lowest number first), decides the route. When no rule matches, the default route asks for
+        one approval by an Approver/Director.
+      </p>
+    </div>
+    <button class="prj-btn" type="button" (click)="startNew()" i18n="@@matrix.new">New rule</button>
+  </div>
+
+  @if (error()) {
+    <p class="prj-note prj-note--error" role="alert">
+      {{ error() }}
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="load()" i18n="@@common.reload">
+        Reload
+      </button>
+    </p>
+  }
+  <div role="status" aria-live="polite">
+    @if (notice()) {
+      <p class="prj-note">{{ notice() }}</p>
+    }
+  </div>
+
+  @if (matrix(); as view) {
+    @if (rules().length) {
+      <div class="prj-table-wrap">
+        <table class="prj-table ev-table">
+          <caption class="prj-visually-hidden" i18n="@@matrix.caption">
+            Approval rules in the order they are checked
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" i18n="@@matrix.colPriority">Priority</th>
+              <th scope="col" i18n="@@matrix.colRule">Rule</th>
+              <th scope="col" i18n="@@matrix.colApplies">Applies to</th>
+              <th scope="col" i18n="@@matrix.colApprovals">Approvals</th>
+              <th scope="col">
+                <span class="prj-visually-hidden" i18n="@@negotiation.colActions">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (rule of rules(); track rule.id) {
+              <tr>
+                <td>{{ rule.priority }}</td>
+                <th scope="row">
+                  <bdi>{{ rule.name }}</bdi>
+                  <small class="tnd-block" [class.prj-hint]="rule.active">
+                    @if (rule.active) {
+                      <span i18n="@@matrix.active">Active</span>
+                    } @else {
+                      <strong i18n="@@matrix.inactive">Inactive — never matches</strong>
+                    }
+                  </small>
+                  <small class="prj-hint tnd-block" i18n="@@matrix.updated"
+                    >updated {{ rule.updatedAtUtc | businessDate: 'instant' }}</small
+                  >
+                </th>
+                <td>
+                  <span class="tnd-block">
+                    @if (rule.currency) {
+                      <bdi dir="ltr">{{ rule.currency }}</bdi> ·
+                    }
+                    <bdi>{{ range(rule) }}</bdi>
+                  </span>
+                  <span class="tnd-block"
+                    ><bdi>{{ projectName(rule.projectId) }}</bdi></span
+                  >
+                  <span class="tnd-block">
+                    @if (rule.category) {
+                      <span i18n="@@matrix.categoryShown"
+                        >Category <bdi>{{ rule.category }}</bdi></span
+                      >
+                    } @else {
+                      <span class="prj-hint" i18n="@@matrix.anyCategory">Any category</span>
+                    }
+                  </span>
+                </td>
+                <td>
+                  @if (rule.requiredApprovals === 0) {
+                    <span i18n="@@matrix.noApproval">No approval needed</span>
+                  } @else {
+                    <ol class="dc-list" role="list">
+                      @for (role of rule.stepRoles; track $index; let index = $index) {
+                        <li i18n="@@decision.routeStep">
+                          Step {{ index + 1 }}: {{ roleLabel(role) }}
+                        </li>
+                      }
+                    </ol>
+                  }
+                  @if (rule.allowSelfApproval) {
+                    <small class="tnd-attention tnd-block" i18n="@@approval.selfAllowedShort"
+                      >self-approval allowed</small
+                    >
+                  }
+                </td>
+                <td>
+                  <button
+                    class="prj-btn prj-btn--ghost ev-btn-small"
+                    type="button"
+                    (click)="startEdit(rule)"
+                  >
+                    <ng-container i18n="@@policy.edit">Edit</ng-container>
+                    <span class="prj-visually-hidden"
+                      ><bdi>{{ rule.name }}</bdi></span
+                    >
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="prj-note" i18n="@@matrix.none">
+        No approval rule yet: every decision needs one approval by an Approver/Director.
+      </p>
+    }
+  } @else if (!error()) {
+    <p class="prj-hint" i18n="@@common.loading">Loading…</p>
+  }
+</section>
+
+@if (editing(); as current) {
+  <app-confirm-dialog
+    [heading]="current === 'new' ? newHeading : editHeading"
+    confirmLabel="Save rule"
+    i18n-confirmLabel="@@matrix.saveRule"
+    [busy]="busy()"
+    (confirmed)="save()"
+    (cancelled)="close()"
+  >
+    <div class="prj-field">
+      <label for="rule-name" i18n="@@policy.name">Name</label>
+      <input id="rule-name" [attr.maxlength]="nameMax" [(ngModel)]="form.name" />
+    </div>
+    <div class="prj-field">
+      <label for="rule-priority" i18n="@@matrix.colPriority">Priority</label>
+      <input
+        id="rule-priority"
+        type="text"
+        inputmode="numeric"
+        dir="ltr"
+        aria-describedby="rule-priority-hint"
+        [(ngModel)]="form.priority"
+      />
+      <small id="rule-priority-hint" class="prj-hint" i18n="@@matrix.priorityHint"
+        >The lowest number is checked first.</small
+      >
+    </div>
+    <div class="prj-field">
+      <label for="rule-currency" i18n="@@matrix.currency">Currency (optional)</label>
+      <app-currency-select
+        inputId="rule-currency"
+        [value]="form.currency || null"
+        [currencies]="currencies()"
+        describedBy="rule-currency-hint"
+        (valueChange)="form.currency = $event"
+      />
+      <small id="rule-currency-hint" class="prj-hint" i18n="@@matrix.currencyHint"
+        >Needed only with a value range; without one the rule matches any currency.</small
+      >
+      @if (form.currency) {
+        <button
+          class="prj-btn prj-btn--ghost ev-btn-small"
+          type="button"
+          (click)="form.currency = ''"
+          i18n="@@matrix.anyCurrency"
+        >
+          Any currency
+        </button>
+      }
+    </div>
+    <div class="dc-pair">
+      <div class="prj-field">
+        <label for="rule-min" i18n="@@matrix.minimum">Minimum value (inclusive)</label>
+        <input
+          id="rule-min"
+          type="text"
+          inputmode="decimal"
+          dir="ltr"
+          [(ngModel)]="form.minimumValue"
+        />
+      </div>
+      <div class="prj-field">
+        <label for="rule-max" i18n="@@matrix.maximum">Maximum value (exclusive)</label>
+        <input
+          id="rule-max"
+          type="text"
+          inputmode="decimal"
+          dir="ltr"
+          [(ngModel)]="form.maximumValue"
+        />
+      </div>
+    </div>
+    <div class="prj-field">
+      <label for="rule-project" i18n="@@matrix.project">Project (optional)</label>
+      <select id="rule-project" [(ngModel)]="form.projectId">
+        <option value="" i18n="@@matrix.anyProject">Any project</option>
+        @if (form.projectId && !projectListed(form.projectId)) {
+          <option [value]="form.projectId" i18n="@@matrix.projectUnlisted">
+            A project not listed here
+          </option>
+        }
+        @for (project of projects(); track project.id) {
+          <option [value]="project.id">{{ project.code }} — {{ project.name }}</option>
+        }
+      </select>
+    </div>
+    <div class="prj-field">
+      <label for="rule-category" i18n="@@matrix.category">Work package category (optional)</label>
+      <input id="rule-category" [attr.maxlength]="categoryMax" [(ngModel)]="form.category" />
+    </div>
+    <div class="prj-field">
+      <label for="rule-approvals" i18n="@@matrix.requiredApprovals"
+        >Independent approvals required</label
+      >
+      <select
+        id="rule-approvals"
+        [ngModel]="form.requiredApprovals"
+        (ngModelChange)="setApprovals($event)"
+      >
+        @for (count of approvalCounts(); track count) {
+          <option [ngValue]="count">{{ count }}</option>
+        }
+      </select>
+    </div>
+    @for (role of form.stepRoles; track $index; let index = $index) {
+      <div class="prj-field">
+        <label [for]="'rule-step-' + index" i18n="@@matrix.stepRole"
+          >Step {{ index + 1 }} approver</label
+        >
+        <select [id]="'rule-step-' + index" [(ngModel)]="form.stepRoles[index]">
+          <option value="" i18n="@@approvalStep.anyApprover">Any approver</option>
+          @for (option of matrix()?.approverRoles ?? []; track option) {
+            <option [value]="option">{{ roleLabel(option) }}</option>
+          }
+        </select>
+      </div>
+    }
+    <label class="tnd-choice">
+      <input type="checkbox" [(ngModel)]="form.active" />
+      <span i18n="@@matrix.activeLabel">Active</span>
+    </label>
+    <label class="tnd-choice tnd-close-confirm">
+      <input type="checkbox" [(ngModel)]="form.allowSelfApproval" />
+      <span i18n="@@matrix.selfApproval">Allow the submitter to approve their own decision</span>
+    </label>
+    @if (form.allowSelfApproval) {
+      <p class="tnd-attention" role="note" i18n="@@matrix.selfApprovalWarning">
+        Self-approval removes the independent check for decisions on this route. Use it only where
+        your procurement policy allows it.
+      </p>
+    }
+    @if (weakRoute) {
+      <label class="tnd-choice tnd-close-confirm">
+        <input type="checkbox" name="weakeningConfirmed" [(ngModel)]="form.weakeningConfirmed" />
+        <span i18n="@@matrix.weakeningConfirm"
+          >I confirm that decisions on this route can be approved without an independent
+          approver</span
+        >
+      </label>
+      <div class="prj-field">
+        <label for="rule-weakening-reason" i18n="@@matrix.weakeningReason"
+          >Why your company accepts this route</label
+        >
+        <textarea
+          id="rule-weakening-reason"
+          name="weakeningReason"
+          rows="2"
+          maxlength="1000"
+          [(ngModel)]="form.weakeningReason"
+        ></textarea>
+      </div>
+      <p class="prj-hint" i18n="@@matrix.overrideStillIndependent">
+        A decision that departs from the recommendation always needs an approval by someone other
+        than its submitter, whatever this rule says.
+      </p>
+    }
+    @if (formError()) {
+      <p class="prj-error-text" role="alert">{{ formError() }}</p>
+    }
+  </app-confirm-dialog>
+}

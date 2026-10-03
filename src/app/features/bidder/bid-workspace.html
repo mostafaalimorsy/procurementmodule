@@ -1,0 +1,1608 @@
+@if (bid(); as current) {
+  <section class="bw" aria-labelledby="bw-title">
+    <header class="bw-head">
+      <div class="bw-head__id">
+        <h2 id="bw-title" tabindex="-1">
+          @if (round(); as number) {
+            @if (current.status === 'Submitted') {
+              <ng-container i18n="@@bidWorkspace.roundSubmittedTitle"
+                >Your submitted response to round {{ number }}</ng-container
+              >
+            } @else {
+              <ng-container i18n="@@bidWorkspace.roundTitle"
+                >Your revised response — round {{ number }}</ng-container
+              >
+            }
+          } @else if (current.status === 'Submitted') {
+            <ng-container i18n="@@bidWorkspace.submittedTitle">Your submitted bid</ng-container>
+          } @else if (amending()) {
+            <ng-container i18n="@@bidWorkspace.amendingTitle"
+              >Revising your submitted bid</ng-container
+            >
+          } @else {
+            <ng-container i18n="@@bidWorkspace.title">Your bid</ng-container>
+          }
+        </h2>
+        <p class="bw-ref">
+          <span i18n="@@bidWorkspace.reference">Bid reference</span>&ngsp;<bdi
+            dir="ltr"
+            class="bw-code"
+            >{{ current.reference }}</bdi
+          >
+          ·&ngsp;<span i18n="@@bidWorkspace.pricedIn">Priced in</span>&ngsp;<bdi
+            dir="ltr"
+            class="bw-code"
+            >{{ currency() }}</bdi
+          >
+          ({{ currencyTitle() }})
+        </p>
+      </div>
+      <div class="bw-deadline">
+        @if (round()) {
+          <span class="prj-hint" i18n="@@negotiation.deadline">Response deadline</span>
+        } @else {
+          <span class="prj-hint" i18n="@@tenderField.deadline">Submission deadline</span>
+        }
+        <strong
+          ><bdi>{{ deadline() }}</bdi></strong
+        >
+        @if (remaining(); as left) {
+          <span class="bw-countdown">
+            <span i18n="@@bidder.timeLeft">Time left:</span>&ngsp;
+            @if (left.days > 0) {
+              <span i18n="@@bidder.daysLeft">{left.days, plural,
+                =1 {1 day}
+                other {{{ left.days }} days}
+              }</span
+              >&ngsp;
+            }
+            @if (left.hours > 0) {
+              <span i18n="@@bidder.hoursLeft">{left.hours, plural,
+                =1 {1 hour}
+                other {{{ left.hours }} hours}
+              }</span
+              >&ngsp;
+            }
+            @if (left.days === 0) {
+              <span i18n="@@bidWorkspace.minutesLeft">{left.minutes, plural,
+                =0 {less than a minute}
+                =1 {1 minute}
+                other {{{ left.minutes }} minutes}
+              }</span>
+            }
+          </span>
+        } @else if (invitation().closedEarlyAt) {
+          <span class="bw-countdown bw-countdown--closed" i18n="@@bidWorkspace.closedEarly"
+            >The buyer closed this tender early.</span
+          >
+        } @else {
+          <span class="bw-countdown bw-countdown--closed" i18n="@@bidWorkspace.deadlinePassed"
+            >The deadline has passed.</span
+          >
+        }
+      </div>
+      @if (drafting()) {
+        <p
+          id="bw-save-status"
+          class="bw-save"
+          tabindex="-1"
+          [attr.data-state]="saveState()"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="bw-save__mark" aria-hidden="true"></span>
+          @switch (saveState()) {
+            @case ('saving') {
+              <ng-container i18n="@@bidWorkspace.saving">Saving…</ng-container>
+            }
+            @case ('dirty') {
+              <ng-container i18n="@@bidWorkspace.dirty"
+                >Unsaved changes — saving shortly</ng-container
+              >
+            }
+            @case ('invalid') {
+              <ng-container i18n="@@bidWorkspace.invalid"
+                >Not saved: correct the highlighted fields</ng-container
+              >
+            }
+            @case ('failed') {
+              <ng-container i18n="@@bidWorkspace.failed">Save failed</ng-container>
+            }
+            @case ('conflict') {
+              <ng-container i18n="@@bidWorkspace.conflict"
+                >Changed elsewhere — reload to continue</ng-container
+              >
+            }
+            @case ('closed') {
+              <ng-container i18n="@@bidWorkspace.closedState"
+                >Read only: this bid can no longer be changed</ng-container
+              >
+            }
+            @default {
+              @if (savedAt()) {
+                <ng-container i18n="@@bidWorkspace.savedAt"
+                  >Saved {{ savedAt() | businessDate: 'instant' }}</ng-container
+                >
+              } @else {
+                <ng-container i18n="@@bidWorkspace.nothingYet">Nothing saved yet</ng-container>
+              }
+            }
+          }
+        </p>
+      }
+    </header>
+
+    @if (newerAddenda().length || outstandingAddenda().length) {
+      <section class="prj-note bw-updated" aria-labelledby="bw-updated-title">
+        <h3 id="bw-updated-title" i18n="@@bidUpdates.addendaTitle">Tender updated</h3>
+        @if (current.status === 'Submitted' && newerAddenda().length) {
+          @if (canAmend()) {
+            <p i18n="@@bidWorkspace.revisedAfterSubmissionRevise">
+              Your bid answered tender revision {{ answeredRevision() }}; the tender is now at
+              revision {{ currentTenderRevision() }}. Your submitted bid stays exactly as submitted
+              unless you revise it before the deadline.
+            </p>
+          } @else {
+            <p i18n="@@bidWorkspace.revisedAfterSubmission">
+              Your bid answered tender revision {{ answeredRevision() }}; the tender is now at
+              revision {{ currentTenderRevision() }}. Your submitted bid stays exactly as submitted.
+              Contact the buyer if the change affects it.
+            </p>
+          }
+        } @else if (newerAddenda().length) {
+          <p i18n="@@bidWorkspace.reviewChanges">
+            Review changes before submitting: the tender is now at revision
+            {{ currentTenderRevision() }}. Your draft is kept exactly as you saved it; nothing was
+            changed for you.
+          </p>
+        }
+        <ul class="bw-addenda" role="list">
+          @for (addendum of current.addenda ?? []; track addendum.id) {
+            @if (
+              addendum.tenderRevision > answeredRevision() ||
+              (addendum.acknowledgementRequired && !addendum.acknowledgedAtUtc)
+            ) {
+              <li>
+                <strong
+                  ><ng-container i18n="@@addendum.numbered"
+                    >Addendum {{ addendum.number }}</ng-container
+                  ></strong
+                >
+                · <bdi>{{ addendum.title }}</bdi>
+                @if (addendum.acknowledgedAtUtc) {
+                  · <span i18n="@@addendum.acknowledged">Acknowledged</span>
+                } @else if (addendum.acknowledgementRequired) {
+                  ·
+                  <strong class="bw-attention" i18n="@@addendum.acknowledgementRequired"
+                    >Acknowledgement required</strong
+                  >
+                }
+              </li>
+            }
+          }
+        </ul>
+        @if (drafting()) {
+          <p class="prj-hint" i18n="@@bidWorkspace.readAddendaFirst">
+            Read each addendum and its documents on the tender page, and acknowledge it there. Your
+            draft is saved before you leave.
+          </p>
+          <div class="prj-actions">
+            <button
+              class="prj-btn"
+              type="button"
+              (click)="requestBack()"
+              i18n="@@bidWorkspace.reviewAddenda"
+            >
+              Review the addenda
+            </button>
+          </div>
+        }
+      </section>
+    }
+
+    @if (message()) {
+      <p class="prj-note" role="status" id="bid-files-status" tabindex="-1">{{ message() }}</p>
+    }
+    @if (saveState() === 'conflict') {
+      <div class="prj-note prj-note--error" role="alert">
+        <p i18n="@@bidWorkspace.conflictHelp">
+          This bid was saved from another tab or device after you opened it. To avoid overwriting
+          newer work, your latest edits here were not saved.
+        </p>
+        <button class="prj-btn" type="button" (click)="reload()" i18n="@@bidWorkspace.reload">
+          Reload the latest version
+        </button>
+      </div>
+    }
+    @if (saveState() === 'failed') {
+      <div class="prj-actions">
+        <button class="prj-btn" type="button" (click)="retrySave()" i18n="@@bidWorkspace.retrySave">
+          Try saving again
+        </button>
+      </div>
+    }
+
+    @if (current.status === 'Submitted' && current.receipt; as receipt) {
+      <div class="bw-receipt" role="status" id="bid-receipt" tabindex="-1">
+        <h3 i18n="@@bidWorkspace.receiptTitle">Submission received</h3>
+        <p i18n="@@bidWorkspace.receiptBody">
+          The system received your bid. The buyer reviews bids after the deadline; this confirmation
+          is not an approval or an award.
+        </p>
+        <dl class="bw-facts">
+          <div>
+            <dt i18n="@@bidWorkspace.reference">Bid reference</dt>
+            <dd>
+              <bdi dir="ltr" class="bw-code">{{ receipt.reference }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidWorkspace.submittedAt">Submitted</dt>
+            <dd>{{ receipt.submittedAtUtc | businessDate: 'instant' }}</dd>
+          </div>
+          @if (receipt.revisionNumber > 1) {
+            <div>
+              <dt i18n="@@bidWorkspace.revisionNumber">Revision</dt>
+              <dd>{{ receipt.revisionNumber }}</dd>
+            </div>
+          }
+          <div>
+            <dt i18n="@@bidField.totalAmount">Total bid amount</dt>
+            <dd>
+              <bdi dir="ltr" class="bw-amount"
+                >{{ amount(receipt.totalAmount) }} {{ receipt.currency }}</bdi
+              >
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidWorkspace.files">Files</dt>
+            <dd>{{ receipt.attachmentCount }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@bidWorkspace.submittedBy">Submitted through the link of</dt>
+            <dd>
+              <bdi>{{ receipt.submittedByName }}</bdi>
+            </dd>
+          </div>
+        </dl>
+        <app-verification-details>
+          <p>
+            <span i18n="@@bidWorkspace.fingerprint">Submission fingerprint (SHA-256)</span>:
+            <code dir="ltr" class="bw-fingerprint">{{ receipt.contentSha256 }}</code>
+          </p>
+        </app-verification-details>
+        @if (canAmend() && current.resubmission; as limit) {
+          <p class="prj-hint" i18n="@@bidWorkspace.receiptRevise">
+            Until the deadline you may submit a revised bid ({{ limit.used }} of
+            {{ limit.maximum }} revisions used). Your submitted bid stays in force until you submit
+            the revised one, and every submission is kept.
+          </p>
+          <div class="prj-actions">
+            <button
+              class="prj-btn"
+              type="button"
+              [disabled]="busy()"
+              (click)="amend()"
+              i18n="@@bidWorkspace.revise"
+            >
+              Revise my bid
+            </button>
+          </div>
+        } @else {
+          <p class="prj-hint" i18n="@@bidWorkspace.receiptChange">
+            A submitted bid cannot be changed here. If you need to correct it, contact the buyer.
+          </p>
+        }
+        @if (canWithdraw()) {
+          @if (confirmingWithdraw()) {
+            <div class="prj-note" id="bw-withdraw" tabindex="-1">
+              <p i18n="@@bidWorkspace.withdrawConfirm">
+                Withdraw your bid? The buyer will not open it. Your submitted bid is kept on record,
+                and you may submit again before the deadline if the buyer allows revisions.
+              </p>
+              <div class="prj-field">
+                <label for="bw-withdraw-reason" i18n="@@bidWorkspace.withdrawReason"
+                  >Reason for the buyer (optional)</label
+                >
+                <textarea
+                  id="bw-withdraw-reason"
+                  name="withdrawReason"
+                  rows="2"
+                  maxlength="1000"
+                  [(ngModel)]="withdrawReason"
+                ></textarea>
+              </div>
+              <div class="prj-actions">
+                <button
+                  class="prj-btn prj-btn--danger"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="withdraw()"
+                  i18n="@@bidWorkspace.withdrawConfirmButton"
+                >
+                  Withdraw my bid
+                </button>
+                <button
+                  class="prj-btn prj-btn--ghost"
+                  type="button"
+                  (click)="confirmingWithdraw.set(false)"
+                  i18n="@@common.cancel"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          } @else {
+            <div class="prj-actions">
+              <button
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                (click)="askWithdraw()"
+                i18n="@@bidWorkspace.withdraw"
+              >
+                Withdraw my bid
+              </button>
+            </div>
+          }
+        }
+      </div>
+    }
+
+    @if (current.status === 'Withdrawn' && current.withdrawal; as withdrawal) {
+      <div class="prj-note" role="status" id="bid-withdrawn" tabindex="-1">
+        <h3 i18n="@@bidWorkspace.withdrawnTitle">Bid withdrawn</h3>
+        <p i18n="@@bidWorkspace.withdrawnBody">
+          You withdrew your bid on {{ withdrawal.recordedAtUtc | businessDate: 'instant' }}. The
+          buyer will not open it; your submitted revision {{ withdrawal.revisionInForce }} is kept
+          on record.
+        </p>
+        @if (canAmend()) {
+          <div class="prj-actions">
+            <button
+              class="prj-btn"
+              type="button"
+              [disabled]="busy()"
+              (click)="amend()"
+              i18n="@@bidWorkspace.submitAgain"
+            >
+              Submit a new bid
+            </button>
+          </div>
+        }
+      </div>
+    }
+
+    @if (amending() && current.receipt; as receipt) {
+      <div class="prj-note" role="status" id="bid-amending">
+        <p i18n="@@bidWorkspace.amendingNote">
+          You are revising your bid. Your submitted revision {{ receipt.revisionNumber }} stays in
+          force until you submit this revised bid before the deadline; if you do not, it is the bid
+          the buyer opens.
+        </p>
+        <div class="prj-actions">
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            [disabled]="busy()"
+            (click)="discardAmendment()"
+            i18n="@@bidWorkspace.discardRevision"
+          >
+            Discard this revision
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (drafting()) {
+      <nav class="bw-steps" aria-label="Bid sections" i18n-aria-label="@@bidWorkspace.sections">
+        @for (item of ['commercial', 'technical', 'files', 'review']; track item) {
+          <button
+            type="button"
+            class="bw-step"
+            [class.is-current]="step() === item"
+            [attr.aria-current]="step() === item ? 'step' : null"
+            (click)="goTo($any(item))"
+          >
+            @switch (item) {
+              @case ('commercial') {
+                <ng-container i18n="@@bidWorkspace.stepCommercial">1. Commercial</ng-container>
+              }
+              @case ('technical') {
+                <ng-container i18n="@@bidWorkspace.stepTechnical">2. Technical</ng-container>
+              }
+              @case ('files') {
+                <ng-container i18n="@@bidWorkspace.stepFiles">3. Files</ng-container>
+              }
+              @default {
+                <ng-container i18n="@@bidWorkspace.stepReview">4. Review and submit</ng-container>
+              }
+            }
+            @if (stepsWithErrors().has($any(item))) {
+              <span class="bw-step__flag" aria-hidden="true">!</span>
+              <span class="prj-visually-hidden" i18n="@@bidWorkspace.stepHasErrors"
+                >(needs correction)</span
+              >
+            }
+          </button>
+        }
+      </nav>
+    }
+
+    @if (drafting() && step() === 'commercial') {
+      <section class="bw-panel" aria-labelledby="bid-step-commercial">
+        <h3 id="bid-step-commercial" tabindex="-1" i18n="@@bidWorkspace.commercialTitle">
+          Commercial offer
+        </h3>
+        @if (commercialLocked()) {
+          <p class="prj-hint" role="note" i18n="@@bidWorkspace.notInScope">
+            Not open for revision in this round: these answers stay as in your offer in force.
+          </p>
+        }
+        <fieldset class="bw-scope-lock" [disabled]="commercialLocked()">
+          <div class="prj-field">
+            <label for="bid-total"
+              ><ng-container i18n="@@bidField.totalAmount">Total bid amount</ng-container
+              >&ngsp;<span class="prj-hint"
+                >(<bdi dir="ltr">{{ currency() }}</bdi
+                >)</span
+              ></label
+            >
+            <div class="bw-money">
+              <input
+                id="bid-total"
+                dir="ltr"
+                inputmode="decimal"
+                autocomplete="off"
+                [disabled]="!editable()"
+                [(ngModel)]="form.totalAmount"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="edited()"
+                (blur)="tidyMoney('total')"
+                [attr.aria-invalid]="fieldError('totalAmount') ? 'true' : null"
+                [attr.aria-describedby]="describedBy('totalAmount', 'bid-total-hint')"
+              />
+              <span class="bw-money__code" dir="ltr" aria-hidden="true">{{ currency() }}</span>
+            </div>
+            @if (fieldError('totalAmount')) {
+              <span id="bid-error-totalAmount" class="prj-error-text">{{
+                fieldError('totalAmount')
+              }}</span>
+            }
+            <span id="bid-total-hint" class="prj-hint" i18n="@@bidWorkspace.totalHint"
+              >Your full price for the scope, in the tender currency. Digits only; the currency is
+              fixed by the buyer.</span
+            >
+          </div>
+
+          @if (schedule().length) {
+            <fieldset class="prj-fieldset" id="bid-schedule">
+              <legend i18n="@@bidWorkspace.scheduleLegend">Price schedule</legend>
+              <p class="prj-hint" i18n="@@bidWorkspace.scheduleHint">
+                Enter a rate for each item. Each amount is exactly quantity × rate in the tender
+                currency — nothing is rounded, so a rate whose amount does not fall on the
+                currency's decimals must be adjusted. Optional items count only if you price them;
+                they are never part of the total.
+              </p>
+              <div
+                class="prj-table-wrap"
+                role="region"
+                aria-labelledby="bid-schedule-caption"
+                tabindex="0"
+              >
+                <table class="prj-table bw-schedule">
+                  <caption
+                    id="bid-schedule-caption"
+                    class="prj-visually-hidden"
+                    i18n="@@bidWorkspace.scheduleCaption"
+                  >
+                    Price schedule items with your rates
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col" i18n="@@scheduleField.key">Item code</th>
+                      <th scope="col" i18n="@@scheduleField.description">Description</th>
+                      <th scope="col" i18n="@@scheduleField.unit">Unit</th>
+                      <th scope="col" i18n="@@scheduleField.quantity">Quantity</th>
+                      <th scope="col" i18n="@@bidWorkspace.rate">Rate</th>
+                      <th scope="col" i18n="@@bidWorkspace.itemAmount">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of schedule(); track item.key; let index = $index) {
+                      @let price = itemPrice(item);
+                      <tr>
+                        <td>
+                          <bdi dir="ltr" class="bw-code">{{ item.key }}</bdi>
+                        </td>
+                        <td>
+                          @if (item.section) {
+                            <span class="prj-hint"
+                              ><bdi>{{ item.section }}</bdi> ·
+                            </span>
+                          }
+                          <bdi>{{ item.description }}</bdi>
+                          @if (item.type !== 'Measured') {
+                            <span class="prj-chip">{{ itemTypeLabel(item.type) }}</span>
+                          }
+                        </td>
+                        <td>
+                          <bdi>{{ item.unit ?? '—' }}</bdi>
+                        </td>
+                        <td>
+                          <bdi dir="ltr">{{ quantity(item.quantity) }}</bdi>
+                        </td>
+                        <td>
+                          @if (item.type === 'ProvisionalSum') {
+                            <span class="prj-hint" i18n="@@bidWorkspace.provisionalFixed"
+                              >Fixed by the buyer</span
+                            >
+                          } @else {
+                            <input
+                              [id]="'bid-rate-' + index"
+                              dir="ltr"
+                              inputmode="decimal"
+                              autocomplete="off"
+                              size="10"
+                              [attr.aria-label]="rateLabel(item.key)"
+                              [disabled]="!editable()"
+                              [ngModel]="rateText(item.key)"
+                              [ngModelOptions]="{ standalone: true }"
+                              (ngModelChange)="setRate(item.key, $event)"
+                              [attr.aria-invalid]="
+                                fieldError('itemRates.' + index) || price.problem ? 'true' : null
+                              "
+                            />
+                            @if (fieldError('itemRates.' + index)) {
+                              <span class="prj-error-text">{{
+                                fieldError('itemRates.' + index)
+                              }}</span>
+                            }
+                          }
+                        </td>
+                        <td>
+                          @if (price.amount) {
+                            <bdi dir="ltr" class="bw-amount">{{ amount(price.amount) }}</bdi>
+                          } @else if (price.problem === 'inexact') {
+                            <span class="prj-error-text" i18n="@@bidWorkspace.itemInexact"
+                              >Not an exact {{ currency() }} amount — adjust the rate</span
+                            >
+                          } @else if (price.problem === 'range') {
+                            <span class="prj-error-text" i18n="@@bidWorkspace.itemTooLarge"
+                              >Too large</span
+                            >
+                          } @else {
+                            <span aria-hidden="true">—</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <p class="bw-sum">
+                <span i18n="@@bidWorkspace.scheduleSum"
+                  >Schedule total (measured items and provisional sums):</span
+                >&ngsp;<bdi dir="ltr" class="bw-amount"
+                  >{{ amount(scheduleTotal()) }} {{ currency() }}</bdi
+                >
+                @if (editable() && expectedTotal()) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="useScheduleTotal()"
+                    i18n="@@bidWorkspace.useScheduleSum"
+                  >
+                    Use schedule + own lines as total bid amount
+                  </button>
+                }
+              </p>
+            </fieldset>
+          }
+
+          <fieldset class="prj-fieldset">
+            <legend i18n="@@bidField.lines">Price breakdown</legend>
+            @if (schedule().length) {
+              <p class="prj-hint" i18n="@@bidWorkspace.ownLinesHint">
+                Optional. Lines of your own (extras, alternatives) are added to the schedule total.
+              </p>
+            } @else {
+              <p class="prj-hint" i18n="@@bidWorkspace.linesHint">
+                Optional. When you list items, they must add up to the total.
+              </p>
+            }
+            @if (form.lines.length) {
+              <ol class="bw-lines" role="list">
+                @for (line of form.lines; track $index; let index = $index) {
+                  <li class="bw-line">
+                    <div class="prj-field bw-line__description">
+                      <label [for]="'bid-line-description-' + index"
+                        ><ng-container i18n="@@bidField.lineDescription"
+                          >Breakdown item</ng-container
+                        >&ngsp;{{ index + 1 }}</label
+                      >
+                      <input
+                        [id]="'bid-line-description-' + index"
+                        [attr.maxlength]="limits.lineDescription"
+                        [disabled]="!editable()"
+                        [(ngModel)]="line.description"
+                        [ngModelOptions]="{ standalone: true }"
+                        (ngModelChange)="edited()"
+                      />
+                    </div>
+                    <div class="prj-field bw-line__amount">
+                      <label [for]="'bid-line-amount-' + index"
+                        ><ng-container i18n="@@bidField.lineAmount">Breakdown amount</ng-container
+                        >&ngsp;{{ index + 1 }}</label
+                      >
+                      <div class="bw-money">
+                        <input
+                          [id]="'bid-line-amount-' + index"
+                          dir="ltr"
+                          inputmode="decimal"
+                          autocomplete="off"
+                          [disabled]="!editable()"
+                          [(ngModel)]="line.amount"
+                          [ngModelOptions]="{ standalone: true }"
+                          (ngModelChange)="edited()"
+                          (blur)="tidyMoney('line', index)"
+                          [attr.aria-invalid]="
+                            fieldError('lines.' + index + '.amount') ? 'true' : null
+                          "
+                          [attr.aria-describedby]="describedBy('lines.' + index + '.amount')"
+                        />
+                        <span class="bw-money__code" dir="ltr" aria-hidden="true">{{
+                          currency()
+                        }}</span>
+                      </div>
+                      @if (fieldError('lines.' + index + '.amount')) {
+                        <span
+                          [id]="'bid-error-lines.' + index + '.amount'"
+                          class="prj-error-text"
+                          >{{ fieldError('lines.' + index + '.amount') }}</span
+                        >
+                      }
+                    </div>
+                    @if (editable()) {
+                      <button
+                        class="prj-btn prj-btn--ghost bw-line__remove"
+                        type="button"
+                        (click)="removeLine(index)"
+                      >
+                        <ng-container i18n="@@bidWorkspace.removeLine">Remove item</ng-container
+                        >&ngsp;{{ index + 1 }}
+                      </button>
+                    }
+                  </li>
+                }
+              </ol>
+              <p class="bw-sum">
+                <span i18n="@@bidWorkspace.linesSum">Breakdown total:</span>&ngsp;<bdi
+                  dir="ltr"
+                  class="bw-amount"
+                  >{{ amount(linesTotal()) }} {{ currency() }}</bdi
+                >
+                @if (editable() && linesTotal()) {
+                  <button
+                    class="prj-btn prj-btn--ghost"
+                    type="button"
+                    (click)="useLinesTotal()"
+                    i18n="@@bidWorkspace.useSum"
+                  >
+                    Use as total bid amount
+                  </button>
+                }
+              </p>
+            }
+            @if (editable()) {
+              <button
+                id="bid-add-line"
+                class="prj-btn prj-btn--ghost"
+                type="button"
+                [disabled]="form.lines.length >= limits.lines"
+                (click)="addLine()"
+                i18n="@@bidWorkspace.addLine"
+              >
+                Add a breakdown item
+              </button>
+            }
+          </fieldset>
+
+          <div class="prj-grid">
+            <div class="prj-field">
+              <label for="bid-validity" i18n="@@bidWorkspace.validityLabel"
+                >Bid validity (days)</label
+              >
+              <input
+                id="bid-validity"
+                dir="ltr"
+                inputmode="numeric"
+                [disabled]="!editable()"
+                [(ngModel)]="form.validityDays"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="edited()"
+                [attr.aria-invalid]="fieldError('validityDays') ? 'true' : null"
+                [attr.aria-describedby]="
+                  describedBy(
+                    'validityDays',
+                    invitation().bidValidityDays ? 'bid-validity-hint' : ''
+                  )
+                "
+              />
+              @if (fieldError('validityDays')) {
+                <span id="bid-error-validityDays" class="prj-error-text">{{
+                  fieldError('validityDays')
+                }}</span>
+              }
+              @if (invitation().bidValidityDays; as asked) {
+                <span id="bid-validity-hint" class="prj-hint"
+                  ><span i18n="@@bidWorkspace.validityAskedDays">{asked, plural,
+                    =1 {The tender asks for 1 day.}
+                    other {The tender asks for {{ asked }} days.}
+                  }</span
+                  >&ngsp;<span i18n="@@bidWorkspace.validityShorter"
+                    >A shorter validity is a commercial deviation.</span
+                  ></span
+                >
+              }
+            </div>
+            <div class="prj-field">
+              @if (invitation().durationRequired) {
+                <label for="bid-duration" i18n="@@bidWorkspace.durationLabelRequired"
+                  >Proposed duration (days, required)</label
+                >
+              } @else {
+                <label for="bid-duration" i18n="@@bidWorkspace.durationLabel"
+                  >Proposed duration (days)</label
+                >
+              }
+              <input
+                id="bid-duration"
+                dir="ltr"
+                inputmode="numeric"
+                [attr.aria-required]="invitation().durationRequired ? 'true' : null"
+                [disabled]="!editable()"
+                [(ngModel)]="form.durationDays"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="edited()"
+                [attr.aria-invalid]="fieldError('durationDays') ? 'true' : null"
+                [attr.aria-describedby]="describedBy('durationDays')"
+              />
+              @if (fieldError('durationDays')) {
+                <span id="bid-error-durationDays" class="prj-error-text">{{
+                  fieldError('durationDays')
+                }}</span>
+              }
+            </div>
+            <div class="prj-field">
+              <label for="bid-warranty" i18n="@@bidWorkspace.warrantyLabel"
+                >Warranty (months)</label
+              >
+              <input
+                id="bid-warranty"
+                dir="ltr"
+                inputmode="numeric"
+                [disabled]="!editable()"
+                [(ngModel)]="form.warrantyMonths"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="edited()"
+                [attr.aria-invalid]="fieldError('warrantyMonths') ? 'true' : null"
+                [attr.aria-describedby]="describedBy('warrantyMonths')"
+              />
+              @if (fieldError('warrantyMonths')) {
+                <span id="bid-error-warrantyMonths" class="prj-error-text">{{
+                  fieldError('warrantyMonths')
+                }}</span>
+              }
+            </div>
+            @if (invitation().pricing; as basis) {
+              <fieldset class="prj-fieldset prj-span-all" id="bid-vat">
+                <legend i18n="@@bidWorkspace.vatLegend">VAT basis</legend>
+                <p class="prj-hint" i18n="@@bidWorkspace.vatAsked">
+                  The tender asks for prices {{ vatLabel(basis.treatment) }}
+                  @if (basis.vatRatePercent) {
+                    (<bdi dir="ltr">{{ basis.vatRatePercent }}%</bdi>)
+                  }
+                  .
+                </p>
+                <label class="tnd-choice">
+                  <input
+                    type="radio"
+                    name="vatConfirmed"
+                    value="yes"
+                    [disabled]="!editable()"
+                    [(ngModel)]="form.vatConfirmed"
+                    (ngModelChange)="edited()"
+                  />
+                  <span i18n="@@bidWorkspace.vatConfirm">My prices are on this basis</span>
+                </label>
+                <label class="tnd-choice">
+                  <input
+                    type="radio"
+                    name="vatConfirmed"
+                    value="no"
+                    [disabled]="!editable()"
+                    [(ngModel)]="form.vatConfirmed"
+                    (ngModelChange)="edited()"
+                  />
+                  <span i18n="@@bidWorkspace.vatDeviate">My prices are on another basis</span>
+                </label>
+                @if (form.vatConfirmed === 'no') {
+                  <div class="prj-grid">
+                    <div class="prj-field">
+                      <label for="bid-vat-treatment" i18n="@@bidWorkspace.vatTreatment"
+                        >My VAT treatment</label
+                      >
+                      <select
+                        id="bid-vat-treatment"
+                        name="vatTreatment"
+                        [disabled]="!editable()"
+                        [(ngModel)]="form.vatTreatment"
+                        (ngModelChange)="edited()"
+                      >
+                        <option value="" disabled i18n="@@bidWorkspace.chooseVat">Choose</option>
+                        @for (treatment of vatTreatments; track treatment) {
+                          <option [value]="treatment">{{ vatLabel(treatment) }}</option>
+                        }
+                      </select>
+                    </div>
+                    @if (form.vatTreatment && form.vatTreatment !== 'NotApplicable') {
+                      <div class="prj-field">
+                        <label for="bid-vat-rate" i18n="@@bidWorkspace.vatRate"
+                          >VAT rate in my prices (%)</label
+                        >
+                        <input
+                          id="bid-vat-rate"
+                          name="vatRatePercent"
+                          dir="ltr"
+                          inputmode="decimal"
+                          [disabled]="!editable()"
+                          [(ngModel)]="form.vatRatePercent"
+                          (ngModelChange)="edited()"
+                        />
+                      </div>
+                    }
+                  </div>
+                }
+              </fieldset>
+            }
+            @if (invitation().terms; as asked) {
+              <fieldset class="prj-fieldset prj-span-all" id="bid-terms">
+                <legend i18n="@@bidWorkspace.termsLegend">Requested commercial terms</legend>
+                <p class="prj-hint" i18n="@@bidWorkspace.termsHint">
+                  Answer each requested term. A different value is a deviation the buyer compares
+                  side by side; percentages have at most two decimals.
+                </p>
+                <div class="prj-grid">
+                  @if (asked.retentionPercent !== null) {
+                    <div class="prj-field">
+                      <label for="bid-retention" i18n="@@bidWorkspace.retention"
+                        >Retention (%) — requested {{ asked.retentionPercent }}%</label
+                      >
+                      <input
+                        id="bid-retention"
+                        name="retentionPercent"
+                        dir="ltr"
+                        inputmode="decimal"
+                        [disabled]="!editable()"
+                        [(ngModel)]="form.retentionPercent"
+                        (ngModelChange)="edited()"
+                      />
+                    </div>
+                  }
+                  @if (asked.advancePaymentPercent !== null) {
+                    <div class="prj-field">
+                      <label for="bid-advance" i18n="@@bidWorkspace.advance"
+                        >Advance payment (%) — requested {{ asked.advancePaymentPercent }}%</label
+                      >
+                      <input
+                        id="bid-advance"
+                        name="advancePaymentPercent"
+                        dir="ltr"
+                        inputmode="decimal"
+                        [disabled]="!editable()"
+                        [(ngModel)]="form.advancePaymentPercent"
+                        (ngModelChange)="edited()"
+                      />
+                    </div>
+                  }
+                  @if (asked.performanceSecurityPercent !== null) {
+                    <div class="prj-field">
+                      <label for="bid-security" i18n="@@bidWorkspace.security"
+                        >Performance security (%) — requested
+                        {{ asked.performanceSecurityPercent }}%</label
+                      >
+                      <input
+                        id="bid-security"
+                        name="performanceSecurityPercent"
+                        dir="ltr"
+                        inputmode="decimal"
+                        [disabled]="!editable()"
+                        [(ngModel)]="form.performanceSecurityPercent"
+                        (ngModelChange)="edited()"
+                      />
+                    </div>
+                  }
+                  @if (asked.bidBondRequired) {
+                    <div class="prj-field" role="radiogroup" aria-labelledby="bid-bond-label">
+                      <span id="bid-bond-label" i18n="@@bidWorkspace.bidBond"
+                        >A bid bond is required. I provide one:</span
+                      >
+                      <label class="tnd-choice">
+                        <input
+                          type="radio"
+                          name="bidBondProvided"
+                          value="yes"
+                          [disabled]="!editable()"
+                          [(ngModel)]="form.bidBondProvided"
+                          (ngModelChange)="edited()"
+                        />
+                        <span i18n="@@terms.yes">Yes</span>
+                      </label>
+                      <label class="tnd-choice">
+                        <input
+                          type="radio"
+                          name="bidBondProvided"
+                          value="no"
+                          [disabled]="!editable()"
+                          [(ngModel)]="form.bidBondProvided"
+                          (ngModelChange)="edited()"
+                        />
+                        <span i18n="@@terms.no">No</span>
+                      </label>
+                    </div>
+                  }
+                </div>
+              </fieldset>
+            }
+            <div class="prj-field prj-span-all">
+              <label for="bid-payment" i18n="@@bidField.paymentTerms">Payment terms</label>
+              <textarea
+                id="bid-payment"
+                rows="3"
+                [attr.maxlength]="limits.paymentTerms"
+                [disabled]="!editable()"
+                [(ngModel)]="form.paymentTerms"
+                [ngModelOptions]="{ standalone: true }"
+                (ngModelChange)="edited()"
+              ></textarea>
+            </div>
+          </div>
+
+          <ng-container
+            *ngTemplateOutlet="
+              listEditor;
+              context: { field: 'exclusions', title: fieldLabel('exclusions') }
+            "
+          />
+          <ng-container
+            *ngTemplateOutlet="
+              listEditor;
+              context: { field: 'commercialDeviations', title: fieldLabel('commercialDeviations') }
+            "
+          />
+          <div class="prj-field">
+            <label for="bid-commercial-notes" i18n="@@bidField.commercialNotes"
+              >Commercial notes</label
+            >
+            <textarea
+              id="bid-commercial-notes"
+              rows="3"
+              [attr.maxlength]="limits.notes"
+              [disabled]="!editable()"
+              [(ngModel)]="form.commercialNotes"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="edited()"
+            ></textarea>
+          </div>
+        </fieldset>
+      </section>
+    }
+
+    @if (drafting() && step() === 'technical') {
+      <section class="bw-panel" aria-labelledby="bid-step-technical">
+        <h3 id="bid-step-technical" tabindex="-1" i18n="@@bidWorkspace.technicalTitle">
+          Technical response
+        </h3>
+        @if (technicalLocked()) {
+          <p class="prj-hint" role="note" i18n="@@bidWorkspace.notInScope">
+            Not open for revision in this round: these answers stay as in your offer in force.
+          </p>
+        }
+        <fieldset class="bw-scope-lock" [disabled]="technicalLocked()">
+          <fieldset class="prj-fieldset">
+            <legend i18n="@@bidField.scopeCompliance">Scope compliance</legend>
+            <label class="bw-choice">
+              <input
+                type="radio"
+                name="bid-scope"
+                [disabled]="!editable()"
+                [checked]="form.scopeCompliance === 'Full'"
+                (change)="form.scopeCompliance = 'Full'; edited()"
+              />
+              <span i18n="@@bidWorkspace.scopeFull">Our bid covers the full scope as issued</span>
+            </label>
+            <label class="bw-choice">
+              <input
+                type="radio"
+                name="bid-scope"
+                [disabled]="!editable()"
+                [checked]="form.scopeCompliance === 'WithDeviations'"
+                (change)="form.scopeCompliance = 'WithDeviations'; edited()"
+              />
+              <span i18n="@@bidWorkspace.scopeDeviations"
+                >Our bid departs from the scope (listed as exclusions or deviations)</span
+              >
+            </label>
+          </fieldset>
+          <div class="prj-field">
+            <label for="bid-approach"
+              ><ng-container i18n="@@bidField.technicalApproach"
+                >Technical approach and methodology</ng-container
+              >
+              @if (invitation().technicalProposalRequired) {
+                &ngsp;<span class="prj-hint" i18n="@@bidWorkspace.requiredMark">(required)</span>
+              }
+            </label>
+            <textarea
+              id="bid-approach"
+              rows="8"
+              [attr.maxlength]="limits.technicalApproach"
+              [disabled]="!editable()"
+              [(ngModel)]="form.technicalApproach"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="edited()"
+              [attr.aria-required]="invitation().technicalProposalRequired ? 'true' : null"
+              aria-describedby="bid-approach-hint"
+            ></textarea>
+            <span id="bid-approach-hint" class="prj-hint" i18n="@@bidWorkspace.approachHint"
+              >How you will deliver the scope: resources, sequence, key equipment and quality
+              control. Attach a full method statement in Files if the tender asks for one.</span
+            >
+          </div>
+          <ng-container
+            *ngTemplateOutlet="
+              listEditor;
+              context: { field: 'technicalDeviations', title: fieldLabel('technicalDeviations') }
+            "
+          />
+          <div class="prj-field">
+            <label for="bid-technical-notes" i18n="@@bidField.technicalNotes"
+              >Technical notes</label
+            >
+            <textarea
+              id="bid-technical-notes"
+              rows="3"
+              [attr.maxlength]="limits.notes"
+              [disabled]="!editable()"
+              [(ngModel)]="form.technicalNotes"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="edited()"
+            ></textarea>
+          </div>
+        </fieldset>
+      </section>
+    }
+
+    @if (drafting() && step() === 'files') {
+      <section class="bw-panel" aria-labelledby="bid-step-files">
+        <h3 id="bid-step-files" tabindex="-1" i18n="@@bidWorkspace.filesTitle">Supporting files</h3>
+        <p class="prj-hint" i18n="@@bidWorkspace.filesHint">
+          Files support your structured answers; they do not replace them. Up to
+          {{ current.maxAttachments }} files, {{ size(current.maxAttachmentBytes) }} each. Files are
+          checked by type and size and scanned for malware; a file is shared only once the scanner
+          finds it clean, and a flagged file is refused so you can upload a clean copy.
+        </p>
+        @for (label of requiredDocuments(); track label; let index = $index) {
+          <ng-container
+            *ngTemplateOutlet="fileGroup; context: { requirement: label, index: index }"
+          />
+        }
+        <ng-container *ngTemplateOutlet="fileGroup; context: { requirement: null, index: -1 }" />
+      </section>
+    }
+
+    @if (current.status === 'Submitted' || step() === 'review') {
+      <section class="bw-panel" aria-labelledby="bid-step-review">
+        <h3 id="bid-step-review" tabindex="-1">
+          @if (current.status === 'Submitted') {
+            <ng-container i18n="@@bidWorkspace.submittedContent">What you submitted</ng-container>
+          } @else {
+            <ng-container i18n="@@bidWorkspace.reviewTitle">Review before submitting</ng-container>
+          }
+        </h3>
+        @if (drafting()) {
+          @if (gapMessages().length) {
+            <div class="bw-gaps" role="region" aria-labelledby="bw-gaps-title">
+              <h4 id="bw-gaps-title" i18n="@@bidWorkspace.gapsTitle">
+                Still needed before you can submit
+              </h4>
+              <ul>
+                @for (item of gapMessages(); track $index) {
+                  <li>
+                    {{ item.text }}&ngsp;
+                    <button class="bw-link" type="button" (click)="goTo(item.step)">
+                      <ng-container i18n="@@bidWorkspace.fixIt">Go to this section</ng-container
+                      >&ngsp;<span class="prj-visually-hidden">{{ item.text }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+          @if (clientErrors().length) {
+            <div class="bw-gaps" role="region" aria-labelledby="bw-errors-title">
+              <h4 id="bw-errors-title" i18n="@@bidWorkspace.errorsTitle">
+                Correct these entries (they are not saved yet)
+              </h4>
+              <ul>
+                @for (error of clientErrors(); track error.key) {
+                  <li>
+                    {{ error.text }}&ngsp;
+                    <button class="bw-link" type="button" (click)="goTo(error.step)">
+                      <ng-container i18n="@@bidWorkspace.fixIt">Go to this section</ng-container
+                      >&ngsp;<span class="prj-visually-hidden">{{ error.text }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+          @if (!gapMessages().length && !clientErrors().length && saveState() === 'saved') {
+            <p class="prj-note" role="status" i18n="@@bidWorkspace.complete">
+              Everything the tender asks for is in your bid.
+            </p>
+          }
+        }
+        <dl class="bw-facts">
+          <div>
+            <dt i18n="@@tenderField.title">Title</dt>
+            <dd>
+              <bdi dir="ltr" class="bw-code">{{ invitation().reference }}</bdi> ·
+              <bdi>{{ invitation().title }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidWorkspace.bidder">Bidder</dt>
+            <dd>
+              <bdi>{{ invitation().subcontractorName }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.totalAmount">Total bid amount</dt>
+            <dd>
+              @if (form.totalAmount) {
+                <bdi dir="ltr" class="bw-amount">{{ form.totalAmount }} {{ currency() }}</bdi>
+              } @else {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.validityDays">Bid validity</dt>
+            <dd>{{ form.validityDays || '—' }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.durationDays">Proposed duration</dt>
+            <dd>{{ form.durationDays || '—' }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.warrantyMonths">Warranty</dt>
+            <dd>{{ form.warrantyMonths || '—' }}</dd>
+          </div>
+          <div class="bw-facts__wide">
+            <dt i18n="@@bidField.paymentTerms">Payment terms</dt>
+            <dd class="bw-prewrap">
+              <bdi>{{ form.paymentTerms || '—' }}</bdi>
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.scopeCompliance">Scope compliance</dt>
+            <dd>
+              @switch (form.scopeCompliance) {
+                @case ('Full') {
+                  <ng-container i18n="@@bidWorkspace.scopeFull"
+                    >Our bid covers the full scope as issued</ng-container
+                  >
+                }
+                @case ('WithDeviations') {
+                  <ng-container i18n="@@bidWorkspace.scopeDeviations"
+                    >Our bid departs from the scope (listed as exclusions or
+                    deviations)</ng-container
+                  >
+                }
+                @default {
+                  —
+                }
+              }
+            </dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.exclusions">Exclusions</dt>
+            <dd>{{ filled(form.exclusions).length }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.commercialDeviations">Commercial deviations</dt>
+            <dd>{{ filled(form.commercialDeviations).length }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.technicalDeviations">Technical deviations</dt>
+            <dd>{{ filled(form.technicalDeviations).length }}</dd>
+          </div>
+          <div>
+            <dt i18n="@@bidField.technicalApproach">Technical approach and methodology</dt>
+            <dd>
+              @if (form.technicalApproach.trim()) {
+                <ng-container i18n="@@bidWorkspace.provided">Provided</ng-container>
+              } @else {
+                <ng-container i18n="@@bidWorkspace.notProvided">Not provided</ng-container>
+              }
+            </dd>
+          </div>
+        </dl>
+        @if (form.lines.length) {
+          <div class="prj-table-wrap">
+            <table class="prj-table">
+              <caption i18n="@@bidField.lines">
+                Price breakdown
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col" i18n="@@bidField.lineDescription">Breakdown item</th>
+                  <th scope="col" class="prj-numeric" i18n="@@bidField.lineAmount">
+                    Breakdown amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of form.lines; track $index; let index = $index) {
+                  <tr>
+                    <td>{{ index + 1 }}</td>
+                    <td>
+                      <bdi>{{ line.description }}</bdi>
+                    </td>
+                    <td class="prj-numeric">
+                      <bdi dir="ltr" class="bw-amount">{{ line.amount }} {{ currency() }}</bdi>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        @for (field of ['exclusions', 'commercialDeviations', 'technicalDeviations']; track field) {
+          @if (filled($any(form)[field]).length) {
+            <h4>{{ fieldLabel(field) }}</h4>
+            <ul class="bw-list">
+              @for (item of filled($any(form)[field]); track $index) {
+                <li class="bw-prewrap">
+                  <bdi>{{ item }}</bdi>
+                </li>
+              }
+            </ul>
+          }
+        }
+        <h4 i18n="@@bidWorkspace.files">Files</h4>
+        @if (
+          (current.status === 'Submitted' ? current.submittedAttachments : attachments()).length
+        ) {
+          <ul class="bw-files" role="list">
+            @for (
+              file of current.status === 'Submitted' ? current.submittedAttachments : attachments();
+              track file.id
+            ) {
+              <li>
+                <span class="bw-file-icon" aria-hidden="true">▤</span>
+                <bdi class="bw-file-name">{{ file.fileName }}</bdi>
+                <span class="prj-hint"
+                  ><bdi>{{ size(file.sizeBytes) }}</bdi>
+                  @if (file.requirementLabel) {
+                    · <bdi>{{ file.requirementLabel }}</bdi>
+                  }
+                </span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p i18n="@@bidWorkspace.noFiles">No files attached.</p>
+        }
+
+        @if (drafting()) {
+          <div class="bw-submit" aria-labelledby="bw-submit-title" role="group">
+            <h4 id="bw-submit-title" i18n="@@bidWorkspace.submitTitle">Submit your bid</h4>
+            <p class="prj-hint" i18n="@@bidWorkspace.submitHelp">
+              Saving keeps a private draft that only your company sees. Submitting sends this exact
+              bid to the buyer as your formal offer and it can no longer be changed here.
+            </p>
+            <label class="bw-choice">
+              <input
+                type="checkbox"
+                [disabled]="!editable()"
+                [checked]="confirmChecked()"
+                (change)="confirmChecked.set($any($event.target).checked); submitError.set('')"
+                aria-describedby="bw-confirm-hint"
+              />
+              @if (round()) {
+                <span i18n="@@bidWorkspace.roundConfirmBox"
+                  >I confirm this revised response is complete and I am authorised to submit it for
+                  <bdi>{{ invitation().subcontractorName }}</bdi
+                  >.</span
+                >
+              } @else {
+                <span i18n="@@bidWorkspace.confirmBox"
+                  >I confirm this bid is complete and I am authorised to submit it for
+                  <bdi>{{ invitation().subcontractorName }}</bdi
+                  >.</span
+                >
+              }
+            </label>
+            <span id="bw-confirm-hint" class="prj-hint" i18n="@@bidWorkspace.confirmHint"
+              >The server checks the deadline again at the moment you submit.</span
+            >
+            @if (current.receiptRecipient) {
+              <span class="prj-hint tnd-block" i18n="@@bidWorkspace.receiptRecipient"
+                >A receipt with the bid reference and fingerprint (no prices) is emailed to
+                <bdi dir="ltr">{{ current.receiptRecipient }}</bdi
+                >.</span
+              >
+            }
+            @if (submitError()) {
+              <p id="bid-submit-error" class="prj-note prj-note--error" role="alert" tabindex="-1">
+                {{ submitError() }}
+              </p>
+            }
+            <div class="prj-actions">
+              <button
+                class="prj-btn"
+                type="button"
+                [disabled]="!canSubmit()"
+                (click)="openConfirmation()"
+                i18n="@@bidWorkspace.submit"
+              >
+                Submit bid
+              </button>
+            </div>
+            @if (!canSubmit() && editable()) {
+              <p class="prj-hint" i18n="@@bidWorkspace.submitBlocked">
+                Submitting is available once everything above is complete and your latest changes
+                are saved.
+              </p>
+            }
+          </div>
+        }
+      </section>
+    }
+
+    @if (confirmingLeave()) {
+      <div class="prj-note prj-note--error" role="alert" id="bw-leave" tabindex="-1">
+        <p i18n="@@bidWorkspace.leaveWarning">
+          Some of your latest changes are not saved (a field needs correcting, a save failed, the
+          bid was changed elsewhere or a file is still uploading). If you leave now they are lost.
+        </p>
+        <div class="prj-actions">
+          <button
+            class="prj-btn prj-btn--danger"
+            type="button"
+            (click)="leaveAnyway()"
+            i18n="@@bidWorkspace.leaveAnyway"
+          >
+            Leave without saving
+          </button>
+          <button
+            class="prj-btn prj-btn--ghost"
+            type="button"
+            (click)="confirmingLeave.set(false)"
+            i18n="@@bidWorkspace.stay"
+          >
+            Stay and fix
+          </button>
+        </div>
+      </div>
+    }
+
+    <div class="bw-actions">
+      <button class="prj-btn prj-btn--ghost" type="button" (click)="requestBack()">
+        @if (round()) {
+          <ng-container i18n="@@round.backToRound">Back to the round</ng-container>
+        } @else {
+          <ng-container i18n="@@bidWorkspace.back">Back to the invitation</ng-container>
+        }
+      </button>
+      @if (drafting() && editable()) {
+        <button
+          class="prj-btn prj-btn--ghost"
+          type="button"
+          [disabled]="saveState() === 'saving' || saveState() === 'conflict'"
+          (click)="save()"
+          i18n="@@bidWorkspace.saveDraft"
+        >
+          Save draft
+        </button>
+      }
+    </div>
+
+    @if (confirming()) {
+      <app-confirm-dialog
+        heading="Submit your bid?"
+        i18n-heading="@@bidWorkspace.confirmTitle"
+        confirmLabel="Submit bid now"
+        i18n-confirmLabel="@@bidWorkspace.confirmAction"
+        [busy]="submitting()"
+        (confirmed)="submit()"
+        (cancelled)="confirming.set(false)"
+      >
+        <p i18n="@@bidWorkspace.confirmBody">
+          Your bid of
+          <bdi dir="ltr" class="bw-amount">{{ form.totalAmount }} {{ currency() }}</bdi>
+          and its attached files will be sent to
+          <bdi>{{ invitation().buyerCompanyName }}</bdi> for tender
+          <bdi dir="ltr">{{ invitation().reference }}</bdi
+          >. After submission it cannot be changed here.
+        </p>
+        @if (round(); as number) {
+          <p i18n="@@bidWorkspace.roundConfirmBody">
+            It becomes your response to round {{ number }} and replaces your earlier offer as the
+            one in force. Your earlier submission is kept unchanged.
+          </p>
+        } @else {
+          <p i18n="@@bidWorkspace.confirmRevision">
+            It answers tender revision {{ currentTenderRevision() }}, the version you reviewed.
+          </p>
+        }
+      </app-confirm-dialog>
+    }
+  </section>
+}
+
+<ng-template #listEditor let-field="field" let-title="title">
+  <fieldset class="prj-fieldset">
+    <legend>{{ title }}</legend>
+    @if ($any(form)[field].length === 0) {
+      <p class="prj-hint" i18n="@@bidWorkspace.listEmpty">None listed.</p>
+    }
+    @for (item of $any(form)[field]; track trackIndex($index); let index = $index) {
+      <div class="bw-item">
+        <label class="prj-visually-hidden" [for]="'bid-' + field + '-' + index"
+          >{{ title }} {{ index + 1 }}</label
+        >
+        <textarea
+          [id]="'bid-' + field + '-' + index"
+          rows="2"
+          [attr.maxlength]="limits.listItem"
+          [disabled]="!editable()"
+          [ngModel]="item"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="$any(form)[field][index] = $event; edited()"
+        ></textarea>
+        @if (editable()) {
+          <button class="prj-btn prj-btn--ghost" type="button" (click)="removeItem(field, index)">
+            <ng-container i18n="@@bidWorkspace.removeEntry">Remove</ng-container>&ngsp;
+            <span class="prj-visually-hidden">{{ title }} {{ index + 1 }}</span>
+          </button>
+        }
+      </div>
+    }
+    @if (editable()) {
+      <button
+        class="prj-btn prj-btn--ghost"
+        type="button"
+        [id]="'bid-add-' + field"
+        [disabled]="$any(form)[field].length >= limits.listItems"
+        (click)="addItem(field)"
+      >
+        <ng-container i18n="@@bidWorkspace.addEntry">Add an entry</ng-container>&ngsp;
+        <span class="prj-visually-hidden">{{ title }}</span>
+      </button>
+    }
+  </fieldset>
+</ng-template>
+
+<ng-template #fileGroup let-requirement="requirement" let-index="index">
+  <div class="bw-file-group" role="group" [attr.aria-labelledby]="'bid-file-group-' + index">
+    <h4 [id]="'bid-file-group-' + index">
+      @if (requirement) {
+        <bdi>{{ requirement }}</bdi
+        >&ngsp;<span class="prj-hint" i18n="@@bidWorkspace.requiredDocument"
+          >(required by the tender)</span
+        >
+      } @else {
+        <ng-container i18n="@@bidWorkspace.otherFiles">Other supporting files</ng-container>
+      }
+    </h4>
+    @if (filesFor(requirement).length) {
+      <ul class="bw-files" role="list">
+        @for (file of filesFor(requirement); track file.id) {
+          <li>
+            <span class="bw-file-icon" aria-hidden="true">▤</span>
+            <bdi class="bw-file-name">{{ file.fileName }}</bdi>
+            <span class="prj-hint"
+              ><bdi>{{ size(file.sizeBytes) }}</bdi></span
+            >
+            @if ((file.scanState ?? 'Clean') === 'Clean') {
+              <button class="bw-link" type="button" (click)="download(file)">
+                <ng-container i18n="@@bidder.download">Download</ng-container>&ngsp;
+                <span class="prj-visually-hidden"
+                  ><bdi>{{ file.fileName }}</bdi></span
+                >
+              </button>
+            } @else if (file.scanState === 'Infected') {
+              <span class="prj-error-text" i18n="@@bidWorkspace.fileWithheld"
+                >Flagged by the malware scanner — remove it and upload a clean copy</span
+              >
+            } @else {
+              <span class="prj-hint" role="status" i18n="@@bidWorkspace.fileScanning"
+                >Being scanned for malware</span
+              >
+            }
+            @if (editable()) {
+              <button class="bw-link" type="button" (click)="remove(file)">
+                <ng-container i18n="@@bidWorkspace.removeEntry">Remove</ng-container>&ngsp;
+                <span class="prj-visually-hidden"
+                  ><bdi>{{ file.fileName }}</bdi></span
+                >
+              </button>
+            }
+          </li>
+        }
+      </ul>
+    } @else if (requirement) {
+      <p class="prj-hint" i18n="@@bidWorkspace.nothingAttached">Nothing attached yet.</p>
+    }
+    @for (item of uploadsFor(requirement); track item.key) {
+      <div class="bw-upload" [attr.data-state]="item.state">
+        <bdi class="bw-file-name">{{ item.file.name }}</bdi>
+        @if (item.state === 'waiting') {
+          <span role="status" i18n="@@bidWorkspace.waiting">Waiting to upload</span>
+        } @else if (item.state === 'uploading') {
+          <progress max="100" [value]="item.progress" [attr.aria-label]="item.file.name"></progress>
+          <!-- The start is announced once; the progress bar carries the changing value. -->
+          <span role="status" i18n="@@bidWorkspace.uploading">Uploading</span>&ngsp;<bdi
+            dir="ltr"
+            aria-hidden="true"
+            >{{ item.progress }}%</bdi
+          >
+        } @else {
+          <span class="prj-error-text" role="alert">{{ item.message }}</span>
+          @if (item.retryable) {
+            <button
+              class="bw-link"
+              type="button"
+              (click)="retry(item)"
+              i18n="@@bidWorkspace.retryUpload"
+            >
+              Retry
+            </button>
+          }
+          <button
+            class="bw-link"
+            type="button"
+            (click)="dismiss(item)"
+            i18n="@@bidWorkspace.dismiss"
+          >
+            Dismiss
+          </button>
+        }
+      </div>
+    }
+    @if (editable()) {
+      <div class="prj-field">
+        <label [for]="'bid-file-input-' + index">
+          @if (requirement) {
+            <ng-container i18n="@@bidWorkspace.chooseFileForDocument"
+              >Upload a file for: <bdi>{{ requirement }}</bdi></ng-container
+            >
+          } @else {
+            <ng-container i18n="@@bidWorkspace.chooseFile">Upload supporting files</ng-container>
+          }
+        </label>
+        <input
+          [id]="'bid-file-input-' + index"
+          type="file"
+          [multiple]="!requirement"
+          [accept]="bid()?.allowedExtensions?.join(',') ?? ''"
+          (change)="upload($any($event.target), requirement)"
+        />
+      </div>
+    }
+  </div>
+</ng-template>

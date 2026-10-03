@@ -1,0 +1,12 @@
+@use 'intelligence-common';
+
+.intel-sub {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+h4 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.95rem;
+}
